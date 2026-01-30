@@ -10,7 +10,8 @@ import {
   Send, 
   Inbox,
   Loader2,
-  Trophy
+  Trophy,
+  Target
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,6 +22,16 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Challenge {
   id: string;
@@ -28,6 +39,7 @@ interface Challenge {
   message: string | null;
   expires_at: string;
   created_at: string;
+  match_id: string | null;
   challenger_team: {
     id: string;
     name: string;
@@ -52,8 +64,14 @@ export default function Challenges() {
   const [userTeam, setUserTeam] = useState<UserTeam | null>(null);
   const [incomingChallenges, setIncomingChallenges] = useState<Challenge[]>([]);
   const [outgoingChallenges, setOutgoingChallenges] = useState<Challenge[]>([]);
+  const [acceptedChallenges, setAcceptedChallenges] = useState<Challenge[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
+  const [scoreDialogOpen, setScoreDialogOpen] = useState(false);
+  const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
+  const [myScore, setMyScore] = useState("");
+  const [opponentScore, setOpponentScore] = useState("");
+  const [isSubmittingScore, setIsSubmittingScore] = useState(false);
 
   const fetchUserTeam = async () => {
     if (!user) return null;
@@ -98,6 +116,7 @@ export default function Challenges() {
         message,
         expires_at,
         created_at,
+        match_id,
         challenger_team_id,
         challenged_team_id
       `)
@@ -116,14 +135,34 @@ export default function Challenges() {
         message,
         expires_at,
         created_at,
+        match_id,
         challenger_team_id,
         challenged_team_id
       `)
       .eq("challenger_team_id", teamId)
-      .in("status", ["pending", "accepted", "declined"])
+      .in("status", ["pending", "declined"])
       .order("created_at", { ascending: false });
 
     if (outError) console.error("Error fetching outgoing:", outError);
+
+    // Fetch accepted challenges (both incoming and outgoing)
+    const { data: accepted, error: accError } = await supabase
+      .from("challenges")
+      .select(`
+        id,
+        status,
+        message,
+        expires_at,
+        created_at,
+        match_id,
+        challenger_team_id,
+        challenged_team_id
+      `)
+      .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+      .eq("status", "accepted")
+      .order("created_at", { ascending: false });
+
+    if (accError) console.error("Error fetching accepted:", accError);
 
     // Get all team IDs
     const allTeamIds = [
@@ -131,6 +170,8 @@ export default function Challenges() {
       ...(incoming?.map(c => c.challenged_team_id) || []),
       ...(outgoing?.map(c => c.challenger_team_id) || []),
       ...(outgoing?.map(c => c.challenged_team_id) || []),
+      ...(accepted?.map(c => c.challenger_team_id) || []),
+      ...(accepted?.map(c => c.challenged_team_id) || []),
     ].filter(Boolean);
 
     // Fetch team names
@@ -154,6 +195,7 @@ export default function Challenges() {
       message: c.message,
       expires_at: c.expires_at,
       created_at: c.created_at,
+      match_id: c.match_id,
       challenger_team: teamsMap.get(c.challenger_team_id) || null,
       challenged_team: teamsMap.get(c.challenged_team_id) || null,
       challenger_rank: ranksMap.get(c.challenger_team_id) || null,
@@ -162,6 +204,7 @@ export default function Challenges() {
 
     setIncomingChallenges((incoming || []).map(mapChallenge));
     setOutgoingChallenges((outgoing || []).map(mapChallenge));
+    setAcceptedChallenges((accepted || []).map(mapChallenge));
   };
 
   useEffect(() => {
@@ -183,20 +226,56 @@ export default function Challenges() {
     setRespondingTo(challengeId);
 
     try {
-      const { error } = await supabase
-        .from("challenges")
-        .update({
-          status: accept ? "accepted" : "declined",
-          responded_at: new Date().toISOString(),
-        })
-        .eq("id", challengeId);
+      if (accept) {
+        // Get challenge details
+        const { data: challenge } = await supabase
+          .from("challenges")
+          .select("challenger_team_id, challenged_team_id")
+          .eq("id", challengeId)
+          .single();
 
-      if (error) throw error;
+        if (!challenge) throw new Error("Challenge not found");
+
+        // Create a match record
+        const { data: match, error: matchError } = await supabase
+          .from("matches")
+          .insert({
+            challenger_team_id: challenge.challenger_team_id,
+            challenged_team_id: challenge.challenged_team_id,
+            status: "pending",
+          })
+          .select()
+          .single();
+
+        if (matchError) throw matchError;
+
+        // Update challenge with match_id
+        const { error: updateError } = await supabase
+          .from("challenges")
+          .update({
+            status: "accepted",
+            responded_at: new Date().toISOString(),
+            match_id: match.id,
+          })
+          .eq("id", challengeId);
+
+        if (updateError) throw updateError;
+      } else {
+        const { error } = await supabase
+          .from("challenges")
+          .update({
+            status: "declined",
+            responded_at: new Date().toISOString(),
+          })
+          .eq("id", challengeId);
+
+        if (error) throw error;
+      }
 
       toast({
         title: accept ? "Challenge accepted!" : "Challenge declined",
         description: accept
-          ? "The match has been scheduled. Good luck!"
+          ? "Record the match result when you've played."
           : "The challenge has been declined.",
       });
 
@@ -244,6 +323,130 @@ export default function Challenges() {
     }
   };
 
+  const openScoreDialog = (challenge: Challenge) => {
+    setSelectedChallenge(challenge);
+    setMyScore("");
+    setOpponentScore("");
+    setScoreDialogOpen(true);
+  };
+
+  const handleSubmitScore = async () => {
+    if (!selectedChallenge || !userTeam) return;
+    
+    const myScoreNum = parseInt(myScore);
+    const opponentScoreNum = parseInt(opponentScore);
+    
+    if (isNaN(myScoreNum) || isNaN(opponentScoreNum) || myScoreNum < 0 || opponentScoreNum < 0) {
+      toast({
+        title: "Invalid scores",
+        description: "Please enter valid positive numbers for both scores.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmittingScore(true);
+
+    try {
+      const isChallenger = selectedChallenge.challenger_team?.id === userTeam.id;
+      const challengerScore = isChallenger ? myScoreNum : opponentScoreNum;
+      const challengedScore = isChallenger ? opponentScoreNum : myScoreNum;
+      
+      const winnerId = challengerScore > challengedScore 
+        ? selectedChallenge.challenger_team?.id 
+        : selectedChallenge.challenged_team?.id;
+      const loserId = challengerScore > challengedScore 
+        ? selectedChallenge.challenged_team?.id 
+        : selectedChallenge.challenger_team?.id;
+
+      // Update the match
+      const { error: matchError } = await supabase
+        .from("matches")
+        .update({
+          challenger_score: challengerScore,
+          challenged_score: challengedScore,
+          winner_team_id: winnerId,
+          status: "completed",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", selectedChallenge.match_id);
+
+      if (matchError) throw matchError;
+
+      // Update ladder rankings
+      // Get current rankings
+      const { data: rankings } = await supabase
+        .from("ladder_rankings")
+        .select("*")
+        .in("team_id", [winnerId, loserId].filter(Boolean));
+
+      if (rankings) {
+        const winnerRanking = rankings.find(r => r.team_id === winnerId);
+        const loserRanking = rankings.find(r => r.team_id === loserId);
+
+        if (winnerRanking && loserRanking) {
+          // Update winner's stats
+          await supabase
+            .from("ladder_rankings")
+            .update({
+              wins: winnerRanking.wins + 1,
+              streak: winnerRanking.streak >= 0 ? winnerRanking.streak + 1 : 1,
+              last_match_at: new Date().toISOString(),
+              points: winnerRanking.points + 25,
+            })
+            .eq("id", winnerRanking.id);
+
+          // Update loser's stats
+          await supabase
+            .from("ladder_rankings")
+            .update({
+              losses: loserRanking.losses + 1,
+              streak: loserRanking.streak <= 0 ? loserRanking.streak - 1 : -1,
+              last_match_at: new Date().toISOString(),
+              points: Math.max(0, loserRanking.points - 10),
+            })
+            .eq("id", loserRanking.id);
+
+          // Swap ranks if lower-ranked team won (challenger upset)
+          if (winnerRanking.rank > loserRanking.rank) {
+            await supabase
+              .from("ladder_rankings")
+              .update({ rank: loserRanking.rank })
+              .eq("id", winnerRanking.id);
+
+            await supabase
+              .from("ladder_rankings")
+              .update({ rank: winnerRanking.rank })
+              .eq("id", loserRanking.id);
+          }
+        }
+      }
+
+      // Mark challenge as completed by setting status to a completed state (via match completion)
+      // The challenge itself stays accepted, but now has a completed match
+
+      toast({
+        title: "Match recorded!",
+        description: `Score: ${challengerScore} - ${challengedScore}. Rankings updated.`,
+      });
+
+      setScoreDialogOpen(false);
+      setSelectedChallenge(null);
+
+      if (userTeam) {
+        await fetchChallenges(userTeam.id);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingScore(false);
+    }
+  };
+
   const formatTimeAgo = (dateStr: string) => {
     const date = new Date(dateStr);
     const now = new Date();
@@ -267,6 +470,13 @@ export default function Challenges() {
     if (diffDays > 0) return `${diffDays}d left`;
     if (diffHours > 0) return `${diffHours}h left`;
     return "< 1h left";
+  };
+
+  const getOpponentName = (challenge: Challenge) => {
+    if (!userTeam) return "Unknown";
+    return challenge.challenger_team?.id === userTeam.id 
+      ? challenge.challenged_team?.name 
+      : challenge.challenger_team?.name;
   };
 
   if (isLoading) {
@@ -333,7 +543,7 @@ export default function Challenges() {
             </Card>
           ) : (
             <Tabs defaultValue="incoming" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsList className="grid w-full grid-cols-3 mb-6">
                 <TabsTrigger value="incoming" className="relative">
                   <Inbox className="w-4 h-4 mr-2" />
                   Incoming
@@ -346,6 +556,15 @@ export default function Challenges() {
                 <TabsTrigger value="outgoing">
                   <Send className="w-4 h-4 mr-2" />
                   Outgoing
+                </TabsTrigger>
+                <TabsTrigger value="accepted" className="relative">
+                  <Target className="w-4 h-4 mr-2" />
+                  Active
+                  {acceptedChallenges.length > 0 && (
+                    <Badge variant="default" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs bg-accent">
+                      {acceptedChallenges.length}
+                    </Badge>
+                  )}
                 </TabsTrigger>
               </TabsList>
 
@@ -472,9 +691,7 @@ export default function Challenges() {
                                     </span>
                                     <Badge
                                       variant={
-                                        challenge.status === "accepted"
-                                          ? "default"
-                                          : challenge.status === "declined"
+                                        challenge.status === "declined"
                                           ? "destructive"
                                           : "secondary"
                                       }
@@ -508,10 +725,117 @@ export default function Challenges() {
                   )}
                 </AnimatePresence>
               </TabsContent>
+
+              <TabsContent value="accepted">
+                <AnimatePresence mode="popLayout">
+                  {acceptedChallenges.length === 0 ? (
+                    <Card className="text-center py-8">
+                      <CardContent>
+                        <Target className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+                        <p className="text-muted-foreground">No active matches to record</p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-3">
+                      {acceptedChallenges.map((challenge) => (
+                        <motion.div
+                          key={challenge.id}
+                          layout
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                        >
+                          <Card className="border-accent/30 bg-accent/5">
+                            <CardContent className="p-4">
+                              <div className="flex items-center justify-between gap-4">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <Swords className="w-4 h-4 text-accent" />
+                                    <span className="font-semibold text-foreground truncate">
+                                      vs {getOpponentName(challenge)}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      Accepted {formatTimeAgo(challenge.created_at)}
+                                    </span>
+                                    <Badge variant="default" className="text-xs bg-accent">
+                                      Ready to play
+                                    </Badge>
+                                  </div>
+                                </div>
+
+                                <Button
+                                  size="sm"
+                                  onClick={() => openScoreDialog(challenge)}
+                                >
+                                  <Trophy className="w-4 h-4 mr-2" />
+                                  Record Score
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </AnimatePresence>
+              </TabsContent>
             </Tabs>
           )}
         </motion.div>
       </main>
+
+      {/* Score Dialog */}
+      <Dialog open={scoreDialogOpen} onOpenChange={setScoreDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record Match Result</DialogTitle>
+            <DialogDescription>
+              Enter the final scores for your match against{" "}
+              <span className="font-semibold">{selectedChallenge ? getOpponentName(selectedChallenge) : ""}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="myScore">Your Score ({userTeam?.name})</Label>
+              <Input
+                id="myScore"
+                type="number"
+                min="0"
+                value={myScore}
+                onChange={(e) => setMyScore(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="opponentScore">Opponent Score</Label>
+              <Input
+                id="opponentScore"
+                type="number"
+                min="0"
+                value={opponentScore}
+                onChange={(e) => setOpponentScore(e.target.value)}
+                placeholder="0"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setScoreDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmitScore} disabled={isSubmittingScore}>
+              {isSubmittingScore ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Check className="w-4 h-4 mr-2" />
+              )}
+              Submit Score
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
