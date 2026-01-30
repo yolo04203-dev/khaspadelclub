@@ -237,15 +237,17 @@ export default function Dashboard() {
               </Card>
             </Link>
 
-            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Swords className="w-5 h-5 text-accent" />
-                  Challenge
-                </CardTitle>
-                <CardDescription>Challenge another player or team</CardDescription>
-              </CardHeader>
-            </Card>
+            <Link to="/challenges">
+              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Swords className="w-5 h-5 text-accent" />
+                    Challenges
+                  </CardTitle>
+                  <CardDescription>View and manage your ladder challenges</CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
 
             <Card className="hover:border-primary/50 transition-colors cursor-pointer">
               <CardHeader>
