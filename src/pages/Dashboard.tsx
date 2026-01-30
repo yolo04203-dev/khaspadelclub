@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LogOut, User, Trophy, Swords, Settings, Users, Plus } from "lucide-react";
+import { LogOut, User, Trophy, Swords, Settings, Users, Plus, Shuffle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -245,6 +245,30 @@ export default function Dashboard() {
                     Challenges
                   </CardTitle>
                   <CardDescription>View and manage your ladder challenges</CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+
+            <Link to="/americano">
+              <Card className="hover:border-success/50 transition-colors cursor-pointer h-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shuffle className="w-5 h-5 text-success" />
+                    Americano
+                  </CardTitle>
+                  <CardDescription>Rotating partners, point accumulation</CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+
+            <Link to="/tournaments">
+              <Card className="hover:border-warning/50 transition-colors cursor-pointer h-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-warning" />
+                    Tournaments
+                  </CardTitle>
+                  <CardDescription>Bracket-based competitions</CardDescription>
                 </CardHeader>
               </Card>
             </Link>
