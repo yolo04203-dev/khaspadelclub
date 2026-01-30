@@ -1,158 +1,180 @@
 
+# Plan: Make All Buttons and Cards Functional
 
-# Paddle Leaderboard Platform - Implementation Plan
+## Overview
+This plan addresses all non-functional buttons and cards across the application, creating new pages where needed and connecting existing elements to real functionality.
 
-## 🎯 Project Overview
-A digital competition platform for your sports academy with:
-- **Native Mobile App** (iOS & Android) for players and teams
-- **Web Admin Portal** for academy management
-- Clean & minimal design aesthetic with a modern, sporty identity
+## Changes Required
 
----
+### 1. Dashboard - Profile Card (Create Profile Page)
+**Current State**: Static card with no link
+**Solution**: Create a new `/profile` page where users can:
+- View and edit their display name
+- Upload an avatar
+- View their match history
+- Leave their current team
 
-## Phase 1: Foundation & Design System
-
-### Brand Identity Creation
-- Create a fresh, sporty logo and visual identity
-- Define color palette (clean, minimal with energetic accent colors)
-- Establish typography and UI component styling
-- Design system consistent across mobile app and web portal
-
-### Backend Setup (Supabase)
-- User authentication system (email/password, social login options)
-- Database structure for players, teams, matches, and rankings
-- Real-time data sync for leaderboard updates
-- Secure role-based access (players vs admins)
+**Files to Create/Modify**:
+- Create `src/pages/Profile.tsx`
+- Update `src/App.tsx` to add route
+- Update `src/pages/Dashboard.tsx` to link the Profile card
 
 ---
 
-## Phase 2: Web Admin Portal
+### 2. Dashboard - Admin Panel Card (Create Admin Page)
+**Current State**: Static card visible only to admins
+**Solution**: Create an `/admin` page with:
+- User management (view all players)
+- Team management 
+- Match result recording
+- Session/Tournament management
 
-### Dashboard & Overview
-- Quick stats: active players, pending matches, recent activity
-- Visual analytics and engagement metrics
-
-### Player Management
-- Add, edit, and view player profiles
-- Assign players to teams
-- Freeze/unfreeze player accounts
-- View individual player stats and history
-
-### Team Management
-- Create and manage team profiles
-- Assign teams to categories/divisions
-- Monitor team rankings and performance
-
-### Match & Results Management
-- Record match results (manual entry)
-- Approve/verify submitted results
-- View match history with filters
-
-### Rankings & Leaderboard Configuration
-- Configure ranking rules and point systems
-- Set challenge limits (e.g., challenge up to 5 ranks higher)
-- Manage multiple leaderboards per category/sport mode
-
-### Sports Mode Management
-- **Ladder Mode**: Configure ranking progression rules
-- **Americano Mode**: Set up casual play scoring
-- **Tournament Mode**: Create brackets, manage rounds
-
-### Engagement & Badges
-- Configure activity badges (Most Active, Consistent Player, Top Performer)
-- View player engagement analytics
-
-### Notifications Administration
-- Compose and send announcements
-- Configure notification triggers
+**Files to Create/Modify**:
+- Create `src/pages/Admin.tsx`
+- Update `src/App.tsx` to add route
+- Update `src/pages/Dashboard.tsx` to link the Admin card
 
 ---
 
-## Phase 3: Native Mobile App (iOS & Android)
+### 3. Dashboard - Stats Cards (Fetch Real Data)
+**Current State**: Shows hardcoded "0" values
+**Solution**: Fetch actual stats from the database:
+- Matches Played: Query `matches` table for user's team
+- Win Rate: Calculate from wins/losses
+- Pending Challenges: Query `challenges` table for pending incoming/outgoing
 
-### Onboarding & Authentication
-- Secure login/registration
-- Profile setup for players
-
-### Player Dashboard
-- Personal ranking and points display
-- Performance stats and match history
-- Activity badges earned
-
-### Leaderboard
-- Real-time rankings with filtering
-- Visual indicators for rank changes
-- Easy navigation to challenge opponents
-
-### Challenge System
-- View eligible teams to challenge (within rule limits)
-- Send and accept challenge requests
-- Track pending and upcoming matches
-
-### Match Flow
-- View scheduled matches
-- Submit match results
-- See results reflected in real-time ranking updates
-
-### Team Features
-- View team profile and members
-- Track team ranking and progress
-- Team-level notifications
-
-### Notifications
-- In-app alerts for challenges, results, announcements
-- Push notifications for important updates
-
-### Sports Modes
-- Switch between Ladder, Americano, and Tournament views
-- Mode-specific features and displays
+**Files to Modify**:
+- `src/pages/Dashboard.tsx` - Add queries and state for real stats
 
 ---
 
-## Phase 4: Advanced Features
+### 4. Landing Page - "View Demo" Button
+**Current State**: Button does nothing
+**Solution**: Either:
+- Option A: Navigate to `/leaderboard` to show a preview of the app
+- Option B: Open a video modal with a demo
+- **Recommended**: Navigate to `/leaderboard` as a live demo
 
-### Tournament System
-- View tournament brackets
-- Track knockout/round-robin progress
-- Register for upcoming events
-
-### Analytics Dashboard (Admin)
-- Detailed engagement reports
-- Player activity trends
-- Platform usage statistics
-
-### Badge & Achievement System
-- Automated badge awarding based on activity
-- Visual display of achievements in player profiles
+**Files to Modify**:
+- `src/components/landing/Hero.tsx` - Link button to `/leaderboard`
 
 ---
 
-## Technical Approach
+### 5. Landing Page - Footer Links
+**Current State**: All use `href="#"` placeholder
+**Solution**: 
+- Features, Sports Modes → Scroll to sections on landing page
+- Pricing → Create a pricing section or page
+- Help Center, Contact → Create simple info pages or modal
+- Privacy Policy, Terms of Service → Create legal pages
 
-### Mobile App
-- Native iOS & Android apps using Capacitor
-- Hot-reload development for fast iteration
-- Smooth animations and transitions
-
-### Backend
-- Supabase for database, authentication, and real-time features
-- Edge functions for business logic (ranking calculations, challenge validation)
-- Secure row-level security policies
-
-### Web Portal
-- React-based responsive admin dashboard
-- Real-time data sync with mobile app
-- Clean, intuitive interface for non-technical staff
+**Files to Create/Modify**:
+- Create `src/pages/Privacy.tsx`
+- Create `src/pages/Terms.tsx`
+- Create `src/pages/Contact.tsx`
+- Update `src/components/landing/Footer.tsx` to link properly
+- Update `src/App.tsx` for new routes
+- Add `id="pricing"` section to Index or remove the link
 
 ---
 
-## What You'll Receive
-✅ iOS & Android native mobile app  
-✅ Web-based admin portal  
-✅ Automated leaderboard & challenge system  
-✅ All three sports modes (Ladder, Americano, Tournament)  
-✅ Engagement badges and analytics  
-✅ Push notification system  
-✅ Modern, professional branding  
-✅ Complete source code ownership
+### 6. Landing Page - Pricing Section
+**Current State**: Header links to `#pricing` but no section exists
+**Solution**: Create a Pricing section component for the landing page
 
+**Files to Create/Modify**:
+- Create `src/components/landing/Pricing.tsx`
+- Update `src/pages/Index.tsx` to include Pricing section
+
+---
+
+### 7. Challenges - Match Result Recording
+**Current State**: Challenges can be accepted but no way to record results
+**Solution**: After a challenge is accepted:
+- Create a match record
+- Allow teams to enter scores
+- Update ladder rankings based on results
+
+**Files to Modify**:
+- `src/pages/Challenges.tsx` - Add match result entry for accepted challenges
+- May need to update database triggers/functions for ranking updates
+
+---
+
+## Technical Details
+
+### New Database Queries Needed
+
+```typescript
+// Dashboard stats
+const matchesPlayed = await supabase
+  .from("matches")
+  .select("*", { count: "exact" })
+  .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+  .eq("status", "completed");
+
+const pendingChallenges = await supabase
+  .from("challenges")
+  .select("*", { count: "exact" })
+  .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+  .eq("status", "pending");
+```
+
+### New Routes to Add
+```typescript
+<Route path="/profile" element={<Profile />} />
+<Route path="/admin" element={<Admin />} />
+<Route path="/privacy" element={<Privacy />} />
+<Route path="/terms" element={<Terms />} />
+<Route path="/contact" element={<Contact />} />
+```
+
+### Profile Page Features
+- Display current user info
+- Form to update display name
+- Avatar upload using storage
+- Team membership display with leave option
+- Match history list
+
+### Admin Page Features (Protected for admin role)
+- Players table with search
+- Teams management
+- Manual match result entry
+- Tournament/Session oversight
+
+---
+
+## Implementation Order
+
+1. **Quick wins first**:
+   - Link "View Demo" button to `/leaderboard`
+   - Link Profile card on Dashboard
+   - Link Admin Panel card on Dashboard
+
+2. **Create simple pages**:
+   - Profile page
+   - Admin page (basic version)
+   - Privacy, Terms, Contact pages
+
+3. **Add dynamic data**:
+   - Dashboard stats fetching
+   - Pricing section
+
+4. **Complex features**:
+   - Challenge match result recording with ranking updates
+
+---
+
+## Summary Table
+
+| Element | Current State | Action |
+|---------|---------------|--------|
+| Profile Card | No link | Create `/profile` page |
+| Admin Panel | No link | Create `/admin` page |
+| Dashboard Stats | Hardcoded 0 | Fetch real data |
+| View Demo Button | No action | Link to `/leaderboard` |
+| Footer Links | `href="#"` | Create pages + proper links |
+| Pricing Nav | No section | Create Pricing component |
+| Challenge Results | No recording | Add score entry + ranking update |
+
+This implementation will make every interactive element in the app fully functional.
