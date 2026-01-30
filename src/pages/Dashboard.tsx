@@ -14,13 +14,26 @@ interface UserTeam {
   rank: number | null;
 }
 
+interface DashboardStats {
+  matchesPlayed: number;
+  wins: number;
+  losses: number;
+  pendingChallenges: number;
+}
+
 export default function Dashboard() {
   const { user, role, isLoading, signOut } = useAuth();
   const [userTeam, setUserTeam] = useState<UserTeam | null>(null);
   const [teamLoading, setTeamLoading] = useState(true);
+  const [stats, setStats] = useState<DashboardStats>({
+    matchesPlayed: 0,
+    wins: 0,
+    losses: 0,
+    pendingChallenges: 0,
+  });
 
   useEffect(() => {
-    const fetchUserTeam = async () => {
+    const fetchUserTeamAndStats = async () => {
       if (!user) {
         setTeamLoading(false);
         return;
@@ -49,7 +62,7 @@ export default function Dashboard() {
           // Get team rank
           const { data: rankData } = await supabase
             .from("ladder_rankings")
-            .select("rank")
+            .select("rank, wins, losses")
             .eq("team_id", memberData.team_id)
             .maybeSingle();
 
@@ -57,6 +70,30 @@ export default function Dashboard() {
             id: teamData.id,
             name: teamData.name,
             rank: rankData?.rank || null,
+          });
+
+          // Fetch stats
+          const teamId = memberData.team_id;
+
+          // Matches played
+          const { count: matchesCount } = await supabase
+            .from("matches")
+            .select("*", { count: "exact", head: true })
+            .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+            .eq("status", "completed");
+
+          // Pending challenges (incoming + outgoing)
+          const { count: pendingCount } = await supabase
+            .from("challenges")
+            .select("*", { count: "exact", head: true })
+            .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+            .eq("status", "pending");
+
+          setStats({
+            matchesPlayed: matchesCount || 0,
+            wins: rankData?.wins || 0,
+            losses: rankData?.losses || 0,
+            pendingChallenges: pendingCount || 0,
           });
         }
       } catch (error) {
@@ -66,8 +103,12 @@ export default function Dashboard() {
       }
     };
 
-    fetchUserTeam();
+    fetchUserTeamAndStats();
   }, [user]);
+
+  const winRate = stats.matchesPlayed > 0 
+    ? Math.round((stats.wins / stats.matchesPlayed) * 100) 
+    : 0;
 
   if (isLoading) {
     return (
@@ -195,7 +236,7 @@ export default function Dashboard() {
                 <Swords className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">0</div>
+                <div className="text-2xl font-bold">{stats.matchesPlayed}</div>
                 <p className="text-xs text-muted-foreground">Total matches</p>
               </CardContent>
             </Card>
@@ -206,8 +247,8 @@ export default function Dashboard() {
                 <Trophy className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">--%</div>
-                <p className="text-xs text-muted-foreground">Victory percentage</p>
+                <div className="text-2xl font-bold">{stats.matchesPlayed > 0 ? `${winRate}%` : "--%"}</div>
+                <p className="text-xs text-muted-foreground">{stats.wins}W / {stats.losses}L</p>
               </CardContent>
             </Card>
 
@@ -217,7 +258,7 @@ export default function Dashboard() {
                 <Swords className="h-4 w-4 text-accent" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">0</div>
+                <div className="text-2xl font-bold">{stats.pendingChallenges}</div>
                 <p className="text-xs text-muted-foreground">Awaiting response</p>
               </CardContent>
             </Card>
@@ -273,26 +314,30 @@ export default function Dashboard() {
               </Card>
             </Link>
 
-            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="w-5 h-5 text-accent" />
-                  Profile
-                </CardTitle>
-                <CardDescription>Update your profile and settings</CardDescription>
-              </CardHeader>
-            </Card>
-
-            {role === "admin" && (
-              <Card className="hover:border-primary/50 transition-colors cursor-pointer border-accent/30">
+            <Link to="/profile">
+              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Settings className="w-5 h-5 text-accent" />
-                    Admin Panel
+                    <User className="w-5 h-5 text-accent" />
+                    Profile
                   </CardTitle>
-                  <CardDescription>Manage players, matches, and academy settings</CardDescription>
+                  <CardDescription>Update your profile and settings</CardDescription>
                 </CardHeader>
               </Card>
+            </Link>
+
+            {role === "admin" && (
+              <Link to="/admin">
+                <Card className="hover:border-primary/50 transition-colors cursor-pointer border-accent/30 h-full">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Settings className="w-5 h-5 text-accent" />
+                      Admin Panel
+                    </CardTitle>
+                    <CardDescription>Manage players, matches, and academy settings</CardDescription>
+                  </CardHeader>
+                </Card>
+              </Link>
             )}
           </div>
         </motion.div>
