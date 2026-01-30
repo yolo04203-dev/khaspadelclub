@@ -409,17 +409,33 @@ export default function Challenges() {
             })
             .eq("id", loserRanking.id);
 
-          // Swap ranks if lower-ranked team won (challenger upset)
+          // If lower-ranked team won: winner takes loser's rank, everyone between shifts down by 1
           if (winnerRanking.rank > loserRanking.rank) {
+            const winnerOldRank = winnerRanking.rank;
+            const loserOldRank = loserRanking.rank;
+            
+            // Get all teams between the two ranks (exclusive of winner, inclusive of loser)
+            const { data: teamsBetween } = await supabase
+              .from("ladder_rankings")
+              .select("id, rank")
+              .gte("rank", loserOldRank)
+              .lt("rank", winnerOldRank);
+            
+            // Shift all teams between down by 1 rank
+            if (teamsBetween && teamsBetween.length > 0) {
+              for (const team of teamsBetween) {
+                await supabase
+                  .from("ladder_rankings")
+                  .update({ rank: team.rank + 1 })
+                  .eq("id", team.id);
+              }
+            }
+            
+            // Winner takes the loser's old rank
             await supabase
               .from("ladder_rankings")
-              .update({ rank: loserRanking.rank })
+              .update({ rank: loserOldRank })
               .eq("id", winnerRanking.id);
-
-            await supabase
-              .from("ladder_rankings")
-              .update({ rank: winnerRanking.rank })
-              .eq("id", loserRanking.id);
           }
         }
       }
