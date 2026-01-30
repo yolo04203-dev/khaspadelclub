@@ -1,13 +1,73 @@
+import { useEffect, useState } from "react";
 import { Navigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LogOut, User, Trophy, Swords, Settings } from "lucide-react";
+import { LogOut, User, Trophy, Swords, Settings, Users, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+interface UserTeam {
+  id: string;
+  name: string;
+  rank: number | null;
+}
+
 export default function Dashboard() {
   const { user, role, isLoading, signOut } = useAuth();
+  const [userTeam, setUserTeam] = useState<UserTeam | null>(null);
+  const [teamLoading, setTeamLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUserTeam = async () => {
+      if (!user) {
+        setTeamLoading(false);
+        return;
+      }
+
+      try {
+        // Get team membership
+        const { data: memberData, error: memberError } = await supabase
+          .from("team_members")
+          .select("team_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (memberError) throw memberError;
+
+        if (memberData?.team_id) {
+          // Get team details
+          const { data: teamData, error: teamError } = await supabase
+            .from("teams")
+            .select("id, name")
+            .eq("id", memberData.team_id)
+            .single();
+
+          if (teamError) throw teamError;
+
+          // Get team rank
+          const { data: rankData } = await supabase
+            .from("ladder_rankings")
+            .select("rank")
+            .eq("team_id", memberData.team_id)
+            .maybeSingle();
+
+          setUserTeam({
+            id: teamData.id,
+            name: teamData.name,
+            rank: rankData?.rank || null,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching user team:", error);
+      } finally {
+        setTeamLoading(false);
+      }
+    };
+
+    fetchUserTeam();
+  }, [user]);
 
   if (isLoading) {
     return (
@@ -62,6 +122,58 @@ export default function Dashboard() {
             </p>
           </div>
 
+          {/* Team Status Card */}
+          {!teamLoading && (
+            <div className="mb-8">
+              {userTeam ? (
+                <Card className="bg-gradient-to-r from-accent/10 to-primary/10 border-accent/30">
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center">
+                          <Users className="w-6 h-6 text-accent" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground">{userTeam.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {userTeam.rank ? `Rank #${userTeam.rank}` : "Unranked"}
+                          </p>
+                        </div>
+                      </div>
+                      <Button variant="outline" asChild>
+                        <Link to="/leaderboard">View Ladder</Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="border-dashed border-2 border-accent/50 bg-accent/5">
+                  <CardContent className="py-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center">
+                          <Plus className="w-6 h-6 text-accent" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground">No team yet</p>
+                          <p className="text-sm text-muted-foreground">
+                            Create a team to join the ladder rankings
+                          </p>
+                        </div>
+                      </div>
+                      <Button asChild>
+                        <Link to="/teams/create">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Create Team
+                        </Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
           {/* Quick Stats */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
             <Card>
@@ -70,7 +182,9 @@ export default function Dashboard() {
                 <Trophy className="h-4 w-4 text-rank-gold" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">#--</div>
+                <div className="text-2xl font-bold">
+                  {userTeam?.rank ? `#${userTeam.rank}` : "#--"}
+                </div>
                 <p className="text-xs text-muted-foreground">Ladder position</p>
               </CardContent>
             </Card>
