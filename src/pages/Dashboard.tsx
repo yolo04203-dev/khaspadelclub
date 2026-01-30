@@ -111,15 +111,17 @@ export default function Dashboard() {
 
           {/* Quick Actions */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-accent" />
-                  Leaderboard
-                </CardTitle>
-                <CardDescription>View current rankings and ladder positions</CardDescription>
-              </CardHeader>
-            </Card>
+            <Link to="/leaderboard">
+              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-accent" />
+                    Leaderboard
+                  </CardTitle>
+                  <CardDescription>View current rankings and ladder positions</CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
 
             <Card className="hover:border-primary/50 transition-colors cursor-pointer">
               <CardHeader>
