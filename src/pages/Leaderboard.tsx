@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, TrendingDown, Flame, Users, ArrowLeft } from "lucide-react";
+import { Trophy, TrendingDown, Flame, Users, ArrowLeft, Swords, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Logo } from "@/components/Logo";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 interface TeamMember {
@@ -93,6 +94,9 @@ export default function Leaderboard() {
   const [rankings, setRankings] = useState<TeamRanking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userTeamId, setUserTeamId] = useState<string | null>(null);
+  const [userTeamRank, setUserTeamRank] = useState<number | null>(null);
+  const [challengingTeamId, setChallengingTeamId] = useState<string | null>(null);
+  const [pendingChallenges, setPendingChallenges] = useState<Set<string>>(new Set());
 
   const fetchRankings = async () => {
     try {
@@ -177,15 +181,68 @@ export default function Leaderboard() {
 
       setRankings(combinedRankings);
 
-      // Check if user is in any team
+      // Check if user is in any team and get their rank
       if (user) {
         const userMembership = membersData?.find((m) => m.user_id === user.id);
-        setUserTeamId(userMembership?.team_id || null);
+        const teamId = userMembership?.team_id || null;
+        setUserTeamId(teamId);
+        
+        if (teamId) {
+          const userRanking = combinedRankings.find(r => r.team?.id === teamId);
+          setUserTeamRank(userRanking?.rank || null);
+          
+          // Fetch pending challenges for this team
+          const { data: challenges } = await supabase
+            .from("challenges")
+            .select("challenged_team_id")
+            .eq("challenger_team_id", teamId)
+            .eq("status", "pending");
+          
+          setPendingChallenges(new Set(challenges?.map(c => c.challenged_team_id) || []));
+        }
       }
     } catch (error) {
       console.error("Error fetching rankings:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const canChallenge = (targetRank: number, targetTeamId: string): boolean => {
+    if (!userTeamId || !userTeamRank) return false;
+    if (targetTeamId === userTeamId) return false;
+    if (pendingChallenges.has(targetTeamId)) return false;
+    // Can only challenge teams ranked higher (lower number) and within 5 positions
+    return targetRank < userTeamRank && userTeamRank - targetRank <= 5;
+  };
+
+  const handleChallenge = async (targetTeamId: string, targetTeamName: string) => {
+    if (!userTeamId) return;
+
+    setChallengingTeamId(targetTeamId);
+
+    try {
+      const { error } = await supabase.from("challenges").insert({
+        challenger_team_id: userTeamId,
+        challenged_team_id: targetTeamId,
+      });
+
+      if (error) throw error;
+
+      setPendingChallenges(prev => new Set([...prev, targetTeamId]));
+
+      toast({
+        title: "Challenge sent!",
+        description: `You have challenged ${targetTeamName}. Waiting for their response.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Failed to send challenge",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setChallengingTeamId(null);
     }
   };
 
@@ -405,12 +462,57 @@ export default function Leaderboard() {
                               {getStreakDisplay(ranking.streak)}
                             </div>
 
-                            {/* Mobile Stats */}
-                            <div className="sm:hidden text-right">
+                            {/* Challenge Button */}
+                            {user && ranking.team && canChallenge(ranking.rank, ranking.team.id) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="hidden sm:flex"
+                                onClick={() => handleChallenge(ranking.team!.id, ranking.team!.name)}
+                                disabled={challengingTeamId === ranking.team.id}
+                              >
+                                {challengingTeamId === ranking.team.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Swords className="w-4 h-4 mr-1" />
+                                    Challenge
+                                  </>
+                                )}
+                              </Button>
+                            )}
+
+                            {/* Pending Badge */}
+                            {ranking.team && pendingChallenges.has(ranking.team.id) && (
+                              <Badge variant="secondary" className="hidden sm:flex">
+                                Pending
+                              </Badge>
+                            )}
+
+                            {/* Mobile Stats & Challenge */}
+                            <div className="sm:hidden text-right space-y-1">
                               <div className="font-semibold text-foreground">{ranking.points} pts</div>
                               <div className="text-xs text-muted-foreground">
                                 {ranking.wins}W - {ranking.losses}L
                               </div>
+                              {ranking.team && canChallenge(ranking.rank, ranking.team.id) && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="mt-2"
+                                  onClick={() => handleChallenge(ranking.team!.id, ranking.team!.name)}
+                                  disabled={challengingTeamId === ranking.team.id}
+                                >
+                                  {challengingTeamId === ranking.team.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Swords className="w-4 h-4" />
+                                  )}
+                                </Button>
+                              )}
+                              {ranking.team && pendingChallenges.has(ranking.team.id) && (
+                                <Badge variant="secondary" className="text-xs">Pending</Badge>
+                              )}
                             </div>
                           </div>
                         </CardContent>
