@@ -31,6 +31,7 @@ interface Challenge {
   expires_at: string;
   created_at: string;
   match_id: string | null;
+  match_status: string | null;
   challenger_team: {
     id: string;
     name: string;
@@ -178,6 +179,19 @@ export default function Challenges() {
     const teamsMap = new Map(teams?.map(t => [t.id, t]) || []);
     const ranksMap = new Map(ranks?.map(r => [r.team_id, r.rank]) || []);
 
+    // Fetch match statuses for accepted challenges
+    const matchIds = (accepted || []).map(c => c.match_id).filter(Boolean);
+    const { data: matches } = matchIds.length > 0 
+      ? await supabase
+          .from("matches")
+          .select("id, status")
+          .in("id", matchIds)
+      : { data: [] as { id: string; status: string }[] };
+    
+    const matchStatusMap = new Map<string, string>(
+      (matches || []).map(m => [m.id, m.status])
+    );
+
     const mapChallenge = (c: any): Challenge => ({
       id: c.id,
       status: c.status,
@@ -185,6 +199,7 @@ export default function Challenges() {
       expires_at: c.expires_at,
       created_at: c.created_at,
       match_id: c.match_id,
+      match_status: c.match_id ? matchStatusMap.get(c.match_id) ?? null : null,
       challenger_team: teamsMap.get(c.challenger_team_id) || null,
       challenged_team: teamsMap.get(c.challenged_team_id) || null,
       challenger_rank: ranksMap.get(c.challenger_team_id) || null,
@@ -747,19 +762,32 @@ export default function Challenges() {
                                       <Clock className="w-3 h-3" />
                                       Accepted {formatTimeAgo(challenge.created_at)}
                                     </span>
-                                    <Badge variant="default" className="text-xs bg-accent">
-                                      Ready to play
+                                    <Badge 
+                                      variant={challenge.match_status === "completed" ? "secondary" : "default"} 
+                                      className={cn(
+                                        "text-xs",
+                                        challenge.match_status === "completed" ? "bg-muted" : "bg-accent"
+                                      )}
+                                    >
+                                      {challenge.match_status === "completed" ? "Completed" : "Ready to play"}
                                     </Badge>
                                   </div>
                                 </div>
 
-                                <Button
-                                  size="sm"
-                                  onClick={() => openScoreDialog(challenge)}
-                                >
-                                  <Trophy className="w-4 h-4 mr-2" />
-                                  Record Score
-                                </Button>
+                                {challenge.match_status === "completed" ? (
+                                  <Badge variant="outline" className="text-muted-foreground">
+                                    <Check className="w-4 h-4 mr-1" />
+                                    Score Recorded
+                                  </Badge>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => openScoreDialog(challenge)}
+                                  >
+                                    <Trophy className="w-4 h-4 mr-2" />
+                                    Record Score
+                                  </Button>
+                                )}
                               </div>
                             </CardContent>
                           </Card>
