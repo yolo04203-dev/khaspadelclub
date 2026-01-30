@@ -8,6 +8,10 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Leaderboard from "./pages/Leaderboard";
+import Ladders from "./pages/Ladders";
+import LadderDetail from "./pages/LadderDetail";
+import LadderCreate from "./pages/LadderCreate";
+import LadderManage from "./pages/LadderManage";
 import CreateTeam from "./pages/CreateTeam";
 import Challenges from "./pages/Challenges";
 import Americano from "./pages/Americano";
@@ -37,6 +41,10 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/ladders" element={<Ladders />} />
+            <Route path="/ladders/create" element={<LadderCreate />} />
+            <Route path="/ladders/:id" element={<LadderDetail />} />
+            <Route path="/ladders/:id/manage" element={<LadderManage />} />
             <Route path="/teams/create" element={<CreateTeam />} />
             <Route path="/challenges" element={<Challenges />} />
             <Route path="/americano" element={<Americano />} />

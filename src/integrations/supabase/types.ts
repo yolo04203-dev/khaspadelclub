@@ -185,6 +185,7 @@ export type Database = {
           created_at: string
           expires_at: string
           id: string
+          ladder_category_id: string | null
           match_id: string | null
           message: string | null
           responded_at: string | null
@@ -196,6 +197,7 @@ export type Database = {
           created_at?: string
           expires_at?: string
           id?: string
+          ladder_category_id?: string | null
           match_id?: string | null
           message?: string | null
           responded_at?: string | null
@@ -207,6 +209,7 @@ export type Database = {
           created_at?: string
           expires_at?: string
           id?: string
+          ladder_category_id?: string | null
           match_id?: string | null
           message?: string | null
           responded_at?: string | null
@@ -228,6 +231,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "challenges_ladder_category_id_fkey"
+            columns: ["ladder_category_id"]
+            isOneToOne: false
+            referencedRelation: "ladder_categories"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "challenges_match_id_fkey"
             columns: ["match_id"]
             isOneToOne: false
@@ -236,10 +246,49 @@ export type Database = {
           },
         ]
       }
+      ladder_categories: {
+        Row: {
+          challenge_range: number
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          ladder_id: string
+          name: string
+        }
+        Insert: {
+          challenge_range?: number
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          ladder_id: string
+          name: string
+        }
+        Update: {
+          challenge_range?: number
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          ladder_id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ladder_categories_ladder_id_fkey"
+            columns: ["ladder_id"]
+            isOneToOne: false
+            referencedRelation: "ladders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ladder_rankings: {
         Row: {
           created_at: string
           id: string
+          ladder_category_id: string | null
           last_match_at: string | null
           losses: number
           points: number
@@ -252,6 +301,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          ladder_category_id?: string | null
           last_match_at?: string | null
           losses?: number
           points?: number
@@ -264,6 +314,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          ladder_category_id?: string | null
           last_match_at?: string | null
           losses?: number
           points?: number
@@ -275,6 +326,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "ladder_rankings_ladder_category_id_fkey"
+            columns: ["ladder_category_id"]
+            isOneToOne: false
+            referencedRelation: "ladder_categories"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ladder_rankings_team_id_fkey"
             columns: ["team_id"]
             isOneToOne: true
@@ -282,6 +340,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ladders: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       matches: {
         Row: {
