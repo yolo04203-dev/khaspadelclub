@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LogOut, User, Trophy, Swords, Settings, Users, Plus, Shuffle } from "lucide-react";
+import { LogOut, User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -266,6 +266,18 @@ export default function Dashboard() {
 
           {/* Quick Actions */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Link to="/ladders">
+              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-accent" />
+                    Ladders
+                  </CardTitle>
+                  <CardDescription>Skill-based divisions with rankings</CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+
             <Link to="/leaderboard">
               <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
                 <CardHeader>
