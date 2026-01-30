@@ -14,6 +14,178 @@ export type Database = {
   }
   public: {
     Tables: {
+      challenges: {
+        Row: {
+          challenged_team_id: string
+          challenger_team_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          match_id: string | null
+          message: string | null
+          responded_at: string | null
+          status: Database["public"]["Enums"]["challenge_status"]
+        }
+        Insert: {
+          challenged_team_id: string
+          challenger_team_id: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          match_id?: string | null
+          message?: string | null
+          responded_at?: string | null
+          status?: Database["public"]["Enums"]["challenge_status"]
+        }
+        Update: {
+          challenged_team_id?: string
+          challenger_team_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          match_id?: string | null
+          message?: string | null
+          responded_at?: string | null
+          status?: Database["public"]["Enums"]["challenge_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenges_challenged_team_id_fkey"
+            columns: ["challenged_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenges_challenger_team_id_fkey"
+            columns: ["challenger_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenges_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ladder_rankings: {
+        Row: {
+          created_at: string
+          id: string
+          last_match_at: string | null
+          losses: number
+          points: number
+          rank: number
+          streak: number
+          team_id: string
+          updated_at: string
+          wins: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_match_at?: string | null
+          losses?: number
+          points?: number
+          rank: number
+          streak?: number
+          team_id: string
+          updated_at?: string
+          wins?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_match_at?: string | null
+          losses?: number
+          points?: number
+          rank?: number
+          streak?: number
+          team_id?: string
+          updated_at?: string
+          wins?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ladder_rankings_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: true
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      matches: {
+        Row: {
+          challenged_score: number | null
+          challenged_team_id: string
+          challenger_score: number | null
+          challenger_team_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          scheduled_at: string | null
+          status: Database["public"]["Enums"]["match_status"]
+          updated_at: string
+          winner_team_id: string | null
+        }
+        Insert: {
+          challenged_score?: number | null
+          challenged_team_id: string
+          challenger_score?: number | null
+          challenger_team_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          scheduled_at?: string | null
+          status?: Database["public"]["Enums"]["match_status"]
+          updated_at?: string
+          winner_team_id?: string | null
+        }
+        Update: {
+          challenged_score?: number | null
+          challenged_team_id?: string
+          challenger_score?: number | null
+          challenger_team_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          scheduled_at?: string | null
+          status?: Database["public"]["Enums"]["match_status"]
+          updated_at?: string
+          winner_team_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matches_challenged_team_id_fkey"
+            columns: ["challenged_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_challenger_team_id_fkey"
+            columns: ["challenger_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_winner_team_id_fkey"
+            columns: ["winner_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -38,6 +210,65 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      team_members: {
+        Row: {
+          id: string
+          is_captain: boolean | null
+          joined_at: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          is_captain?: boolean | null
+          joined_at?: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          is_captain?: boolean | null
+          joined_at?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -67,6 +298,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_team_with_captain: {
+        Args: { _avatar_url?: string; _name: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -75,9 +310,29 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_team_captain: {
+        Args: { _team_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_team_member: {
+        Args: { _team_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "player"
+      challenge_status:
+        | "pending"
+        | "accepted"
+        | "declined"
+        | "expired"
+        | "cancelled"
+      match_status:
+        | "pending"
+        | "scheduled"
+        | "in_progress"
+        | "completed"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -206,6 +461,20 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "player"],
+      challenge_status: [
+        "pending",
+        "accepted",
+        "declined",
+        "expired",
+        "cancelled",
+      ],
+      match_status: [
+        "pending",
+        "scheduled",
+        "in_progress",
+        "completed",
+        "cancelled",
+      ],
     },
   },
 } as const
