@@ -22,16 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { SetScoreDialog } from "@/components/challenges/SetScoreDialog";
 
 interface Challenge {
   id: string;
@@ -69,8 +60,6 @@ export default function Challenges() {
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   const [scoreDialogOpen, setScoreDialogOpen] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
-  const [myScore, setMyScore] = useState("");
-  const [opponentScore, setOpponentScore] = useState("");
   const [isSubmittingScore, setIsSubmittingScore] = useState(false);
 
   const fetchUserTeam = async () => {
@@ -325,46 +314,45 @@ export default function Challenges() {
 
   const openScoreDialog = (challenge: Challenge) => {
     setSelectedChallenge(challenge);
-    setMyScore("");
-    setOpponentScore("");
     setScoreDialogOpen(true);
   };
 
-  const handleSubmitScore = async () => {
+  const handleSubmitScore = async (
+    mySets: number[], 
+    opponentSets: number[], 
+    setsWonByMe: number, 
+    setsWonByOpponent: number
+  ) => {
     if (!selectedChallenge || !userTeam) return;
-    
-    const myScoreNum = parseInt(myScore);
-    const opponentScoreNum = parseInt(opponentScore);
-    
-    if (isNaN(myScoreNum) || isNaN(opponentScoreNum) || myScoreNum < 0 || opponentScoreNum < 0) {
-      toast({
-        title: "Invalid scores",
-        description: "Please enter valid positive numbers for both scores.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     setIsSubmittingScore(true);
 
     try {
       const isChallenger = selectedChallenge.challenger_team?.id === userTeam.id;
-      const challengerScore = isChallenger ? myScoreNum : opponentScoreNum;
-      const challengedScore = isChallenger ? opponentScoreNum : myScoreNum;
       
-      const winnerId = challengerScore > challengedScore 
+      // Determine challenger/challenged sets based on perspective
+      const challengerSets = isChallenger ? mySets : opponentSets;
+      const challengedSets = isChallenger ? opponentSets : mySets;
+      const setsWonChallenger = isChallenger ? setsWonByMe : setsWonByOpponent;
+      const setsWonChallenged = isChallenger ? setsWonByOpponent : setsWonByMe;
+      
+      const winnerId = setsWonChallenger > setsWonChallenged 
         ? selectedChallenge.challenger_team?.id 
         : selectedChallenge.challenged_team?.id;
-      const loserId = challengerScore > challengedScore 
+      const loserId = setsWonChallenger > setsWonChallenged 
         ? selectedChallenge.challenged_team?.id 
         : selectedChallenge.challenger_team?.id;
 
-      // Update the match
+      // Update the match with set scores
       const { error: matchError } = await supabase
         .from("matches")
         .update({
-          challenger_score: challengerScore,
-          challenged_score: challengedScore,
+          challenger_score: setsWonChallenger,
+          challenged_score: setsWonChallenged,
+          challenger_sets: challengerSets,
+          challenged_sets: challengedSets,
+          sets_won_challenger: setsWonChallenger,
+          sets_won_challenged: setsWonChallenged,
           winner_team_id: winnerId,
           status: "completed",
           completed_at: new Date().toISOString(),
@@ -374,7 +362,6 @@ export default function Challenges() {
       if (matchError) throw matchError;
 
       // Update ladder rankings
-      // Get current rankings
       const { data: rankings } = await supabase
         .from("ladder_rankings")
         .select("*")
@@ -422,12 +409,12 @@ export default function Challenges() {
         }
       }
 
-      // Mark challenge as completed by setting status to a completed state (via match completion)
-      // The challenge itself stays accepted, but now has a completed match
+      // Format set scores for display
+      const setScoreDisplay = mySets.map((s, i) => `${s}-${opponentSets[i]}`).join(", ");
 
       toast({
         title: "Match recorded!",
-        description: `Score: ${challengerScore} - ${challengedScore}. Rankings updated.`,
+        description: `Sets: ${setScoreDisplay}. You ${setsWonByMe > setsWonByOpponent ? "won" : "lost"} ${setsWonByMe}-${setsWonByOpponent}. Rankings updated.`,
       });
 
       setScoreDialogOpen(false);
@@ -788,54 +775,14 @@ export default function Challenges() {
       </main>
 
       {/* Score Dialog */}
-      <Dialog open={scoreDialogOpen} onOpenChange={setScoreDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Record Match Result</DialogTitle>
-            <DialogDescription>
-              Enter the final scores for your match against{" "}
-              <span className="font-semibold">{selectedChallenge ? getOpponentName(selectedChallenge) : ""}</span>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="myScore">Your Score ({userTeam?.name})</Label>
-              <Input
-                id="myScore"
-                type="number"
-                min="0"
-                value={myScore}
-                onChange={(e) => setMyScore(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="opponentScore">Opponent Score</Label>
-              <Input
-                id="opponentScore"
-                type="number"
-                min="0"
-                value={opponentScore}
-                onChange={(e) => setOpponentScore(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setScoreDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmitScore} disabled={isSubmittingScore}>
-              {isSubmittingScore ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Check className="w-4 h-4 mr-2" />
-              )}
-              Submit Score
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SetScoreDialog
+        open={scoreDialogOpen}
+        onOpenChange={setScoreDialogOpen}
+        myTeamName={userTeam?.name || "Your Team"}
+        opponentTeamName={selectedChallenge ? getOpponentName(selectedChallenge) : "Opponent"}
+        onSubmit={handleSubmitScore}
+        isSubmitting={isSubmittingScore}
+      />
     </div>
   );
 }

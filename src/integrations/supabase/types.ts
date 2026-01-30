@@ -286,42 +286,54 @@ export type Database = {
       matches: {
         Row: {
           challenged_score: number | null
+          challenged_sets: Json | null
           challenged_team_id: string
           challenger_score: number | null
+          challenger_sets: Json | null
           challenger_team_id: string
           completed_at: string | null
           created_at: string
           id: string
           notes: string | null
           scheduled_at: string | null
+          sets_won_challenged: number | null
+          sets_won_challenger: number | null
           status: Database["public"]["Enums"]["match_status"]
           updated_at: string
           winner_team_id: string | null
         }
         Insert: {
           challenged_score?: number | null
+          challenged_sets?: Json | null
           challenged_team_id: string
           challenger_score?: number | null
+          challenger_sets?: Json | null
           challenger_team_id: string
           completed_at?: string | null
           created_at?: string
           id?: string
           notes?: string | null
           scheduled_at?: string | null
+          sets_won_challenged?: number | null
+          sets_won_challenger?: number | null
           status?: Database["public"]["Enums"]["match_status"]
           updated_at?: string
           winner_team_id?: string | null
         }
         Update: {
           challenged_score?: number | null
+          challenged_sets?: Json | null
           challenged_team_id?: string
           challenger_score?: number | null
+          challenger_sets?: Json | null
           challenger_team_id?: string
           completed_at?: string | null
           created_at?: string
           id?: string
           notes?: string | null
           scheduled_at?: string | null
+          sets_won_challenged?: number | null
+          sets_won_challenger?: number | null
           status?: Database["public"]["Enums"]["match_status"]
           updated_at?: string
           winner_team_id?: string | null
