@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock, DollarSign, Tag } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock, DollarSign, Tag, Info, MapPin, Calendar, FileText } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -34,6 +34,9 @@ interface Tournament {
   entry_fee: number;
   entry_fee_currency: string;
   payment_instructions: string | null;
+  venue: string | null;
+  registration_deadline: string | null;
+  created_at: string;
 }
 
 interface TournamentGroup {
@@ -868,8 +871,9 @@ export default function TournamentDetail() {
             </div>
           )}
 
-          <Tabs defaultValue={isAdmin ? "manage" : "groups"} className="w-full">
+          <Tabs defaultValue="info" className="w-full">
             <TabsList className="mb-6 flex-wrap">
+              <TabsTrigger value="info"><Info className="w-4 h-4 mr-2" />Info</TabsTrigger>
               {isAdmin && <TabsTrigger value="manage"><Settings className="w-4 h-4 mr-2" />Manage</TabsTrigger>}
               {isAdmin && <TabsTrigger value="categories"><Tag className="w-4 h-4 mr-2" />Categories</TabsTrigger>}
               {isAdmin && tournament.entry_fee > 0 && (
@@ -880,6 +884,130 @@ export default function TournamentDetail() {
               <TabsTrigger value="knockout">Knockout</TabsTrigger>
               <TabsTrigger value="participants">Participants</TabsTrigger>
             </TabsList>
+
+            {/* Info Tab */}
+            <TabsContent value="info">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Info className="w-5 h-5" />
+                    Tournament Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Description */}
+                  {tournament.description && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <FileText className="w-4 h-4" />
+                        Description
+                      </div>
+                      <p className="text-foreground">{tournament.description}</p>
+                    </div>
+                  )}
+
+                  {/* Venue */}
+                  {tournament.venue && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <MapPin className="w-4 h-4" />
+                        Venue
+                      </div>
+                      <p className="text-foreground">{tournament.venue}</p>
+                    </div>
+                  )}
+
+                  {/* Registration Deadline */}
+                  {tournament.registration_deadline && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <Calendar className="w-4 h-4" />
+                        Registration Deadline
+                      </div>
+                      <p className="text-foreground">
+                        {new Date(tournament.registration_deadline).toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Entry Fee */}
+                  {tournament.entry_fee > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <DollarSign className="w-4 h-4" />
+                        Entry Fee
+                      </div>
+                      <p className="text-foreground font-semibold">
+                        {tournament.entry_fee_currency} {tournament.entry_fee.toLocaleString()}
+                      </p>
+                      {tournament.payment_instructions && (
+                        <div className="p-3 rounded-lg bg-muted/50 border border-border mt-2">
+                          <p className="text-sm font-medium mb-1">Payment Instructions:</p>
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{tournament.payment_instructions}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Tournament Format */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <Trophy className="w-4 h-4" />
+                      Format
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline">{groups.length} Groups</Badge>
+                      <Badge variant="outline">{tournament.max_teams} Max Teams</Badge>
+                      <Badge variant="outline">Best of {tournament.sets_per_match} Sets</Badge>
+                    </div>
+                  </div>
+
+                  {/* Categories */}
+                  {categories.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <Tag className="w-4 h-4" />
+                        Categories
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {categories.map(cat => (
+                          <Badge key={cat.id} variant="secondary">
+                            {cat.name} ({cat.participantCount || 0}/{cat.max_teams})
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Teams Info */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                      <Users className="w-4 h-4" />
+                      Participants
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline">{registeredParticipants.length} Registered</Badge>
+                      {waitlistParticipants.length > 0 && (
+                        <Badge variant="outline">{waitlistParticipants.length} on Waitlist</Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* No info available placeholder */}
+                  {!tournament.description && !tournament.venue && !tournament.registration_deadline && tournament.entry_fee === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Info className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>No additional information available for this tournament.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             {/* Admin Management Tab */}
             {isAdmin && (
