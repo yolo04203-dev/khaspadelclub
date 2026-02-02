@@ -1,180 +1,172 @@
 
-# Plan: Make All Buttons and Cards Functional
+
+# Tournament Entry Fee Collection System
+
+This plan implements a comprehensive entry fee collection mechanism for tournaments, allowing admins to set fees and track payments while giving participants the option to register with their existing team or create a new one.
+
+---
 
 ## Overview
-This plan addresses all non-functional buttons and cards across the application, creating new pages where needed and connecting existing elements to real functionality.
 
-## Changes Required
-
-### 1. Dashboard - Profile Card (Create Profile Page)
-**Current State**: Static card with no link
-**Solution**: Create a new `/profile` page where users can:
-- View and edit their display name
-- Upload an avatar
-- View their match history
-- Leave their current team
-
-**Files to Create/Modify**:
-- Create `src/pages/Profile.tsx`
-- Update `src/App.tsx` to add route
-- Update `src/pages/Dashboard.tsx` to link the Profile card
+The system will add:
+1. **Entry fee configuration** for tournaments (amount, currency)
+2. **Registration dialog** with team selection (existing or new team)
+3. **Payment status tracking** on participant records
+4. **Admin payment management dashboard** to view and update payment status
+5. **Clear messaging** about payment requirements during registration
 
 ---
 
-### 2. Dashboard - Admin Panel Card (Create Admin Page)
-**Current State**: Static card visible only to admins
-**Solution**: Create an `/admin` page with:
-- User management (view all players)
-- Team management 
-- Match result recording
-- Session/Tournament management
+## Database Changes
 
-**Files to Create/Modify**:
-- Create `src/pages/Admin.tsx`
-- Update `src/App.tsx` to add route
-- Update `src/pages/Dashboard.tsx` to link the Admin card
+### 1. Add Entry Fee to Tournaments Table
 
----
+```sql
+ALTER TABLE tournaments
+ADD COLUMN entry_fee DECIMAL(10, 2) DEFAULT 0,
+ADD COLUMN entry_fee_currency TEXT DEFAULT 'PKR';
+```
 
-### 3. Dashboard - Stats Cards (Fetch Real Data)
-**Current State**: Shows hardcoded "0" values
-**Solution**: Fetch actual stats from the database:
-- Matches Played: Query `matches` table for user's team
-- Win Rate: Calculate from wins/losses
-- Pending Challenges: Query `challenges` table for pending incoming/outgoing
+### 2. Add Payment Status to Tournament Participants
 
-**Files to Modify**:
-- `src/pages/Dashboard.tsx` - Add queries and state for real stats
+```sql
+ALTER TABLE tournament_participants
+ADD COLUMN payment_status TEXT DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'refunded')),
+ADD COLUMN payment_confirmed_at TIMESTAMP WITH TIME ZONE,
+ADD COLUMN payment_confirmed_by UUID REFERENCES auth.users(id),
+ADD COLUMN payment_notes TEXT,
+ADD COLUMN custom_team_name TEXT;
+```
 
----
-
-### 4. Landing Page - "View Demo" Button
-**Current State**: Button does nothing
-**Solution**: Either:
-- Option A: Navigate to `/leaderboard` to show a preview of the app
-- Option B: Open a video modal with a demo
-- **Recommended**: Navigate to `/leaderboard` as a live demo
-
-**Files to Modify**:
-- `src/components/landing/Hero.tsx` - Link button to `/leaderboard`
+**Column purposes:**
+- `payment_status`: Track if team has paid (pending/paid/refunded)
+- `payment_confirmed_at`: When admin marked as paid
+- `payment_confirmed_by`: Which admin confirmed payment
+- `payment_notes`: Optional notes about payment (e.g., "Cash payment received")
+- `custom_team_name`: For teams created during registration without a pre-existing team
 
 ---
 
-### 5. Landing Page - Footer Links
-**Current State**: All use `href="#"` placeholder
-**Solution**: 
-- Features, Sports Modes → Scroll to sections on landing page
-- Pricing → Create a pricing section or page
-- Help Center, Contact → Create simple info pages or modal
-- Privacy Policy, Terms of Service → Create legal pages
+## Feature Implementation
 
-**Files to Create/Modify**:
-- Create `src/pages/Privacy.tsx`
-- Create `src/pages/Terms.tsx`
-- Create `src/pages/Contact.tsx`
-- Update `src/components/landing/Footer.tsx` to link properly
-- Update `src/App.tsx` for new routes
-- Add `id="pricing"` section to Index or remove the link
+### 1. Tournament Creation Updates
+
+**File:** `src/pages/TournamentCreate.tsx`
+
+Add fields for entry fee configuration:
+- Entry fee amount (numeric input)
+- Currency selector (PKR, USD, etc.)
+- Preview of fee information
+
+### 2. Registration Dialog Component
+
+**New File:** `src/components/tournament/RegistrationDialog.tsx`
+
+A modal dialog that appears when clicking "Register":
+- **Team Selection Section:**
+  - Radio button: "Use my existing team" (shows team name if user is captain)
+  - Radio button: "Register a new team" (shows team name input)
+- **Entry Fee Information:**
+  - Clear display of the entry fee amount
+  - Message: "Your slot will be confirmed once payment is verified by the organizer"
+  - Payment instructions or contact info
+- **Confirmation button** to submit registration
+
+### 3. Tournament Detail Registration Flow
+
+**File:** `src/pages/TournamentDetail.tsx`
+
+Update registration logic:
+- Open RegistrationDialog instead of direct registration
+- Handle both existing team and custom team name scenarios
+- Show payment pending status after registration
+- Display entry fee info in the tournament header
+
+### 4. Admin Payment Management Panel
+
+**New File:** `src/components/tournament/PaymentManagement.tsx`
+
+A new tab or section in the admin management area showing:
+- Table of all registered teams with columns:
+  - Team Name
+  - Registration Date
+  - Payment Status (badge: Pending/Paid/Refunded)
+  - Actions (Mark as Paid, Mark as Refunded, Add Note)
+- Filter options: All / Pending / Paid
+- Summary stats: Total teams, Paid count, Pending count, Total collected
+- Quick action to mark multiple as paid
+
+### 5. Update AdminGroupManagement
+
+**File:** `src/components/tournament/AdminGroupManagement.tsx`
+
+- Add a "Payments" section or integrate payment status badges next to team names
+- Visual indicator for unpaid teams (warning icon/color)
+- Option to only allow group assignment for paid teams
+
+### 6. Update Participant Display
+
+**File:** `src/pages/TournamentDetail.tsx` (Participants tab)
+
+- Show payment status badge next to each team
+- Different styling for paid vs pending teams
+- For waitlist teams, still show payment status
 
 ---
 
-### 6. Landing Page - Pricing Section
-**Current State**: Header links to `#pricing` but no section exists
-**Solution**: Create a Pricing section component for the landing page
+## User Experience Flow
 
-**Files to Create/Modify**:
-- Create `src/components/landing/Pricing.tsx`
-- Update `src/pages/Index.tsx` to include Pricing section
+### For Participants:
 
----
+1. User clicks "Register" on tournament page
+2. Registration dialog opens with:
+   - Option to select existing team (if captain) or enter new team name
+   - Entry fee amount displayed prominently
+   - Message explaining payment process
+3. User confirms registration
+4. Toast message: "Registration submitted! Please pay the entry fee of [amount] to confirm your slot."
+5. User sees their team with "Payment Pending" status
+6. Once admin confirms payment, status changes to "Paid"
 
-### 7. Challenges - Match Result Recording
-**Current State**: Challenges can be accepted but no way to record results
-**Solution**: After a challenge is accepted:
-- Create a match record
-- Allow teams to enter scores
-- Update ladder rankings based on results
+### For Admins:
 
-**Files to Modify**:
-- `src/pages/Challenges.tsx` - Add match result entry for accepted challenges
-- May need to update database triggers/functions for ranking updates
+1. View "Payments" tab in tournament management
+2. See list of all registered teams with payment status
+3. Click "Mark as Paid" when payment is received
+4. Optionally add notes (e.g., payment method, reference number)
+5. Filter by payment status to see who still needs to pay
 
 ---
 
 ## Technical Details
 
-### New Database Queries Needed
+### Files to Create:
+1. `src/components/tournament/RegistrationDialog.tsx` - Team selection and registration modal
+2. `src/components/tournament/PaymentManagement.tsx` - Admin payment tracking panel
 
-```typescript
-// Dashboard stats
-const matchesPlayed = await supabase
-  .from("matches")
-  .select("*", { count: "exact" })
-  .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
-  .eq("status", "completed");
+### Files to Modify:
+1. `src/pages/TournamentCreate.tsx` - Add entry fee fields
+2. `src/pages/TournamentDetail.tsx` - Integrate registration dialog, show payment info
+3. `src/components/tournament/AdminGroupManagement.tsx` - Add payment status indicators
 
-const pendingChallenges = await supabase
-  .from("challenges")
-  .select("*", { count: "exact" })
-  .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
-  .eq("status", "pending");
-```
+### Database Migration:
+- Add `entry_fee` and `entry_fee_currency` to `tournaments` table
+- Add `payment_status`, `payment_confirmed_at`, `payment_confirmed_by`, `payment_notes`, and `custom_team_name` to `tournament_participants` table
 
-### New Routes to Add
-```typescript
-<Route path="/profile" element={<Profile />} />
-<Route path="/admin" element={<Admin />} />
-<Route path="/privacy" element={<Privacy />} />
-<Route path="/terms" element={<Terms />} />
-<Route path="/contact" element={<Contact />} />
-```
-
-### Profile Page Features
-- Display current user info
-- Form to update display name
-- Avatar upload using storage
-- Team membership display with leave option
-- Match history list
-
-### Admin Page Features (Protected for admin role)
-- Players table with search
-- Teams management
-- Manual match result entry
-- Tournament/Session oversight
+### RLS Policies:
+- Tournament creators and admins can update payment status
+- Participants can view their own payment status
+- All tournament participants visible to everyone (existing policy covers this)
 
 ---
 
-## Implementation Order
+## UI Components Used
 
-1. **Quick wins first**:
-   - Link "View Demo" button to `/leaderboard`
-   - Link Profile card on Dashboard
-   - Link Admin Panel card on Dashboard
+- Dialog (for registration modal)
+- RadioGroup (for team selection)
+- Input (for custom team name, entry fee)
+- Select (for currency)
+- Badge (for payment status)
+- Table (for payment management list)
+- Button, Card, and other existing UI components
 
-2. **Create simple pages**:
-   - Profile page
-   - Admin page (basic version)
-   - Privacy, Terms, Contact pages
-
-3. **Add dynamic data**:
-   - Dashboard stats fetching
-   - Pricing section
-
-4. **Complex features**:
-   - Challenge match result recording with ranking updates
-
----
-
-## Summary Table
-
-| Element | Current State | Action |
-|---------|---------------|--------|
-| Profile Card | No link | Create `/profile` page |
-| Admin Panel | No link | Create `/admin` page |
-| Dashboard Stats | Hardcoded 0 | Fetch real data |
-| View Demo Button | No action | Link to `/leaderboard` |
-| Footer Links | `href="#"` | Create pages + proper links |
-| Pricing Nav | No section | Create Pricing component |
-| Challenge Results | No recording | Add score entry + ranking update |
-
-This implementation will make every interactive element in the app fully functional.
