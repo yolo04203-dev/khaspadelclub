@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -46,6 +46,7 @@ interface Participant {
   group_losses: number;
   group_points_for: number;
   group_points_against: number;
+  waitlist_position: number | null;
 }
 
 interface TournamentMatch {
@@ -134,13 +135,37 @@ export default function TournamentDetail() {
   const registerTeam = async () => {
     if (!userTeam || !tournament) return;
     try {
-      const { error } = await supabase.from("tournament_participants").insert({
-        tournament_id: tournament.id,
-        team_id: userTeam.id,
-        seed: participants.length + 1,
-      });
-      if (error) throw error;
-      toast({ title: "Registered!", description: `${userTeam.name} has joined the tournament` });
+      // Count registered teams (not on waitlist)
+      const registeredCount = participants.filter(p => p.waitlist_position === null).length;
+      const isFull = registeredCount >= tournament.max_teams;
+
+      if (isFull) {
+        // Add to waitlist
+        const waitlistTeams = participants.filter(p => p.waitlist_position !== null);
+        const nextWaitlistPosition = waitlistTeams.length > 0 
+          ? Math.max(...waitlistTeams.map(p => p.waitlist_position!)) + 1 
+          : 1;
+
+        const { error } = await supabase.from("tournament_participants").insert({
+          tournament_id: tournament.id,
+          team_id: userTeam.id,
+          waitlist_position: nextWaitlistPosition,
+        });
+        if (error) throw error;
+        toast({ 
+          title: "Added to Waiting List", 
+          description: `${userTeam.name} is #${nextWaitlistPosition} on the waiting list. You'll be added if a team withdraws.` 
+        });
+      } else {
+        // Normal registration
+        const { error } = await supabase.from("tournament_participants").insert({
+          tournament_id: tournament.id,
+          team_id: userTeam.id,
+          seed: registeredCount + 1,
+        });
+        if (error) throw error;
+        toast({ title: "Registered!", description: `${userTeam.name} has joined the tournament` });
+      }
       fetchData();
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -151,9 +176,21 @@ export default function TournamentDetail() {
     if (!userTeam || !tournament) return;
     const participant = participants.find((p) => p.team_id === userTeam.id);
     if (!participant) return;
+    
+    const wasOnWaitlist = participant.waitlist_position !== null;
+    
     try {
       const { error } = await supabase.from("tournament_participants").delete().eq("id", participant.id);
       if (error) throw error;
+      
+      if (!wasOnWaitlist) {
+        // Promote first waitlist team if a registered team withdrew
+        await promoteFromWaitlist();
+      } else {
+        // Reorder waitlist positions
+        await reorderWaitlist();
+      }
+      
       toast({ title: "Withdrawn", description: `${userTeam.name} has left the tournament` });
       fetchData();
     } catch (error: any) {
@@ -161,14 +198,79 @@ export default function TournamentDetail() {
     }
   };
 
+  const promoteFromWaitlist = async () => {
+    if (!tournament) return;
+    
+    // Get first team on waitlist
+    const { data: waitlistTeam } = await supabase
+      .from("tournament_participants")
+      .select("id, team_id")
+      .eq("tournament_id", tournament.id)
+      .not("waitlist_position", "is", null)
+      .order("waitlist_position", { ascending: true })
+      .limit(1)
+      .single();
+
+    if (waitlistTeam) {
+      // Get current registered count for seed
+      const registeredCount = participants.filter(p => p.waitlist_position === null).length;
+      
+      // Promote to registered
+      await supabase
+        .from("tournament_participants")
+        .update({ waitlist_position: null, seed: registeredCount })
+        .eq("id", waitlistTeam.id);
+      
+      // Reorder remaining waitlist
+      await reorderWaitlist();
+      
+      // Get team name for notification
+      const { data: team } = await supabase.from("teams").select("name").eq("id", waitlistTeam.team_id).single();
+      if (team) {
+        sonnerToast.success(`${team.name} has been promoted from the waiting list!`);
+      }
+    }
+  };
+
+  const reorderWaitlist = async () => {
+    if (!tournament) return;
+    
+    const { data: waitlistTeams } = await supabase
+      .from("tournament_participants")
+      .select("id")
+      .eq("tournament_id", tournament.id)
+      .not("waitlist_position", "is", null)
+      .order("waitlist_position", { ascending: true });
+
+    if (waitlistTeams) {
+      for (let i = 0; i < waitlistTeams.length; i++) {
+        await supabase
+          .from("tournament_participants")
+          .update({ waitlist_position: i + 1 })
+          .eq("id", waitlistTeams[i].id);
+      }
+    }
+  };
+
   const kickTeam = async (participantId: string, teamName: string) => {
     if (!tournament) return;
+    
+    const participant = participants.find(p => p.id === participantId);
+    const wasOnWaitlist = participant?.waitlist_position !== null;
+    
     try {
       const { error } = await supabase
         .from("tournament_participants")
         .delete()
         .eq("id", participantId);
       if (error) throw error;
+      
+      if (!wasOnWaitlist) {
+        await promoteFromWaitlist();
+      } else {
+        await reorderWaitlist();
+      }
+      
       sonnerToast.success(`${teamName} has been removed from the tournament`);
       fetchData();
     } catch (error: any) {
@@ -463,8 +565,12 @@ export default function TournamentDetail() {
 
   const isOwner = user?.id === tournament?.created_by;
   const isAdmin = role === "admin" || isOwner;
-  const isRegistered = userTeam && participants.some((p) => p.team_id === userTeam.id);
-  const canRegister = tournament?.status === "registration" && userTeam && !isRegistered && participants.length < (tournament?.max_teams || 0);
+  const registeredParticipants = participants.filter(p => p.waitlist_position === null);
+  const waitlistParticipants = participants.filter(p => p.waitlist_position !== null).sort((a, b) => (a.waitlist_position || 0) - (b.waitlist_position || 0));
+  const userParticipant = userTeam ? participants.find(p => p.team_id === userTeam.id) : null;
+  const isRegistered = !!userParticipant;
+  const isOnWaitlist = userParticipant?.waitlist_position !== null;
+  const canRegister = tournament?.status === "registration" && userTeam && !isRegistered;
   
   const groupMatches = matches.filter(m => m.stage === "group");
   const knockoutMatches = matches.filter(m => m.stage === "knockout");
@@ -472,7 +578,6 @@ export default function TournamentDetail() {
   const canStartKnockout = allGroupMatchesComplete && knockoutMatches.length === 0;
 
   // Find user's group
-  const userParticipant = userTeam ? participants.find(p => p.team_id === userTeam.id) : null;
   const userGroup = userParticipant?.group_id ? groups.find(g => g.id === userParticipant.group_id) : null;
 
   if (loading) {
@@ -514,7 +619,8 @@ export default function TournamentDetail() {
               <div>
                 <h1 className="text-2xl font-bold text-foreground">{tournament.name}</h1>
                 <p className="text-muted-foreground">
-                  {groups.length} groups • {participants.length} / {tournament.max_teams} teams
+                  {groups.length} groups • {registeredParticipants.length} / {tournament.max_teams} teams
+                  {waitlistParticipants.length > 0 && ` • ${waitlistParticipants.length} on waitlist`}
                 </p>
               </div>
             </div>
@@ -529,20 +635,37 @@ export default function TournamentDetail() {
               <CardContent className="py-4 flex items-center justify-between flex-wrap gap-4">
                 <div>
                   <p className="font-medium">Registration is open</p>
-                  <p className="text-sm text-muted-foreground">{participants.length} teams registered</p>
+                  <p className="text-sm text-muted-foreground">
+                    {registeredParticipants.length} teams registered
+                    {registeredParticipants.length >= tournament.max_teams && " (Full)"}
+                    {waitlistParticipants.length > 0 && `, ${waitlistParticipants.length} on waiting list`}
+                  </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   {canRegister && (
                     <Button onClick={registerTeam}>
                       <Users className="w-4 h-4 mr-2" />
-                      Register {userTeam?.name}
+                      {registeredParticipants.length >= tournament.max_teams 
+                        ? `Join Waiting List` 
+                        : `Register ${userTeam?.name}`}
                     </Button>
                   )}
-                  {isRegistered && (
+                  {isRegistered && !isOnWaitlist && (
                     <Button variant="outline" onClick={withdrawTeam}>
                       <XCircle className="w-4 h-4 mr-2" />
                       Withdraw
                     </Button>
+                  )}
+                  {isRegistered && isOnWaitlist && (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="bg-warning/20 text-warning-foreground">
+                        Waitlist #{userParticipant?.waitlist_position}
+                      </Badge>
+                      <Button variant="outline" size="sm" onClick={withdrawTeam}>
+                        <XCircle className="w-4 h-4 mr-2" />
+                        Leave Waitlist
+                      </Button>
+                    </div>
                   )}
                 </div>
               </CardContent>
@@ -699,47 +822,82 @@ export default function TournamentDetail() {
 
             {/* Participants Tab */}
             <TabsContent value="participants">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="w-5 h-5" />
-                    All Participants
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {participants.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-4">No teams registered</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {participants.map((p, idx) => {
-                        const groupName = groups.find(g => g.id === p.group_id)?.name;
-                        return (
+              <div className="space-y-6">
+                {/* Registered Teams */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="w-5 h-5" />
+                      Registered Teams ({registeredParticipants.length}/{tournament.max_teams})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {registeredParticipants.length === 0 ? (
+                      <p className="text-muted-foreground text-center py-4">No teams registered</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {registeredParticipants.map((p, idx) => {
+                          const groupName = groups.find(g => g.id === p.group_id)?.name;
+                          return (
+                            <div
+                              key={p.id}
+                              className={`flex items-center justify-between p-3 rounded-lg border ${
+                                p.is_eliminated ? "opacity-50 bg-muted/30" : ""
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="text-sm text-muted-foreground w-6">{idx + 1}.</span>
+                                <span className={p.is_eliminated ? "line-through" : "font-medium"}>
+                                  {p.team_name}
+                                </span>
+                                {groupName && (
+                                  <Badge variant="outline" className="text-xs">{groupName}</Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {p.is_eliminated && <XCircle className="w-4 h-4 text-destructive" />}
+                                {tournament.winner_team_id === p.team_id && <Crown className="w-4 h-4 text-rank-gold" />}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Waiting List */}
+                {waitlistParticipants.length > 0 && (
+                  <Card className="border-warning/30">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-warning">
+                        <Clock className="w-5 h-5" />
+                        Waiting List ({waitlistParticipants.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {waitlistParticipants.map((p) => (
                           <div
                             key={p.id}
-                            className={`flex items-center justify-between p-3 rounded-lg border ${
-                              p.is_eliminated ? "opacity-50 bg-muted/30" : ""
-                            }`}
+                            className="flex items-center justify-between p-3 rounded-lg border border-warning/20 bg-warning/5"
                           >
                             <div className="flex items-center gap-3">
-                              <span className="text-sm text-muted-foreground w-6">{idx + 1}.</span>
-                              <span className={p.is_eliminated ? "line-through" : "font-medium"}>
-                                {p.team_name}
-                              </span>
-                              {groupName && (
-                                <Badge variant="outline" className="text-xs">{groupName}</Badge>
-                              )}
+                              <Badge variant="outline" className="bg-warning/20 text-warning-foreground">
+                                #{p.waitlist_position}
+                              </Badge>
+                              <span className="font-medium">{p.team_name}</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                              {p.is_eliminated && <XCircle className="w-4 h-4 text-destructive" />}
-                              {tournament.winner_team_id === p.team_id && <Crown className="w-4 h-4 text-rank-gold" />}
-                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              Will be added if a team withdraws
+                            </span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </TabsContent>
           </Tabs>
         </motion.div>
