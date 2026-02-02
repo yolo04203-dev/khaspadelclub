@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trophy, DollarSign, Plus, Trash2, Tag } from "lucide-react";
+import { ArrowLeft, Trophy, DollarSign, Plus, Trash2, Tag, MapPin } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -36,6 +36,7 @@ export default function TournamentCreate() {
   const [entryFee, setEntryFee] = useState<number>(0);
   const [entryFeeCurrency, setEntryFeeCurrency] = useState("PKR");
   const [paymentInstructions, setPaymentInstructions] = useState("");
+  const [venue, setVenue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Categories state
@@ -81,6 +82,7 @@ export default function TournamentCreate() {
           entry_fee: entryFee,
           entry_fee_currency: entryFeeCurrency,
           payment_instructions: paymentInstructions.trim() || null,
+          venue: venue.trim() || null,
           created_by: user!.id,
           status: "registration",
         })
@@ -222,6 +224,18 @@ export default function TournamentCreate() {
                     type="date"
                     value={deadline}
                     onChange={(e) => setDeadline(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="venue" className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    Venue (optional)
+                  </Label>
+                  <Input
+                    id="venue"
+                    placeholder="e.g., City Sports Club, Main Court"
+                    value={venue}
+                    onChange={(e) => setVenue(e.target.value)}
                   />
                 </div>
               </CardContent>

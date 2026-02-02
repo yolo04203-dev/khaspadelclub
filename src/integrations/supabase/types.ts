@@ -960,6 +960,7 @@ export type Database = {
           started_at: string | null
           status: Database["public"]["Enums"]["tournament_status"]
           updated_at: string
+          venue: string | null
           winner_team_id: string | null
         }
         Insert: {
@@ -980,6 +981,7 @@ export type Database = {
           started_at?: string | null
           status?: Database["public"]["Enums"]["tournament_status"]
           updated_at?: string
+          venue?: string | null
           winner_team_id?: string | null
         }
         Update: {
@@ -1000,6 +1002,7 @@ export type Database = {
           started_at?: string | null
           status?: Database["public"]["Enums"]["tournament_status"]
           updated_at?: string
+          venue?: string | null
           winner_team_id?: string | null
         }
         Relationships: [
