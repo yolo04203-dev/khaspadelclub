@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock, DollarSign } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -14,6 +14,8 @@ import { GroupStandings } from "@/components/tournament/GroupStandings";
 import { GroupMatchList } from "@/components/tournament/GroupMatchList";
 import { AdminGroupManagement } from "@/components/tournament/AdminGroupManagement";
 import { KnockoutBracket } from "@/components/tournament/KnockoutBracket";
+import { RegistrationDialog } from "@/components/tournament/RegistrationDialog";
+import { PaymentManagement } from "@/components/tournament/PaymentManagement";
 import { toast as sonnerToast } from "sonner";
 
 interface Tournament {
@@ -27,6 +29,8 @@ interface Tournament {
   winner_team_id: string | null;
   number_of_groups: number | null;
   sets_per_match: number;
+  entry_fee: number;
+  entry_fee_currency: string;
 }
 
 interface TournamentGroup {
@@ -47,6 +51,10 @@ interface Participant {
   group_points_for: number;
   group_points_against: number;
   waitlist_position: number | null;
+  payment_status: string;
+  payment_notes: string | null;
+  custom_team_name: string | null;
+  registered_at: string;
 }
 
 interface TournamentMatch {
@@ -79,6 +87,7 @@ export default function TournamentDetail() {
   const [matches, setMatches] = useState<TournamentMatch[]>([]);
   const [userTeam, setUserTeam] = useState<UserTeam | null>(null);
   const [loading, setLoading] = useState(true);
+  const [registrationDialogOpen, setRegistrationDialogOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -99,7 +108,14 @@ export default function TournamentDetail() {
       const participantsWithNames = await Promise.all(
         (participantsRes.data || []).map(async (p) => {
           const { data: team } = await supabase.from("teams").select("name").eq("id", p.team_id).single();
-          return { ...p, team_name: team?.name || "Unknown" };
+          return { 
+            ...p, 
+            team_name: team?.name || "Unknown",
+            payment_status: (p as any).payment_status || "pending",
+            payment_notes: (p as any).payment_notes || null,
+            custom_team_name: (p as any).custom_team_name || null,
+            registered_at: p.registered_at,
+          };
         })
       );
       setParticipants(participantsWithNames);
@@ -132,8 +148,13 @@ export default function TournamentDetail() {
     }
   }, [id, user, fetchData, fetchUserTeam]);
 
-  const registerTeam = async () => {
-    if (!userTeam || !tournament) return;
+  const registerTeam = async (teamId: string | null, customTeamName: string | null) => {
+    if (!tournament) return;
+    
+    // For custom team registration, we need to create a placeholder
+    const actualTeamId = teamId || userTeam?.id;
+    if (!actualTeamId && !customTeamName) return;
+    
     try {
       // Count registered teams (not on waitlist)
       const registeredCount = participants.filter(p => p.waitlist_position === null).length;
@@ -148,23 +169,37 @@ export default function TournamentDetail() {
 
         const { error } = await supabase.from("tournament_participants").insert({
           tournament_id: tournament.id,
-          team_id: userTeam.id,
+          team_id: actualTeamId!,
           waitlist_position: nextWaitlistPosition,
+          custom_team_name: customTeamName,
+          payment_status: "pending",
         });
         if (error) throw error;
+        
+        const teamName = customTeamName || userTeam?.name;
         toast({ 
           title: "Added to Waiting List", 
-          description: `${userTeam.name} is #${nextWaitlistPosition} on the waiting list. You'll be added if a team withdraws.` 
+          description: `${teamName} is #${nextWaitlistPosition} on the waiting list. You'll be added if a team withdraws.` 
         });
       } else {
         // Normal registration
         const { error } = await supabase.from("tournament_participants").insert({
           tournament_id: tournament.id,
-          team_id: userTeam.id,
+          team_id: actualTeamId!,
           seed: registeredCount + 1,
+          custom_team_name: customTeamName,
+          payment_status: "pending",
         });
         if (error) throw error;
-        toast({ title: "Registered!", description: `${userTeam.name} has joined the tournament` });
+        
+        const teamName = customTeamName || userTeam?.name;
+        const feeMessage = tournament.entry_fee > 0 
+          ? ` Please pay ${tournament.entry_fee_currency} ${tournament.entry_fee.toLocaleString()} to confirm your slot.`
+          : "";
+        toast({ 
+          title: "Registered!", 
+          description: `${teamName} has joined the tournament.${feeMessage}` 
+        });
       }
       fetchData();
     } catch (error: any) {
@@ -634,7 +669,15 @@ export default function TournamentDetail() {
             <Card className="mb-6">
               <CardContent className="py-4 flex items-center justify-between flex-wrap gap-4">
                 <div>
-                  <p className="font-medium">Registration is open</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-medium">Registration is open</p>
+                    {tournament.entry_fee > 0 && (
+                      <Badge variant="outline" className="text-xs">
+                        <DollarSign className="w-3 h-3 mr-1" />
+                        {tournament.entry_fee_currency} {tournament.entry_fee.toLocaleString()}
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     {registeredParticipants.length} teams registered
                     {registeredParticipants.length >= tournament.max_teams && " (Full)"}
@@ -643,18 +686,29 @@ export default function TournamentDetail() {
                 </div>
                 <div className="flex gap-2 items-center">
                   {canRegister && (
-                    <Button onClick={registerTeam}>
+                    <Button onClick={() => setRegistrationDialogOpen(true)}>
                       <Users className="w-4 h-4 mr-2" />
                       {registeredParticipants.length >= tournament.max_teams 
-                        ? `Join Waiting List` 
-                        : `Register ${userTeam?.name}`}
+                        ? "Join Waiting List" 
+                        : "Register"}
                     </Button>
                   )}
                   {isRegistered && !isOnWaitlist && (
-                    <Button variant="outline" onClick={withdrawTeam}>
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Withdraw
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Badge 
+                        variant="outline" 
+                        className={userParticipant?.payment_status === "paid" 
+                          ? "bg-emerald-500/20 text-emerald-600" 
+                          : "bg-warning/20 text-warning"
+                        }
+                      >
+                        {userParticipant?.payment_status === "paid" ? "Paid" : "Payment Pending"}
+                      </Badge>
+                      <Button variant="outline" onClick={withdrawTeam}>
+                        <XCircle className="w-4 h-4 mr-2" />
+                        Withdraw
+                      </Button>
+                    </div>
                   )}
                   {isRegistered && isOnWaitlist && (
                     <div className="flex items-center gap-2">
@@ -672,6 +726,19 @@ export default function TournamentDetail() {
             </Card>
           )}
 
+          {/* Registration Dialog */}
+          <RegistrationDialog
+            open={registrationDialogOpen}
+            onOpenChange={setRegistrationDialogOpen}
+            tournamentId={tournament.id}
+            tournamentName={tournament.name}
+            entryFee={tournament.entry_fee || 0}
+            entryFeeCurrency={tournament.entry_fee_currency || "PKR"}
+            isFull={registeredParticipants.length >= tournament.max_teams}
+            userTeam={userTeam}
+            onRegister={registerTeam}
+          />
+
           {/* Winner Banner */}
           {tournament.status === "completed" && tournament.winner_team_id && (
             <Card className="mb-6 bg-gradient-to-r from-rank-gold/10 to-warning/10 border-rank-gold/30">
@@ -685,8 +752,11 @@ export default function TournamentDetail() {
           )}
 
           <Tabs defaultValue={isAdmin ? "manage" : "groups"} className="w-full">
-            <TabsList className="mb-6">
+            <TabsList className="mb-6 flex-wrap">
               {isAdmin && <TabsTrigger value="manage"><Settings className="w-4 h-4 mr-2" />Manage</TabsTrigger>}
+              {isAdmin && tournament.entry_fee > 0 && (
+                <TabsTrigger value="payments"><DollarSign className="w-4 h-4 mr-2" />Payments</TabsTrigger>
+              )}
               <TabsTrigger value="groups">Groups</TabsTrigger>
               <TabsTrigger value="matches">Matches</TabsTrigger>
               <TabsTrigger value="knockout">Knockout</TabsTrigger>
@@ -725,6 +795,28 @@ export default function TournamentDetail() {
                       fetchData();
                     }
                   }}
+                />
+              </TabsContent>
+            )}
+
+            {/* Payments Tab (Admin Only) */}
+            {isAdmin && tournament.entry_fee > 0 && (
+              <TabsContent value="payments">
+                <PaymentManagement
+                  tournamentId={tournament.id}
+                  entryFee={tournament.entry_fee}
+                  entryFeeCurrency={tournament.entry_fee_currency || "PKR"}
+                  participants={participants.map(p => ({
+                    id: p.id,
+                    team_id: p.team_id,
+                    team_name: p.team_name || "Unknown",
+                    registered_at: p.registered_at,
+                    payment_status: p.payment_status || "pending",
+                    payment_notes: p.payment_notes,
+                    custom_team_name: p.custom_team_name,
+                    waitlist_position: p.waitlist_position,
+                  }))}
+                  onRefresh={fetchData}
                 />
               </TabsContent>
             )}
@@ -838,6 +930,7 @@ export default function TournamentDetail() {
                       <div className="space-y-2">
                         {registeredParticipants.map((p, idx) => {
                           const groupName = groups.find(g => g.id === p.group_id)?.name;
+                          const displayName = p.custom_team_name || p.team_name;
                           return (
                             <div
                               key={p.id}
@@ -848,13 +941,28 @@ export default function TournamentDetail() {
                               <div className="flex items-center gap-3">
                                 <span className="text-sm text-muted-foreground w-6">{idx + 1}.</span>
                                 <span className={p.is_eliminated ? "line-through" : "font-medium"}>
-                                  {p.team_name}
+                                  {displayName}
                                 </span>
                                 {groupName && (
                                   <Badge variant="outline" className="text-xs">{groupName}</Badge>
                                 )}
+                                {p.custom_team_name && (
+                                  <span className="text-xs text-muted-foreground">(Custom)</span>
+                                )}
                               </div>
                               <div className="flex items-center gap-2">
+                                {tournament.entry_fee > 0 && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs ${
+                                      p.payment_status === "paid" 
+                                        ? "bg-emerald-500/20 text-emerald-600" 
+                                        : "bg-warning/20 text-warning"
+                                    }`}
+                                  >
+                                    {p.payment_status === "paid" ? "Paid" : "Pending"}
+                                  </Badge>
+                                )}
                                 {p.is_eliminated && <XCircle className="w-4 h-4 text-destructive" />}
                                 {tournament.winner_team_id === p.team_id && <Crown className="w-4 h-4 text-rank-gold" />}
                               </div>
