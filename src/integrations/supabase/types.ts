@@ -683,6 +683,7 @@ export type Database = {
           seed: number | null
           team_id: string
           tournament_id: string
+          waitlist_position: number | null
         }
         Insert: {
           eliminated_at?: string | null
@@ -698,6 +699,7 @@ export type Database = {
           seed?: number | null
           team_id: string
           tournament_id: string
+          waitlist_position?: number | null
         }
         Update: {
           eliminated_at?: string | null
@@ -713,6 +715,7 @@ export type Database = {
           seed?: number | null
           team_id?: string
           tournament_id?: string
+          waitlist_position?: number | null
         }
         Relationships: [
           {
