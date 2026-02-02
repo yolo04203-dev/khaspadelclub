@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Shuffle, Plus, Users, Trash2, Play } from "lucide-react";
+import { Shuffle, Plus, Users, Trash2, Play, UserX } from "lucide-react";
 import { toast } from "sonner";
 
 interface Team {
@@ -31,6 +31,7 @@ interface AdminGroupManagementProps {
   onGenerateGroupMatches: () => Promise<void>;
   canStartKnockout: boolean;
   onStartKnockout: () => Promise<void>;
+  onKickTeam?: (participantId: string, teamName: string) => Promise<void>;
 }
 
 export function AdminGroupManagement({
@@ -43,6 +44,7 @@ export function AdminGroupManagement({
   onGenerateGroupMatches,
   canStartKnockout,
   onStartKnockout,
+  onKickTeam,
 }: AdminGroupManagementProps) {
   const [newGroupName, setNewGroupName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
@@ -124,13 +126,26 @@ export function AdminGroupManagement({
                     className="flex items-center justify-between p-2 rounded bg-muted/50"
                   >
                     <span className="font-medium">{team.team_name}</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onAssignTeam(team.id, null)}
-                    >
-                      Remove
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onAssignTeam(team.id, null)}
+                      >
+                        Remove
+                      </Button>
+                      {onKickTeam && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => onKickTeam(team.id, team.team_name)}
+                          title="Kick from tournament"
+                        >
+                          <UserX className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ))}
                 {group.teams.length === 0 && (
@@ -156,20 +171,33 @@ export function AdminGroupManagement({
                   className="flex items-center justify-between p-2 rounded border"
                 >
                   <span>{team.team_name}</span>
-                  <Select
-                    onValueChange={(value) => onAssignTeam(team.id, value)}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="Assign to..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {groups.map((g) => (
-                        <SelectItem key={g.id} value={g.id}>
-                          {g.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      onValueChange={(value) => onAssignTeam(team.id, value)}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue placeholder="Assign to..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {groups.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>
+                            {g.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {onKickTeam && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => onKickTeam(team.id, team.team_name)}
+                        title="Kick from tournament"
+                      >
+                        <UserX className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
