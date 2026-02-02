@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Play, Trophy, Users, CheckCircle, Shuffle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +32,28 @@ interface Round {
   completed_at: string | null;
 }
 
+interface Team {
+  id: string;
+  team_name: string;
+  player1_name: string;
+  player2_name: string;
+  total_points: number;
+  matches_played: number;
+  wins: number;
+  losses: number;
+}
+
+interface TeamMatch {
+  id: string;
+  round_number: number;
+  court_number: number;
+  team1_id: string;
+  team2_id: string;
+  team1_score: number | null;
+  team2_score: number | null;
+  completed_at: string | null;
+}
+
 interface Session {
   id: string;
   name: string;
@@ -40,17 +62,19 @@ interface Session {
   total_rounds: number;
   current_round: number;
   created_by: string;
+  mode: string;
 }
 
 export default function AmericanoSession() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
 
   const [session, setSession] = useState<Session | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [teamMatches, setTeamMatches] = useState<TeamMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [scores, setScores] = useState<Record<string, { team1: string; team2: string }>>({});
 
@@ -60,16 +84,52 @@ export default function AmericanoSession() {
 
   const fetchSessionData = async () => {
     try {
-      const [sessionRes, playersRes, roundsRes] = await Promise.all([
-        supabase.from("americano_sessions").select("*").eq("id", id).single(),
-        supabase.from("americano_players").select("*").eq("session_id", id).order("total_points", { ascending: false }),
-        supabase.from("americano_rounds").select("*").eq("session_id", id).order("round_number").order("court_number"),
-      ]);
+      const sessionRes = await supabase
+        .from("americano_sessions")
+        .select("*")
+        .eq("id", id)
+        .single();
 
       if (sessionRes.error) throw sessionRes.error;
       setSession(sessionRes.data);
-      setPlayers(playersRes.data || []);
-      setRounds(roundsRes.data || []);
+
+      if (sessionRes.data.mode === "team") {
+        // Fetch team mode data
+        const [teamsRes, matchesRes] = await Promise.all([
+          supabase
+            .from("americano_teams")
+            .select("*")
+            .eq("session_id", id)
+            .order("total_points", { ascending: false }),
+          supabase
+            .from("americano_team_matches")
+            .select("*")
+            .eq("session_id", id)
+            .order("round_number")
+            .order("court_number"),
+        ]);
+
+        setTeams(teamsRes.data || []);
+        setTeamMatches(matchesRes.data || []);
+      } else {
+        // Fetch individual mode data
+        const [playersRes, roundsRes] = await Promise.all([
+          supabase
+            .from("americano_players")
+            .select("*")
+            .eq("session_id", id)
+            .order("total_points", { ascending: false }),
+          supabase
+            .from("americano_rounds")
+            .select("*")
+            .eq("session_id", id)
+            .order("round_number")
+            .order("court_number"),
+        ]);
+
+        setPlayers(playersRes.data || []);
+        setRounds(roundsRes.data || []);
+      }
     } catch (error) {
       console.error("Error fetching session:", error);
       toast({ title: "Error", description: "Failed to load session", variant: "destructive" });
@@ -78,12 +138,32 @@ export default function AmericanoSession() {
     }
   };
 
+  // Generate round-robin schedule for team mode
+  const generateRoundRobinSchedule = (teamList: Team[]): Omit<TeamMatch, "id" | "completed_at">[] => {
+    const matches: Omit<TeamMatch, "id" | "completed_at">[] = [];
+    let matchNumber = 1;
+
+    for (let i = 0; i < teamList.length; i++) {
+      for (let j = i + 1; j < teamList.length; j++) {
+        matches.push({
+          round_number: matchNumber,
+          court_number: 1,
+          team1_id: teamList[i].id,
+          team2_id: teamList[j].id,
+          team1_score: null,
+          team2_score: null,
+        });
+        matchNumber++;
+      }
+    }
+
+    return matches;
+  };
+
   const generateRound = (playerList: Player[], roundNumber: number): Omit<Round, "id" | "completed_at">[] => {
-    // Shuffle players for randomization
     const shuffled = [...playerList].sort(() => Math.random() - 0.5);
     const matches: Omit<Round, "id" | "completed_at">[] = [];
-    
-    // Create matches - 4 players per match (2v2)
+
     for (let i = 0; i < shuffled.length; i += 4) {
       matches.push({
         round_number: roundNumber,
@@ -96,35 +176,125 @@ export default function AmericanoSession() {
         team2_score: null,
       });
     }
-    
+
     return matches;
   };
 
   const startSession = async () => {
-    if (!session || players.length < 4) return;
+    if (!session) return;
 
     try {
-      // Generate first round
-      const firstRoundMatches = generateRound(players, 1);
-      
-      const { error: roundsError } = await supabase
-        .from("americano_rounds")
-        .insert(firstRoundMatches.map(m => ({ ...m, session_id: session.id })));
+      if (session.mode === "team") {
+        if (teams.length < 2) return;
 
-      if (roundsError) throw roundsError;
+        // Generate all round-robin matches
+        const allMatches = generateRoundRobinSchedule(teams);
 
-      const { error: sessionError } = await supabase
-        .from("americano_sessions")
-        .update({ status: "in_progress", current_round: 1, started_at: new Date().toISOString() })
-        .eq("id", session.id);
+        const { error: matchesError } = await supabase
+          .from("americano_team_matches")
+          .insert(allMatches.map((m) => ({ ...m, session_id: session.id })));
 
-      if (sessionError) throw sessionError;
+        if (matchesError) throw matchesError;
 
-      toast({ title: "Session started!", description: "Round 1 matches have been generated" });
+        const { error: sessionError } = await supabase
+          .from("americano_sessions")
+          .update({ status: "in_progress", current_round: 1, started_at: new Date().toISOString() })
+          .eq("id", session.id);
+
+        if (sessionError) throw sessionError;
+
+        toast({ title: "Session started!", description: `${allMatches.length} matches have been generated` });
+      } else {
+        if (players.length < 4) return;
+
+        const firstRoundMatches = generateRound(players, 1);
+
+        const { error: roundsError } = await supabase
+          .from("americano_rounds")
+          .insert(firstRoundMatches.map((m) => ({ ...m, session_id: session.id })));
+
+        if (roundsError) throw roundsError;
+
+        const { error: sessionError } = await supabase
+          .from("americano_sessions")
+          .update({ status: "in_progress", current_round: 1, started_at: new Date().toISOString() })
+          .eq("id", session.id);
+
+        if (sessionError) throw sessionError;
+
+        toast({ title: "Session started!", description: "Round 1 matches have been generated" });
+      }
+
       fetchSessionData();
     } catch (error) {
       console.error("Error starting session:", error);
       toast({ title: "Error", description: "Failed to start session", variant: "destructive" });
+    }
+  };
+
+  const submitTeamScore = async (match: TeamMatch) => {
+    const scoreData = scores[match.id];
+    if (!scoreData) return;
+
+    const team1Score = parseInt(scoreData.team1);
+    const team2Score = parseInt(scoreData.team2);
+
+    if (isNaN(team1Score) || isNaN(team2Score)) {
+      toast({ title: "Invalid scores", description: "Please enter valid numbers", variant: "destructive" });
+      return;
+    }
+
+    try {
+      // Update match score
+      const { error: matchError } = await supabase
+        .from("americano_team_matches")
+        .update({ team1_score: team1Score, team2_score: team2Score, completed_at: new Date().toISOString() })
+        .eq("id", match.id);
+
+      if (matchError) throw matchError;
+
+      // Update team stats
+      const team1 = teams.find((t) => t.id === match.team1_id);
+      const team2 = teams.find((t) => t.id === match.team2_id);
+
+      if (team1) {
+        await supabase
+          .from("americano_teams")
+          .update({
+            total_points: team1.total_points + team1Score,
+            matches_played: team1.matches_played + 1,
+            wins: team1.wins + (team1Score > team2Score ? 1 : 0),
+            losses: team1.losses + (team1Score < team2Score ? 1 : 0),
+          })
+          .eq("id", team1.id);
+      }
+
+      if (team2) {
+        await supabase
+          .from("americano_teams")
+          .update({
+            total_points: team2.total_points + team2Score,
+            matches_played: team2.matches_played + 1,
+            wins: team2.wins + (team2Score > team1Score ? 1 : 0),
+            losses: team2.losses + (team2Score < team1Score ? 1 : 0),
+          })
+          .eq("id", team2.id);
+      }
+
+      // Check if all matches completed
+      const completedCount = teamMatches.filter((m) => m.completed_at || m.id === match.id).length;
+      if (completedCount === teamMatches.length) {
+        await supabase
+          .from("americano_sessions")
+          .update({ status: "completed", completed_at: new Date().toISOString() })
+          .eq("id", session!.id);
+      }
+
+      toast({ title: "Score saved!", description: "Team stats updated" });
+      fetchSessionData();
+    } catch (error) {
+      console.error("Error submitting score:", error);
+      toast({ title: "Error", description: "Failed to save score", variant: "destructive" });
     }
   };
 
@@ -141,7 +311,6 @@ export default function AmericanoSession() {
     }
 
     try {
-      // Update round score
       const { error: roundError } = await supabase
         .from("americano_rounds")
         .update({ team1_score: team1Score, team2_score: team2Score, completed_at: new Date().toISOString() })
@@ -149,7 +318,6 @@ export default function AmericanoSession() {
 
       if (roundError) throw roundError;
 
-      // Update player points
       const playerUpdates = [
         { id: round.team1_player1_id, points: team1Score },
         { id: round.team1_player2_id, points: team1Score },
@@ -158,13 +326,13 @@ export default function AmericanoSession() {
       ];
 
       for (const update of playerUpdates) {
-        const player = players.find(p => p.id === update.id);
+        const player = players.find((p) => p.id === update.id);
         if (player) {
           await supabase
             .from("americano_players")
-            .update({ 
+            .update({
               total_points: player.total_points + update.points,
-              matches_played: player.matches_played + 1 
+              matches_played: player.matches_played + 1,
             })
             .eq("id", update.id);
         }
@@ -181,8 +349,8 @@ export default function AmericanoSession() {
   const advanceRound = async () => {
     if (!session) return;
 
-    const currentRoundMatches = rounds.filter(r => r.round_number === session.current_round);
-    const allCompleted = currentRoundMatches.every(r => r.completed_at);
+    const currentRoundMatches = rounds.filter((r) => r.round_number === session.current_round);
+    const allCompleted = currentRoundMatches.every((r) => r.completed_at);
 
     if (!allCompleted) {
       toast({ title: "Incomplete round", description: "All matches must be completed first", variant: "destructive" });
@@ -190,37 +358,34 @@ export default function AmericanoSession() {
     }
 
     if (session.current_round >= session.total_rounds) {
-      // Complete session
       await supabase
         .from("americano_sessions")
         .update({ status: "completed", completed_at: new Date().toISOString() })
         .eq("id", session.id);
-      
+
       toast({ title: "Session complete!", description: "Final standings are ready" });
       fetchSessionData();
       return;
     }
 
-    // Generate next round
     const nextRound = session.current_round + 1;
     const nextRoundMatches = generateRound(players, nextRound);
 
     await supabase
       .from("americano_rounds")
-      .insert(nextRoundMatches.map(m => ({ ...m, session_id: session.id })));
+      .insert(nextRoundMatches.map((m) => ({ ...m, session_id: session.id })));
 
-    await supabase
-      .from("americano_sessions")
-      .update({ current_round: nextRound })
-      .eq("id", session.id);
+    await supabase.from("americano_sessions").update({ current_round: nextRound }).eq("id", session.id);
 
     toast({ title: `Round ${nextRound} started!`, description: "New matches generated" });
     fetchSessionData();
   };
 
-  const getPlayerName = (playerId: string) => players.find(p => p.id === playerId)?.player_name || "Unknown";
+  const getPlayerName = (playerId: string) => players.find((p) => p.id === playerId)?.player_name || "Unknown";
+  const getTeamName = (teamId: string) => teams.find((t) => t.id === teamId)?.team_name || "Unknown";
 
   const isOwner = user?.id === session?.created_by;
+  const isTeamMode = session?.mode === "team";
 
   if (loading) {
     return (
@@ -238,8 +403,10 @@ export default function AmericanoSession() {
     );
   }
 
-  const currentRoundMatches = rounds.filter(r => r.round_number === session.current_round);
-  const allCurrentCompleted = currentRoundMatches.every(r => r.completed_at);
+  const currentRoundMatches = rounds.filter((r) => r.round_number === session.current_round);
+  const allCurrentCompleted = currentRoundMatches.every((r) => r.completed_at);
+  const pendingTeamMatches = teamMatches.filter((m) => !m.completed_at);
+  const completedTeamMatches = teamMatches.filter((m) => m.completed_at);
 
   return (
     <div className="min-h-screen bg-background">
@@ -260,12 +427,17 @@ export default function AmericanoSession() {
           <div className="flex items-start justify-between mb-8">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center">
-                <Shuffle className="w-6 h-6 text-success" />
+                {isTeamMode ? <Users className="w-6 h-6 text-success" /> : <Shuffle className="w-6 h-6 text-success" />}
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-foreground">{session.name}</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold text-foreground">{session.name}</h1>
+                  <Badge variant="outline">{isTeamMode ? "Team" : "Individual"}</Badge>
+                </div>
                 <p className="text-muted-foreground">
-                  Round {session.current_round} of {session.total_rounds}
+                  {isTeamMode
+                    ? `${completedTeamMatches.length} of ${teamMatches.length} matches completed`
+                    : `Round ${session.current_round} of ${session.total_rounds}`}
                 </p>
               </div>
             </div>
@@ -275,7 +447,7 @@ export default function AmericanoSession() {
           </div>
 
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* Leaderboard */}
+            {/* Standings */}
             <Card className="lg:col-span-1">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -284,24 +456,56 @@ export default function AmericanoSession() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-8">#</TableHead>
-                      <TableHead>Player</TableHead>
-                      <TableHead className="text-right">Points</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {players.map((player, idx) => (
-                      <TableRow key={player.id}>
-                        <TableCell className="font-medium">{idx + 1}</TableCell>
-                        <TableCell>{player.player_name}</TableCell>
-                        <TableCell className="text-right font-semibold">{player.total_points}</TableCell>
+                {isTeamMode ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-8">#</TableHead>
+                        <TableHead>Team</TableHead>
+                        <TableHead className="text-center">W</TableHead>
+                        <TableHead className="text-center">L</TableHead>
+                        <TableHead className="text-right">Pts</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {teams.map((team, idx) => (
+                        <TableRow key={team.id}>
+                          <TableCell className="font-medium">{idx + 1}</TableCell>
+                          <TableCell>
+                            <div>
+                              <span className="font-medium">{team.team_name}</span>
+                              <p className="text-xs text-muted-foreground">
+                                {team.player1_name} & {team.player2_name}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center text-success">{team.wins}</TableCell>
+                          <TableCell className="text-center text-destructive">{team.losses}</TableCell>
+                          <TableCell className="text-right font-semibold">{team.total_points}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-8">#</TableHead>
+                        <TableHead>Player</TableHead>
+                        <TableHead className="text-right">Points</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {players.map((player, idx) => (
+                        <TableRow key={player.id}>
+                          <TableCell className="font-medium">{idx + 1}</TableCell>
+                          <TableCell>{player.player_name}</TableCell>
+                          <TableCell className="text-right font-semibold">{player.total_points}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
 
@@ -309,14 +513,14 @@ export default function AmericanoSession() {
             <Card className="lg:col-span-2">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Round {session.current_round} Matches</CardTitle>
+                  <CardTitle>{isTeamMode ? "Matches" : `Round ${session.current_round} Matches`}</CardTitle>
                   {isOwner && session.status === "draft" && (
                     <Button onClick={startSession}>
                       <Play className="w-4 h-4 mr-2" />
                       Start Session
                     </Button>
                   )}
-                  {isOwner && session.status === "in_progress" && allCurrentCompleted && (
+                  {isOwner && !isTeamMode && session.status === "in_progress" && allCurrentCompleted && (
                     <Button onClick={advanceRound}>
                       {session.current_round >= session.total_rounds ? "Complete Session" : "Next Round"}
                     </Button>
@@ -329,6 +533,87 @@ export default function AmericanoSession() {
                     <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p>Start the session to generate matches</p>
                   </div>
+                ) : isTeamMode ? (
+                  <>
+                    {pendingTeamMatches.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium text-muted-foreground">Pending Matches</h4>
+                        {pendingTeamMatches.map((match) => (
+                          <Card key={match.id}>
+                            <CardContent className="py-4">
+                              <div className="flex items-center justify-between gap-4">
+                                <div className="flex-1">
+                                  <p className="text-sm text-muted-foreground mb-1">Match {match.round_number}</p>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{getTeamName(match.team1_id)}</span>
+                                    <span className="text-muted-foreground">vs</span>
+                                    <span className="font-medium">{getTeamName(match.team2_id)}</span>
+                                  </div>
+                                </div>
+
+                                {isOwner ? (
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      type="number"
+                                      className="w-16"
+                                      placeholder="0"
+                                      value={scores[match.id]?.team1 || ""}
+                                      onChange={(e) =>
+                                        setScores({ ...scores, [match.id]: { ...scores[match.id], team1: e.target.value } })
+                                      }
+                                    />
+                                    <span className="text-muted-foreground">-</span>
+                                    <Input
+                                      type="number"
+                                      className="w-16"
+                                      placeholder="0"
+                                      value={scores[match.id]?.team2 || ""}
+                                      onChange={(e) =>
+                                        setScores({ ...scores, [match.id]: { ...scores[match.id], team2: e.target.value } })
+                                      }
+                                    />
+                                    <Button size="sm" onClick={() => submitTeamScore(match)}>
+                                      Save
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">Pending</span>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+
+                    {completedTeamMatches.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-medium text-muted-foreground">Completed Matches</h4>
+                        {completedTeamMatches.map((match) => (
+                          <Card key={match.id} className="bg-muted/50">
+                            <CardContent className="py-4">
+                              <div className="flex items-center justify-between gap-4">
+                                <div className="flex-1">
+                                  <p className="text-sm text-muted-foreground mb-1">Match {match.round_number}</p>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{getTeamName(match.team1_id)}</span>
+                                    <span className="text-muted-foreground">vs</span>
+                                    <span className="font-medium">{getTeamName(match.team2_id)}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-lg">{match.team1_score}</span>
+                                  <span className="text-muted-foreground">-</span>
+                                  <span className="font-bold text-lg">{match.team2_score}</span>
+                                  <CheckCircle className="w-5 h-5 text-success ml-2" />
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 ) : currentRoundMatches.length === 0 ? (
                   <p className="text-center py-8 text-muted-foreground">No matches for this round</p>
                 ) : (
@@ -363,7 +648,9 @@ export default function AmericanoSession() {
                                 className="w-16"
                                 placeholder="0"
                                 value={scores[round.id]?.team1 || ""}
-                                onChange={(e) => setScores({ ...scores, [round.id]: { ...scores[round.id], team1: e.target.value } })}
+                                onChange={(e) =>
+                                  setScores({ ...scores, [round.id]: { ...scores[round.id], team1: e.target.value } })
+                                }
                               />
                               <span className="text-muted-foreground">-</span>
                               <Input
@@ -371,9 +658,13 @@ export default function AmericanoSession() {
                                 className="w-16"
                                 placeholder="0"
                                 value={scores[round.id]?.team2 || ""}
-                                onChange={(e) => setScores({ ...scores, [round.id]: { ...scores[round.id], team2: e.target.value } })}
+                                onChange={(e) =>
+                                  setScores({ ...scores, [round.id]: { ...scores[round.id], team2: e.target.value } })
+                                }
                               />
-                              <Button size="sm" onClick={() => submitScore(round)}>Save</Button>
+                              <Button size="sm" onClick={() => submitScore(round)}>
+                                Save
+                              </Button>
                             </div>
                           ) : (
                             <span className="text-muted-foreground">Pending</span>
