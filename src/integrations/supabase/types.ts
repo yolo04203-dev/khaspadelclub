@@ -795,6 +795,8 @@ export type Database = {
           payment_confirmed_by: string | null
           payment_notes: string | null
           payment_status: string | null
+          player1_name: string | null
+          player2_name: string | null
           registered_at: string
           seed: number | null
           team_id: string
@@ -816,6 +818,8 @@ export type Database = {
           payment_confirmed_by?: string | null
           payment_notes?: string | null
           payment_status?: string | null
+          player1_name?: string | null
+          player2_name?: string | null
           registered_at?: string
           seed?: number | null
           team_id: string
@@ -837,6 +841,8 @@ export type Database = {
           payment_confirmed_by?: string | null
           payment_notes?: string | null
           payment_status?: string | null
+          player1_name?: string | null
+          player2_name?: string | null
           registered_at?: string
           seed?: number | null
           team_id?: string

@@ -4,9 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Badge } from "@/components/ui/badge";
 import { AlertCircle, Users, DollarSign } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 
 interface UserTeam {
   id: string;
@@ -23,7 +21,7 @@ interface RegistrationDialogProps {
   paymentInstructions?: string | null;
   isFull: boolean;
   userTeam: UserTeam | null;
-  onRegister: (teamId: string | null, customTeamName: string | null) => Promise<void>;
+  onRegister: (teamId: string | null, customTeamName: string | null, player1Name?: string, player2Name?: string) => Promise<void>;
 }
 
 export function RegistrationDialog({
@@ -41,17 +39,26 @@ export function RegistrationDialog({
     userTeam ? "existing" : "custom"
   );
   const [customTeamName, setCustomTeamName] = useState("");
+  const [player1Name, setPlayer1Name] = useState("");
+  const [player2Name, setPlayer2Name] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
       setRegistrationType(userTeam ? "existing" : "custom");
       setCustomTeamName("");
+      setPlayer1Name("");
+      setPlayer2Name("");
     }
   }, [open, userTeam]);
 
+  const isCustomFormValid = 
+    customTeamName.trim() !== "" && 
+    player1Name.trim() !== "" && 
+    player2Name.trim() !== "";
+
   const handleSubmit = async () => {
-    if (registrationType === "custom" && !customTeamName.trim()) {
+    if (registrationType === "custom" && !isCustomFormValid) {
       return;
     }
 
@@ -60,7 +67,7 @@ export function RegistrationDialog({
       if (registrationType === "existing" && userTeam) {
         await onRegister(userTeam.id, null);
       } else {
-        await onRegister(null, customTeamName.trim());
+        await onRegister(null, customTeamName.trim(), player1Name.trim(), player2Name.trim());
       }
       onOpenChange(false);
     } finally {
@@ -107,19 +114,40 @@ export function RegistrationDialog({
                 <RadioGroupItem value="custom" id="custom" />
                 <Label htmlFor="custom" className="flex-1 cursor-pointer">
                   <div className="font-medium">Register a new team</div>
-                  <div className="text-sm text-muted-foreground">Enter a custom team name</div>
+                  <div className="text-sm text-muted-foreground">Enter team name and player names</div>
                 </Label>
               </div>
             </RadioGroup>
 
             {registrationType === "custom" && (
-              <div className="pt-2">
-                <Input
-                  placeholder="Enter team name"
-                  value={customTeamName}
-                  onChange={(e) => setCustomTeamName(e.target.value)}
-                  className="w-full"
-                />
+              <div className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <Label htmlFor="teamName">Team Name</Label>
+                  <Input
+                    id="teamName"
+                    placeholder="Enter team name"
+                    value={customTeamName}
+                    onChange={(e) => setCustomTeamName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="player1">Player 1 Name</Label>
+                  <Input
+                    id="player1"
+                    placeholder="Enter first player's name"
+                    value={player1Name}
+                    onChange={(e) => setPlayer1Name(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="player2">Player 2 Name</Label>
+                  <Input
+                    id="player2"
+                    placeholder="Enter second player's name"
+                    value={player2Name}
+                    onChange={(e) => setPlayer2Name(e.target.value)}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -170,7 +198,7 @@ export function RegistrationDialog({
           </Button>
           <Button 
             onClick={handleSubmit} 
-            disabled={isSubmitting || (registrationType === "custom" && !customTeamName.trim())}
+            disabled={isSubmitting || (registrationType === "custom" && !isCustomFormValid)}
           >
             {isSubmitting ? (
               <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin mr-2" />
