@@ -21,24 +21,54 @@ interface GroupMatchListProps {
   matches: GroupMatch[];
   isAdmin: boolean;
   onSubmitScore: (matchId: string, team1Score: number, team2Score: number) => Promise<void>;
+  setsPerMatch?: number;
 }
 
-export function GroupMatchList({ groupName, matches, isAdmin, onSubmitScore }: GroupMatchListProps) {
-  const [scores, setScores] = useState<Record<string, { team1: string; team2: string }>>({});
+export function GroupMatchList({ groupName, matches, isAdmin, onSubmitScore, setsPerMatch = 3 }: GroupMatchListProps) {
+  const [scores, setScores] = useState<Record<string, { sets: { team1: string; team2: string }[] }>>({});
   const [submitting, setSubmitting] = useState<string | null>(null);
+
+  const initializeScores = (matchId: string) => {
+    if (!scores[matchId]) {
+      const numSets = setsPerMatch;
+      setScores(prev => ({
+        ...prev,
+        [matchId]: {
+          sets: Array(numSets).fill(null).map(() => ({ team1: "", team2: "" }))
+        }
+      }));
+    }
+  };
 
   const handleSubmit = async (match: GroupMatch) => {
     const scoreData = scores[match.id];
     if (!scoreData) return;
 
-    const team1Score = parseInt(scoreData.team1);
-    const team2Score = parseInt(scoreData.team2);
+    // For single set, just count the first set as the score
+    // For best of 3, count sets won
+    let team1Total = 0;
+    let team2Total = 0;
 
-    if (isNaN(team1Score) || isNaN(team2Score)) return;
+    if (setsPerMatch === 1) {
+      team1Total = parseInt(scoreData.sets[0]?.team1 || "0");
+      team2Total = parseInt(scoreData.sets[0]?.team2 || "0");
+    } else {
+      // Count sets won (who won each set)
+      scoreData.sets.forEach(set => {
+        const s1 = parseInt(set.team1 || "0");
+        const s2 = parseInt(set.team2 || "0");
+        if (s1 > s2) team1Total++;
+        else if (s2 > s1) team2Total++;
+      });
+    }
+
+    if (team1Total === team2Total) {
+      return; // Can't have a tie
+    }
 
     setSubmitting(match.id);
     try {
-      await onSubmitScore(match.id, team1Score, team2Score);
+      await onSubmitScore(match.id, team1Total, team2Total);
       setScores(prev => {
         const updated = { ...prev };
         delete updated[match.id];
@@ -46,6 +76,34 @@ export function GroupMatchList({ groupName, matches, isAdmin, onSubmitScore }: G
       });
     } finally {
       setSubmitting(null);
+    }
+  };
+
+  const isValidScore = (matchId: string) => {
+    const scoreData = scores[matchId];
+    if (!scoreData) return false;
+
+    if (setsPerMatch === 1) {
+      const s1 = parseInt(scoreData.sets[0]?.team1 || "");
+      const s2 = parseInt(scoreData.sets[0]?.team2 || "");
+      return !isNaN(s1) && !isNaN(s2) && s1 !== s2;
+    } else {
+      // For best of 3, need at least 2 sets filled
+      let team1Wins = 0;
+      let team2Wins = 0;
+      let validSets = 0;
+
+      scoreData.sets.forEach(set => {
+        const s1 = parseInt(set.team1 || "");
+        const s2 = parseInt(set.team2 || "");
+        if (!isNaN(s1) && !isNaN(s2) && s1 !== s2) {
+          validSets++;
+          if (s1 > s2) team1Wins++;
+          else team2Wins++;
+        }
+      });
+
+      return validSets >= 2 && (team1Wins === 2 || team2Wins === 2);
     }
   };
 
@@ -57,9 +115,14 @@ export function GroupMatchList({ groupName, matches, isAdmin, onSubmitScore }: G
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center justify-between">
           <span>{groupName} Matches</span>
-          <Badge variant="outline">
-            {completedMatches.length}/{matches.length} played
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              {setsPerMatch === 1 ? "Single Set" : "Best of 3"}
+            </Badge>
+            <Badge variant="outline">
+              {completedMatches.length}/{matches.length} played
+            </Badge>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -68,63 +131,76 @@ export function GroupMatchList({ groupName, matches, isAdmin, onSubmitScore }: G
         ) : (
           <>
             {/* Pending matches first */}
-            {pendingMatches.map((match) => (
-              <div key={match.id} className="p-3 rounded-lg border border-border bg-card">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="w-3 h-3 text-warning" />
-                      <span className="text-muted-foreground">Pending</span>
-                    </div>
-                    <div className="mt-1 font-medium">
-                      {match.team1_name} vs {match.team2_name}
-                    </div>
+            {pendingMatches.map((match) => {
+              initializeScores(match.id);
+              const matchScores = scores[match.id];
+
+              return (
+                <div key={match.id} className="p-3 rounded-lg border border-border bg-card">
+                  <div className="flex items-center gap-2 text-sm mb-2">
+                    <Clock className="w-3 h-3 text-warning" />
+                    <span className="text-muted-foreground">Pending</span>
                   </div>
-                  {isAdmin && (
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        min={0}
-                        placeholder="0"
-                        className="w-16 text-center"
-                        value={scores[match.id]?.team1 || ""}
-                        onChange={(e) =>
-                          setScores((prev) => ({
-                            ...prev,
-                            [match.id]: { ...prev[match.id], team1: e.target.value },
-                          }))
-                        }
-                      />
-                      <span className="text-muted-foreground">-</span>
-                      <Input
-                        type="number"
-                        min={0}
-                        placeholder="0"
-                        className="w-16 text-center"
-                        value={scores[match.id]?.team2 || ""}
-                        onChange={(e) =>
-                          setScores((prev) => ({
-                            ...prev,
-                            [match.id]: { ...prev[match.id], team2: e.target.value },
-                          }))
-                        }
-                      />
+                  <div className="font-medium mb-3">
+                    {match.team1_name} vs {match.team2_name}
+                  </div>
+                  {isAdmin && matchScores && (
+                    <div className="space-y-2">
+                      {matchScores.sets.map((set, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground w-12">
+                            {setsPerMatch === 1 ? "Score" : `Set ${idx + 1}`}
+                          </span>
+                          <Input
+                            type="number"
+                            min={0}
+                            placeholder="0"
+                            className="w-14 text-center h-8"
+                            value={set.team1}
+                            onChange={(e) =>
+                              setScores((prev) => ({
+                                ...prev,
+                                [match.id]: {
+                                  sets: prev[match.id].sets.map((s, i) =>
+                                    i === idx ? { ...s, team1: e.target.value } : s
+                                  ),
+                                },
+                              }))
+                            }
+                          />
+                          <span className="text-muted-foreground">-</span>
+                          <Input
+                            type="number"
+                            min={0}
+                            placeholder="0"
+                            className="w-14 text-center h-8"
+                            value={set.team2}
+                            onChange={(e) =>
+                              setScores((prev) => ({
+                                ...prev,
+                                [match.id]: {
+                                  sets: prev[match.id].sets.map((s, i) =>
+                                    i === idx ? { ...s, team2: e.target.value } : s
+                                  ),
+                                },
+                              }))
+                            }
+                          />
+                        </div>
+                      ))}
                       <Button
                         size="sm"
                         onClick={() => handleSubmit(match)}
-                        disabled={
-                          submitting === match.id ||
-                          !scores[match.id]?.team1 ||
-                          !scores[match.id]?.team2
-                        }
+                        disabled={submitting === match.id || !isValidScore(match.id)}
+                        className="mt-2"
                       >
-                        {submitting === match.id ? "..." : "Save"}
+                        {submitting === match.id ? "Saving..." : "Save Result"}
                       </Button>
                     </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Completed matches */}
             {completedMatches.map((match) => (

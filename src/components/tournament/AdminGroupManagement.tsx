@@ -32,6 +32,8 @@ interface AdminGroupManagementProps {
   canStartKnockout: boolean;
   onStartKnockout: () => Promise<void>;
   onKickTeam?: (participantId: string, teamName: string) => Promise<void>;
+  setsPerMatch?: number;
+  onSetsPerMatchChange?: (sets: number) => Promise<void>;
 }
 
 export function AdminGroupManagement({
@@ -45,6 +47,8 @@ export function AdminGroupManagement({
   canStartKnockout,
   onStartKnockout,
   onKickTeam,
+  setsPerMatch = 3,
+  onSetsPerMatchChange,
 }: AdminGroupManagementProps) {
   const [newGroupName, setNewGroupName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
@@ -79,6 +83,25 @@ export function AdminGroupManagement({
         <CardDescription>Create groups and assign teams</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Match Format Setting */}
+        {onSetsPerMatchChange && (
+          <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
+            <Label className="text-sm font-medium">Match Format:</Label>
+            <Select
+              value={String(setsPerMatch)}
+              onValueChange={(value) => onSetsPerMatchChange(Number(value))}
+            >
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Single Set</SelectItem>
+                <SelectItem value="3">Best of 3 Sets</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         {/* Create Group */}
         <div className="flex gap-2">
           <Input
