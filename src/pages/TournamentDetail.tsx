@@ -160,6 +160,21 @@ export default function TournamentDetail() {
     }
   };
 
+  const kickTeam = async (participantId: string, teamName: string) => {
+    if (!tournament) return;
+    try {
+      const { error } = await supabase
+        .from("tournament_participants")
+        .delete()
+        .eq("id", participantId);
+      if (error) throw error;
+      sonnerToast.success(`${teamName} has been removed from the tournament`);
+      fetchData();
+    } catch (error: any) {
+      sonnerToast.error("Failed to remove team");
+    }
+  };
+
   // Group management functions
   const createGroup = async (name: string) => {
     if (!tournament) return;
@@ -565,6 +580,7 @@ export default function TournamentDetail() {
                   onGenerateGroupMatches={generateGroupMatches}
                   canStartKnockout={canStartKnockout}
                   onStartKnockout={startKnockoutStage}
+                  onKickTeam={kickTeam}
                 />
               </TabsContent>
             )}
