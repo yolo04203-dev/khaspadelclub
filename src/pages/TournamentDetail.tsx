@@ -149,7 +149,7 @@ export default function TournamentDetail() {
     }
   }, [id, user, fetchData, fetchUserTeam]);
 
-  const registerTeam = async (teamId: string | null, customTeamName: string | null) => {
+  const registerTeam = async (teamId: string | null, customTeamName: string | null, player1Name?: string, player2Name?: string) => {
     if (!tournament) return;
     
     // For custom team registration, we need to create a placeholder
@@ -173,6 +173,8 @@ export default function TournamentDetail() {
           team_id: actualTeamId!,
           waitlist_position: nextWaitlistPosition,
           custom_team_name: customTeamName,
+          player1_name: player1Name || null,
+          player2_name: player2Name || null,
           payment_status: "pending",
         });
         if (error) throw error;
@@ -189,6 +191,8 @@ export default function TournamentDetail() {
           team_id: actualTeamId!,
           seed: registeredCount + 1,
           custom_team_name: customTeamName,
+          player1_name: player1Name || null,
+          player2_name: player2Name || null,
           payment_status: "pending",
         });
         if (error) throw error;
