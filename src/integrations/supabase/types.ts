@@ -769,6 +769,7 @@ export type Database = {
           max_teams: number
           name: string
           number_of_groups: number | null
+          payment_instructions: string | null
           registration_deadline: string | null
           sets_per_match: number
           started_at: string | null
@@ -788,6 +789,7 @@ export type Database = {
           max_teams?: number
           name: string
           number_of_groups?: number | null
+          payment_instructions?: string | null
           registration_deadline?: string | null
           sets_per_match?: number
           started_at?: string | null
@@ -807,6 +809,7 @@ export type Database = {
           max_teams?: number
           name?: string
           number_of_groups?: number | null
+          payment_instructions?: string | null
           registration_deadline?: string | null
           sets_per_match?: number
           started_at?: string | null

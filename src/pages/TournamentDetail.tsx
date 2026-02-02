@@ -31,6 +31,7 @@ interface Tournament {
   sets_per_match: number;
   entry_fee: number;
   entry_fee_currency: string;
+  payment_instructions: string | null;
 }
 
 interface TournamentGroup {
@@ -734,6 +735,7 @@ export default function TournamentDetail() {
             tournamentName={tournament.name}
             entryFee={tournament.entry_fee || 0}
             entryFeeCurrency={tournament.entry_fee_currency || "PKR"}
+            paymentInstructions={tournament.payment_instructions}
             isFull={registeredParticipants.length >= tournament.max_teams}
             userTeam={userTeam}
             onRegister={registerTeam}
