@@ -750,6 +750,7 @@ export type Database = {
           name: string
           number_of_groups: number | null
           registration_deadline: string | null
+          sets_per_match: number
           started_at: string | null
           status: Database["public"]["Enums"]["tournament_status"]
           updated_at: string
@@ -766,6 +767,7 @@ export type Database = {
           name: string
           number_of_groups?: number | null
           registration_deadline?: string | null
+          sets_per_match?: number
           started_at?: string | null
           status?: Database["public"]["Enums"]["tournament_status"]
           updated_at?: string
@@ -782,6 +784,7 @@ export type Database = {
           name?: string
           number_of_groups?: number | null
           registration_deadline?: string | null
+          sets_per_match?: number
           started_at?: string | null
           status?: Database["public"]["Enums"]["tournament_status"]
           updated_at?: string

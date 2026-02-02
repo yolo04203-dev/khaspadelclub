@@ -26,6 +26,7 @@ interface Tournament {
   created_by: string;
   winner_team_id: string | null;
   number_of_groups: number | null;
+  sets_per_match: number;
 }
 
 interface TournamentGroup {
@@ -588,6 +589,19 @@ export default function TournamentDetail() {
                   canStartKnockout={canStartKnockout}
                   onStartKnockout={startKnockoutStage}
                   onKickTeam={kickTeam}
+                  setsPerMatch={tournament.sets_per_match}
+                  onSetsPerMatchChange={async (sets) => {
+                    const { error } = await supabase
+                      .from("tournaments")
+                      .update({ sets_per_match: sets })
+                      .eq("id", tournament.id);
+                    if (error) {
+                      sonnerToast.error("Failed to update match format");
+                    } else {
+                      sonnerToast.success(`Match format set to best of ${sets}`);
+                      fetchData();
+                    }
+                  }}
                 />
               </TabsContent>
             )}
@@ -660,6 +674,7 @@ export default function TournamentDetail() {
                         matches={gMatches}
                         isAdmin={isAdmin}
                         onSubmitScore={submitGroupMatchScore}
+                        setsPerMatch={tournament.sets_per_match}
                       />
                     );
                   })}
