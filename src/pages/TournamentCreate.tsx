@@ -10,7 +10,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 
 type TournamentFormat = "single_elimination" | "double_elimination" | "round_robin";
@@ -24,6 +23,7 @@ export default function TournamentCreate() {
   const [description, setDescription] = useState("");
   const [format, setFormat] = useState<TournamentFormat>("single_elimination");
   const [maxTeams, setMaxTeams] = useState(8);
+  const [numberOfGroups, setNumberOfGroups] = useState(2);
   const [deadline, setDeadline] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -45,6 +45,7 @@ export default function TournamentCreate() {
           description: description.trim() || null,
           format,
           max_teams: maxTeams,
+          number_of_groups: numberOfGroups,
           registration_deadline: deadline || null,
           created_by: user!.id,
           status: "registration",
@@ -147,61 +148,48 @@ export default function TournamentCreate() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="deadline">Registration Deadline</Label>
+                    <Label htmlFor="numberOfGroups">Number of Groups</Label>
                     <Input
-                      id="deadline"
-                      type="date"
-                      value={deadline}
-                      onChange={(e) => setDeadline(e.target.value)}
+                      id="numberOfGroups"
+                      type="number"
+                      min={2}
+                      max={8}
+                      value={numberOfGroups}
+                      onChange={(e) => setNumberOfGroups(parseInt(e.target.value))}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Top 2 from each group qualify for knockout
+                    </p>
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="deadline">Registration Deadline</Label>
+                  <Input
+                    id="deadline"
+                    type="date"
+                    value={deadline}
+                    onChange={(e) => setDeadline(e.target.value)}
+                  />
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Format</CardTitle>
-                <CardDescription>Choose how teams compete</CardDescription>
+                <CardTitle>Tournament Format</CardTitle>
+                <CardDescription>Padel tournament with group stage + knockout</CardDescription>
               </CardHeader>
               <CardContent>
-                <RadioGroup value={format} onValueChange={(v) => setFormat(v as TournamentFormat)}>
-                  <div className="flex items-start space-x-3 p-4 rounded-lg border border-border hover:bg-muted/50 cursor-pointer">
-                    <RadioGroupItem value="single_elimination" id="single" />
-                    <div className="flex-1">
-                      <Label htmlFor="single" className="font-medium cursor-pointer">
-                        Single Elimination
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Lose once and you're out. Fast-paced, high stakes.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start space-x-3 p-4 rounded-lg border border-border hover:bg-muted/50 cursor-pointer">
-                    <RadioGroupItem value="double_elimination" id="double" />
-                    <div className="flex-1">
-                      <Label htmlFor="double" className="font-medium cursor-pointer">
-                        Double Elimination
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Two losses to be eliminated. Includes losers bracket.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start space-x-3 p-4 rounded-lg border border-border hover:bg-muted/50 cursor-pointer">
-                    <RadioGroupItem value="round_robin" id="robin" />
-                    <div className="flex-1">
-                      <Label htmlFor="robin" className="font-medium cursor-pointer">
-                        Round Robin
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Everyone plays everyone. Most wins determines the champion.
-                      </p>
-                    </div>
-                  </div>
-                </RadioGroup>
+                <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                  <h4 className="font-medium mb-2">How it works:</h4>
+                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                    <li>Teams are divided into {numberOfGroups} groups</li>
+                    <li>Round-robin matches within each group</li>
+                    <li>Top 2 teams from each group qualify for knockout</li>
+                    <li>Cross-group semi-finals (1st A vs 2nd B, 1st B vs 2nd A)</li>
+                    <li>Winners advance to the finals</li>
+                  </ul>
+                </div>
               </CardContent>
             </Card>
 
