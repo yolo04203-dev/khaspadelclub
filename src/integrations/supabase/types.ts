@@ -647,8 +647,47 @@ export type Database = {
         }
         Relationships: []
       }
+      tournament_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          max_teams: number
+          name: string
+          tournament_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          max_teams?: number
+          name: string
+          tournament_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          max_teams?: number
+          name?: string
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_categories_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tournament_groups: {
         Row: {
+          category_id: string | null
           created_at: string
           display_order: number
           id: string
@@ -656,6 +695,7 @@ export type Database = {
           tournament_id: string
         }
         Insert: {
+          category_id?: string | null
           created_at?: string
           display_order?: number
           id?: string
@@ -663,6 +703,7 @@ export type Database = {
           tournament_id: string
         }
         Update: {
+          category_id?: string | null
           created_at?: string
           display_order?: number
           id?: string
@@ -670,6 +711,13 @@ export type Database = {
           tournament_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tournament_groups_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "tournament_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tournament_groups_tournament_id_fkey"
             columns: ["tournament_id"]
@@ -681,6 +729,7 @@ export type Database = {
       }
       tournament_matches: {
         Row: {
+          category_id: string | null
           completed_at: string | null
           created_at: string
           group_id: string | null
@@ -699,6 +748,7 @@ export type Database = {
           winner_team_id: string | null
         }
         Insert: {
+          category_id?: string | null
           completed_at?: string | null
           created_at?: string
           group_id?: string | null
@@ -717,6 +767,7 @@ export type Database = {
           winner_team_id?: string | null
         }
         Update: {
+          category_id?: string | null
           completed_at?: string | null
           created_at?: string
           group_id?: string | null
@@ -735,6 +786,13 @@ export type Database = {
           winner_team_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "tournament_matches_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "tournament_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tournament_matches_group_id_fkey"
             columns: ["group_id"]
@@ -781,6 +839,7 @@ export type Database = {
       }
       tournament_participants: {
         Row: {
+          category_id: string | null
           custom_team_name: string | null
           eliminated_at: string | null
           final_placement: number | null
@@ -804,6 +863,7 @@ export type Database = {
           waitlist_position: number | null
         }
         Insert: {
+          category_id?: string | null
           custom_team_name?: string | null
           eliminated_at?: string | null
           final_placement?: number | null
@@ -827,6 +887,7 @@ export type Database = {
           waitlist_position?: number | null
         }
         Update: {
+          category_id?: string | null
           custom_team_name?: string | null
           eliminated_at?: string | null
           final_placement?: number | null
@@ -850,6 +911,13 @@ export type Database = {
           waitlist_position?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "tournament_participants_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "tournament_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tournament_participants_group_id_fkey"
             columns: ["group_id"]

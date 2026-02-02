@@ -4,11 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { AlertCircle, Users, DollarSign } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertCircle, Users, DollarSign, Tag } from "lucide-react";
 
 interface UserTeam {
   id: string;
   name: string;
+}
+
+interface TournamentCategory {
+  id: string;
+  name: string;
+  max_teams: number;
+  participantCount: number;
 }
 
 interface RegistrationDialogProps {
@@ -21,7 +29,8 @@ interface RegistrationDialogProps {
   paymentInstructions?: string | null;
   isFull: boolean;
   userTeam: UserTeam | null;
-  onRegister: (teamId: string | null, customTeamName: string | null, player1Name?: string, player2Name?: string) => Promise<void>;
+  categories?: TournamentCategory[];
+  onRegister: (teamId: string | null, customTeamName: string | null, player1Name?: string, player2Name?: string, categoryId?: string) => Promise<void>;
 }
 
 export function RegistrationDialog({
@@ -33,6 +42,7 @@ export function RegistrationDialog({
   paymentInstructions,
   isFull,
   userTeam,
+  categories = [],
   onRegister,
 }: RegistrationDialogProps) {
   const [registrationType, setRegistrationType] = useState<"existing" | "custom">(
@@ -41,6 +51,7 @@ export function RegistrationDialog({
   const [customTeamName, setCustomTeamName] = useState("");
   const [player1Name, setPlayer1Name] = useState("");
   const [player2Name, setPlayer2Name] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -49,25 +60,42 @@ export function RegistrationDialog({
       setCustomTeamName("");
       setPlayer1Name("");
       setPlayer2Name("");
+      // Auto-select first category if only one exists
+      if (categories.length === 1) {
+        setSelectedCategoryId(categories[0].id);
+      } else {
+        setSelectedCategoryId("");
+      }
     }
-  }, [open, userTeam]);
+  }, [open, userTeam, categories]);
 
   const isCustomFormValid = 
     customTeamName.trim() !== "" && 
     player1Name.trim() !== "" && 
     player2Name.trim() !== "";
 
+  const isCategoryRequired = categories.length > 0;
+  const isCategoryValid = !isCategoryRequired || selectedCategoryId !== "";
+
+  const selectedCategory = categories.find(c => c.id === selectedCategoryId);
+  const isCategoryFull = selectedCategory 
+    ? selectedCategory.participantCount >= selectedCategory.max_teams 
+    : isFull;
+
   const handleSubmit = async () => {
     if (registrationType === "custom" && !isCustomFormValid) {
+      return;
+    }
+    if (!isCategoryValid) {
       return;
     }
 
     setIsSubmitting(true);
     try {
       if (registrationType === "existing" && userTeam) {
-        await onRegister(userTeam.id, null);
+        await onRegister(userTeam.id, null, undefined, undefined, selectedCategoryId || undefined);
       } else {
-        await onRegister(null, customTeamName.trim(), player1Name.trim(), player2Name.trim());
+        await onRegister(null, customTeamName.trim(), player1Name.trim(), player2Name.trim(), selectedCategoryId || undefined);
       }
       onOpenChange(false);
     } finally {
@@ -93,6 +121,33 @@ export function RegistrationDialog({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {/* Category Selection */}
+          {categories.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Tag className="w-4 h-4" />
+                Select Category
+              </Label>
+              <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((category) => (
+                    <SelectItem 
+                      key={category.id} 
+                      value={category.id}
+                      disabled={category.participantCount >= category.max_teams}
+                    >
+                      {category.name} ({category.participantCount}/{category.max_teams})
+                      {category.participantCount >= category.max_teams && " - Full"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Team Selection */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">Team Selection</Label>
@@ -179,11 +234,13 @@ export function RegistrationDialog({
           )}
 
           {/* Waitlist Warning */}
-          {isFull && (
+          {isCategoryFull && (
             <div className="rounded-lg border border-muted bg-muted/30 p-4 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-muted-foreground mt-0.5" />
               <div>
-                <p className="font-medium text-foreground">Tournament is full</p>
+                <p className="font-medium text-foreground">
+                  {selectedCategory ? `${selectedCategory.name} is full` : "Tournament is full"}
+                </p>
                 <p className="text-sm text-muted-foreground">
                   You will be added to the waiting list. If a team withdraws, you'll be promoted automatically.
                 </p>
@@ -198,12 +255,12 @@ export function RegistrationDialog({
           </Button>
           <Button 
             onClick={handleSubmit} 
-            disabled={isSubmitting || (registrationType === "custom" && !isCustomFormValid)}
+            disabled={isSubmitting || (registrationType === "custom" && !isCustomFormValid) || !isCategoryValid}
           >
             {isSubmitting ? (
               <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin mr-2" />
             ) : null}
-            {isFull ? "Join Waiting List" : "Register"}
+            {isCategoryFull ? "Join Waiting List" : "Register"}
           </Button>
         </DialogFooter>
       </DialogContent>

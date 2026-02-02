@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trophy, DollarSign } from "lucide-react";
+import { ArrowLeft, Trophy, DollarSign, Plus, Trash2, Tag } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -11,9 +11,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
 type TournamentFormat = "single_elimination" | "double_elimination" | "round_robin";
+
+interface CategoryInput {
+  name: string;
+  description: string;
+  maxTeams: number;
+}
 
 export default function TournamentCreate() {
   const { user, isLoading: authLoading } = useAuth();
@@ -30,6 +37,26 @@ export default function TournamentCreate() {
   const [entryFeeCurrency, setEntryFeeCurrency] = useState("PKR");
   const [paymentInstructions, setPaymentInstructions] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Categories state
+  const [categories, setCategories] = useState<CategoryInput[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryMaxTeams, setNewCategoryMaxTeams] = useState(8);
+
+  const addCategory = () => {
+    if (!newCategoryName.trim()) return;
+    setCategories([...categories, { 
+      name: newCategoryName.trim(), 
+      description: "", 
+      maxTeams: newCategoryMaxTeams 
+    }]);
+    setNewCategoryName("");
+    setNewCategoryMaxTeams(8);
+  };
+
+  const removeCategory = (index: number) => {
+    setCategories(categories.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +88,25 @@ export default function TournamentCreate() {
         .single();
 
       if (error) throw error;
+
+      // Create categories if any
+      if (categories.length > 0) {
+        const categoriesToInsert = categories.map((cat, index) => ({
+          tournament_id: data.id,
+          name: cat.name,
+          description: cat.description || null,
+          max_teams: cat.maxTeams,
+          display_order: index,
+        }));
+
+        const { error: catError } = await supabase
+          .from("tournament_categories")
+          .insert(categoriesToInsert);
+
+        if (catError) {
+          console.error("Error creating categories:", catError);
+        }
+      }
 
       toast({ title: "Tournament created!", description: "Teams can now register" });
       navigate(`/tournaments/${data.id}`);
@@ -178,6 +224,78 @@ export default function TournamentCreate() {
                     onChange={(e) => setDeadline(e.target.value)}
                   />
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Categories Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Tag className="w-5 h-5" />
+                  Categories (Optional)
+                </CardTitle>
+                <CardDescription>
+                  Add categories like "Men's", "Women's", "Mixed" for separate brackets
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {categories.length > 0 && (
+                  <div className="space-y-2">
+                    {categories.map((cat, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">{cat.name}</Badge>
+                          <span className="text-sm text-muted-foreground">
+                            Max {cat.maxTeams} teams
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeCategory(index)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Category name (e.g., Men's A)"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addCategory();
+                        }
+                      }}
+                    />
+                  </div>
+                  <Input
+                    type="number"
+                    className="w-24"
+                    min={2}
+                    max={64}
+                    value={newCategoryMaxTeams}
+                    onChange={(e) => setNewCategoryMaxTeams(parseInt(e.target.value) || 8)}
+                    placeholder="Max"
+                  />
+                  <Button type="button" variant="outline" onClick={addCategory}>
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Leave empty for a single-category tournament. Each category will have its own groups and knockout bracket.
+                </p>
               </CardContent>
             </Card>
 

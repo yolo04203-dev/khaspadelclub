@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock, DollarSign } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock, DollarSign, Tag } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { GroupStandings } from "@/components/tournament/GroupStandings";
 import { GroupMatchList } from "@/components/tournament/GroupMatchList";
@@ -16,6 +17,7 @@ import { AdminGroupManagement } from "@/components/tournament/AdminGroupManageme
 import { KnockoutBracket } from "@/components/tournament/KnockoutBracket";
 import { RegistrationDialog } from "@/components/tournament/RegistrationDialog";
 import { PaymentManagement } from "@/components/tournament/PaymentManagement";
+import { CategoryManagement, TournamentCategory } from "@/components/tournament/CategoryManagement";
 import { toast as sonnerToast } from "sonner";
 
 interface Tournament {
@@ -38,6 +40,7 @@ interface TournamentGroup {
   id: string;
   name: string;
   display_order: number;
+  category_id: string | null;
 }
 
 interface Participant {
@@ -47,6 +50,7 @@ interface Participant {
   is_eliminated: boolean;
   team_name?: string;
   group_id: string | null;
+  category_id: string | null;
   group_wins: number;
   group_losses: number;
   group_points_for: number;
@@ -56,6 +60,8 @@ interface Participant {
   payment_notes: string | null;
   custom_team_name: string | null;
   registered_at: string;
+  player1_name: string | null;
+  player2_name: string | null;
 }
 
 interface TournamentMatch {
@@ -69,6 +75,7 @@ interface TournamentMatch {
   winner_team_id: string | null;
   is_losers_bracket: boolean;
   group_id: string | null;
+  category_id: string | null;
   stage: string;
 }
 
@@ -76,7 +83,6 @@ interface UserTeam {
   id: string;
   name: string;
 }
-
 export default function TournamentDetail() {
   const { id } = useParams<{ id: string }>();
   const { user, role } = useAuth();
@@ -86,6 +92,8 @@ export default function TournamentDetail() {
   const [groups, setGroups] = useState<TournamentGroup[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [matches, setMatches] = useState<TournamentMatch[]>([]);
+  const [categories, setCategories] = useState<TournamentCategory[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
   const [userTeam, setUserTeam] = useState<UserTeam | null>(null);
   const [loading, setLoading] = useState(true);
   const [registrationDialogOpen, setRegistrationDialogOpen] = useState(false);
@@ -93,17 +101,25 @@ export default function TournamentDetail() {
   const fetchData = useCallback(async () => {
     if (!id) return;
     try {
-      const [tournamentRes, groupsRes, participantsRes, matchesRes] = await Promise.all([
+      const [tournamentRes, groupsRes, participantsRes, matchesRes, categoriesRes] = await Promise.all([
         supabase.from("tournaments").select("*").eq("id", id).single(),
         supabase.from("tournament_groups").select("*").eq("tournament_id", id).order("display_order"),
         supabase.from("tournament_participants").select("*").eq("tournament_id", id),
         supabase.from("tournament_matches").select("*").eq("tournament_id", id).order("round_number").order("match_number"),
+        supabase.from("tournament_categories").select("*").eq("tournament_id", id).order("display_order"),
       ]);
 
       if (tournamentRes.error) throw tournamentRes.error;
       setTournament(tournamentRes.data);
       setGroups(groupsRes.data || []);
       setMatches(matchesRes.data || []);
+      
+      // Process categories with participant counts
+      const cats = (categoriesRes.data || []).map(cat => ({
+        ...cat,
+        participantCount: (participantsRes.data || []).filter(p => p.category_id === cat.id && p.waitlist_position === null).length,
+      }));
+      setCategories(cats);
 
       // Fetch team names for participants
       const participantsWithNames = await Promise.all(
@@ -115,6 +131,9 @@ export default function TournamentDetail() {
             payment_status: (p as any).payment_status || "pending",
             payment_notes: (p as any).payment_notes || null,
             custom_team_name: (p as any).custom_team_name || null,
+            category_id: (p as any).category_id || null,
+            player1_name: (p as any).player1_name || null,
+            player2_name: (p as any).player2_name || null,
             registered_at: p.registered_at,
           };
         })
@@ -149,7 +168,7 @@ export default function TournamentDetail() {
     }
   }, [id, user, fetchData, fetchUserTeam]);
 
-  const registerTeam = async (teamId: string | null, customTeamName: string | null, player1Name?: string, player2Name?: string) => {
+  const registerTeam = async (teamId: string | null, customTeamName: string | null, player1Name?: string, player2Name?: string, categoryId?: string) => {
     if (!tournament) return;
     
     // For custom team registration, we need to create a placeholder
@@ -157,13 +176,20 @@ export default function TournamentDetail() {
     if (!actualTeamId && !customTeamName) return;
     
     try {
-      // Count registered teams (not on waitlist)
-      const registeredCount = participants.filter(p => p.waitlist_position === null).length;
-      const isFull = registeredCount >= tournament.max_teams;
+      // Count registered teams (not on waitlist) - optionally filtered by category
+      const relevantParticipants = categoryId 
+        ? participants.filter(p => p.category_id === categoryId)
+        : participants;
+      const registeredCount = relevantParticipants.filter(p => p.waitlist_position === null).length;
+      
+      // Get max teams limit - from category or tournament
+      const category = categoryId ? categories.find(c => c.id === categoryId) : null;
+      const maxTeams = category ? category.max_teams : tournament.max_teams;
+      const isFull = registeredCount >= maxTeams;
 
       if (isFull) {
         // Add to waitlist
-        const waitlistTeams = participants.filter(p => p.waitlist_position !== null);
+        const waitlistTeams = relevantParticipants.filter(p => p.waitlist_position !== null);
         const nextWaitlistPosition = waitlistTeams.length > 0 
           ? Math.max(...waitlistTeams.map(p => p.waitlist_position!)) + 1 
           : 1;
@@ -175,6 +201,7 @@ export default function TournamentDetail() {
           custom_team_name: customTeamName,
           player1_name: player1Name || null,
           player2_name: player2Name || null,
+          category_id: categoryId || null,
           payment_status: "pending",
         });
         if (error) throw error;
@@ -193,6 +220,7 @@ export default function TournamentDetail() {
           custom_team_name: customTeamName,
           player1_name: player1Name || null,
           player2_name: player2Name || null,
+          category_id: categoryId || null,
           payment_status: "pending",
         });
         if (error) throw error;
@@ -598,22 +626,80 @@ export default function TournamentDetail() {
     }
   };
 
+  // Category management functions
+  const createCategory = async (name: string, description: string, maxTeams: number) => {
+    if (!tournament) return;
+    const { error } = await supabase.from("tournament_categories").insert({
+      tournament_id: tournament.id,
+      name,
+      description: description || null,
+      max_teams: maxTeams,
+      display_order: categories.length,
+    });
+    if (error) {
+      sonnerToast.error("Failed to create category");
+    } else {
+      sonnerToast.success("Category created");
+      fetchData();
+    }
+  };
+
+  const updateCategory = async (id: string, name: string, description: string, maxTeams: number) => {
+    const { error } = await supabase.from("tournament_categories")
+      .update({ name, description: description || null, max_teams: maxTeams })
+      .eq("id", id);
+    if (error) {
+      sonnerToast.error("Failed to update category");
+    } else {
+      sonnerToast.success("Category updated");
+      fetchData();
+    }
+  };
+
+  const deleteCategory = async (id: string) => {
+    // Unassign participants from this category
+    await supabase.from("tournament_participants")
+      .update({ category_id: null })
+      .eq("category_id", id);
+    
+    const { error } = await supabase.from("tournament_categories").delete().eq("id", id);
+    if (error) {
+      sonnerToast.error("Failed to delete category");
+    } else {
+      sonnerToast.success("Category deleted");
+      fetchData();
+    }
+  };
+
   const getTeamName = (teamId: string | null) => {
     if (!teamId) return "TBD";
-    return participants.find((p) => p.team_id === teamId)?.team_name || "Unknown";
+    const participant = participants.find((p) => p.team_id === teamId);
+    return participant?.custom_team_name || participant?.team_name || "Unknown";
   };
 
   const isOwner = user?.id === tournament?.created_by;
   const isAdmin = role === "admin" || isOwner;
-  const registeredParticipants = participants.filter(p => p.waitlist_position === null);
-  const waitlistParticipants = participants.filter(p => p.waitlist_position !== null).sort((a, b) => (a.waitlist_position || 0) - (b.waitlist_position || 0));
+  
+  // Filter participants by selected category
+  const filteredParticipants = selectedCategoryId === "all" 
+    ? participants 
+    : participants.filter(p => p.category_id === selectedCategoryId);
+  const filteredGroups = selectedCategoryId === "all"
+    ? groups
+    : groups.filter(g => g.category_id === selectedCategoryId);
+  const filteredMatches = selectedCategoryId === "all"
+    ? matches
+    : matches.filter(m => m.category_id === selectedCategoryId);
+    
+  const registeredParticipants = filteredParticipants.filter(p => p.waitlist_position === null);
+  const waitlistParticipants = filteredParticipants.filter(p => p.waitlist_position !== null).sort((a, b) => (a.waitlist_position || 0) - (b.waitlist_position || 0));
   const userParticipant = userTeam ? participants.find(p => p.team_id === userTeam.id) : null;
   const isRegistered = !!userParticipant;
   const isOnWaitlist = userParticipant?.waitlist_position !== null;
-  const canRegister = tournament?.status === "registration" && userTeam && !isRegistered;
+  const canRegister = tournament?.status === "registration" && !isRegistered;
   
-  const groupMatches = matches.filter(m => m.stage === "group");
-  const knockoutMatches = matches.filter(m => m.stage === "knockout");
+  const groupMatches = filteredMatches.filter(m => m.stage === "group");
+  const knockoutMatches = filteredMatches.filter(m => m.stage === "knockout");
   const allGroupMatchesComplete = groupMatches.length > 0 && groupMatches.every(m => m.winner_team_id !== null);
   const canStartKnockout = allGroupMatchesComplete && knockoutMatches.length === 0;
 
@@ -742,6 +828,12 @@ export default function TournamentDetail() {
             paymentInstructions={tournament.payment_instructions}
             isFull={registeredParticipants.length >= tournament.max_teams}
             userTeam={userTeam}
+            categories={categories.map(c => ({
+              id: c.id,
+              name: c.name,
+              max_teams: c.max_teams,
+              participantCount: c.participantCount ?? 0,
+            }))}
             onRegister={registerTeam}
           />
 
@@ -757,9 +849,29 @@ export default function TournamentDetail() {
             </Card>
           )}
 
+          {/* Category Filter */}
+          {categories.length > 0 && (
+            <div className="flex items-center gap-3 mb-6">
+              <Tag className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Filter by category:</span>
+              <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <Tabs defaultValue={isAdmin ? "manage" : "groups"} className="w-full">
             <TabsList className="mb-6 flex-wrap">
               {isAdmin && <TabsTrigger value="manage"><Settings className="w-4 h-4 mr-2" />Manage</TabsTrigger>}
+              {isAdmin && <TabsTrigger value="categories"><Tag className="w-4 h-4 mr-2" />Categories</TabsTrigger>}
               {isAdmin && tournament.entry_fee > 0 && (
                 <TabsTrigger value="payments"><DollarSign className="w-4 h-4 mr-2" />Payments</TabsTrigger>
               )}
@@ -805,6 +917,19 @@ export default function TournamentDetail() {
               </TabsContent>
             )}
 
+            {/* Categories Tab (Admin Only) */}
+            {isAdmin && (
+              <TabsContent value="categories">
+                <CategoryManagement
+                  categories={categories}
+                  tournamentStatus={tournament.status}
+                  onCreateCategory={createCategory}
+                  onUpdateCategory={updateCategory}
+                  onDeleteCategory={deleteCategory}
+                />
+              </TabsContent>
+            )}
+
             {/* Payments Tab (Admin Only) */}
             {isAdmin && tournament.entry_fee > 0 && (
               <TabsContent value="payments">
@@ -829,7 +954,7 @@ export default function TournamentDetail() {
 
             {/* Groups Tab */}
             <TabsContent value="groups">
-              {groups.length === 0 ? (
+              {filteredGroups.length === 0 ? (
                 <Card>
                   <CardContent className="py-8 text-center text-muted-foreground">
                     <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -838,12 +963,12 @@ export default function TournamentDetail() {
                 </Card>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2">
-                  {groups.map(group => {
-                    const groupTeams = participants
+                  {filteredGroups.map(group => {
+                    const groupTeams = filteredParticipants
                       .filter(p => p.group_id === group.id)
                       .map(p => ({
                         team_id: p.team_id,
-                        team_name: p.team_name || "Unknown",
+                        team_name: p.custom_team_name || p.team_name || "Unknown",
                         wins: p.group_wins,
                         losses: p.group_losses,
                         points_for: p.group_points_for,
@@ -865,7 +990,7 @@ export default function TournamentDetail() {
 
             {/* Matches Tab */}
             <TabsContent value="matches">
-              {groups.length === 0 ? (
+              {filteredGroups.length === 0 ? (
                 <Card>
                   <CardContent className="py-8 text-center text-muted-foreground">
                     <Trophy className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -874,7 +999,7 @@ export default function TournamentDetail() {
                 </Card>
               ) : (
                 <div className="space-y-6">
-                  {groups.map(group => {
+                  {filteredGroups.map(group => {
                     const gMatches = groupMatches
                       .filter(m => m.group_id === group.id)
                       .map(m => ({
@@ -936,6 +1061,7 @@ export default function TournamentDetail() {
                       <div className="space-y-2">
                         {registeredParticipants.map((p, idx) => {
                           const groupName = groups.find(g => g.id === p.group_id)?.name;
+                          const categoryName = categories.find(c => c.id === p.category_id)?.name;
                           const displayName = p.custom_team_name || p.team_name;
                           return (
                             <div
@@ -944,16 +1070,24 @@ export default function TournamentDetail() {
                                 p.is_eliminated ? "opacity-50 bg-muted/30" : ""
                               }`}
                             >
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-3 flex-wrap">
                                 <span className="text-sm text-muted-foreground w-6">{idx + 1}.</span>
                                 <span className={p.is_eliminated ? "line-through" : "font-medium"}>
                                   {displayName}
                                 </span>
+                                {categoryName && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    <Tag className="w-3 h-3 mr-1" />
+                                    {categoryName}
+                                  </Badge>
+                                )}
                                 {groupName && (
                                   <Badge variant="outline" className="text-xs">{groupName}</Badge>
                                 )}
-                                {p.custom_team_name && (
-                                  <span className="text-xs text-muted-foreground">(Custom)</span>
+                                {p.custom_team_name && p.player1_name && p.player2_name && (
+                                  <span className="text-xs text-muted-foreground">
+                                    ({p.player1_name} & {p.player2_name})
+                                  </span>
                                 )}
                               </div>
                               <div className="flex items-center gap-2">
@@ -991,22 +1125,32 @@ export default function TournamentDetail() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2">
-                        {waitlistParticipants.map((p) => (
-                          <div
-                            key={p.id}
-                            className="flex items-center justify-between p-3 rounded-lg border border-warning/20 bg-warning/5"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Badge variant="outline" className="bg-warning/20 text-warning-foreground">
-                                #{p.waitlist_position}
-                              </Badge>
-                              <span className="font-medium">{p.team_name}</span>
+                        {waitlistParticipants.map((p) => {
+                          const categoryName = categories.find(c => c.id === p.category_id)?.name;
+                          const displayName = p.custom_team_name || p.team_name;
+                          return (
+                            <div
+                              key={p.id}
+                              className="flex items-center justify-between p-3 rounded-lg border border-warning/20 bg-warning/5"
+                            >
+                              <div className="flex items-center gap-3">
+                                <Badge variant="outline" className="bg-warning/20 text-warning-foreground">
+                                  #{p.waitlist_position}
+                                </Badge>
+                                <span className="font-medium">{displayName}</span>
+                                {categoryName && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    <Tag className="w-3 h-3 mr-1" />
+                                    {categoryName}
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className="text-sm text-muted-foreground">
+                                Will be added if a team withdraws
+                              </span>
                             </div>
-                            <span className="text-sm text-muted-foreground">
-                              Will be added if a team withdraws
-                            </span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </CardContent>
                   </Card>
