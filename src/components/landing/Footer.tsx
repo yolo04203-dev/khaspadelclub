@@ -44,11 +44,6 @@ export function Footer() {
                   Live Demo
                 </Link>
               </li>
-              <li>
-                <button onClick={() => scrollToSection("pricing")} className="hover:text-primary-foreground transition-colors">
-                  Pricing
-                </button>
-              </li>
             </ul>
           </div>
 
