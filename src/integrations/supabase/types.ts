@@ -141,6 +141,7 @@ export type Database = {
           current_round: number
           description: string | null
           id: string
+          mode: string
           name: string
           points_per_round: number
           started_at: string | null
@@ -155,6 +156,7 @@ export type Database = {
           current_round?: number
           description?: string | null
           id?: string
+          mode?: string
           name: string
           points_per_round?: number
           started_at?: string | null
@@ -169,6 +171,7 @@ export type Database = {
           current_round?: number
           description?: string | null
           id?: string
+          mode?: string
           name?: string
           points_per_round?: number
           started_at?: string | null
@@ -177,6 +180,114 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      americano_team_matches: {
+        Row: {
+          completed_at: string | null
+          court_number: number
+          created_at: string
+          id: string
+          round_number: number
+          session_id: string
+          team1_id: string
+          team1_score: number | null
+          team2_id: string
+          team2_score: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          court_number?: number
+          created_at?: string
+          id?: string
+          round_number: number
+          session_id: string
+          team1_id: string
+          team1_score?: number | null
+          team2_id: string
+          team2_score?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          court_number?: number
+          created_at?: string
+          id?: string
+          round_number?: number
+          session_id?: string
+          team1_id?: string
+          team1_score?: number | null
+          team2_id?: string
+          team2_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "americano_team_matches_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "americano_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "americano_team_matches_team1_id_fkey"
+            columns: ["team1_id"]
+            isOneToOne: false
+            referencedRelation: "americano_teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "americano_team_matches_team2_id_fkey"
+            columns: ["team2_id"]
+            isOneToOne: false
+            referencedRelation: "americano_teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      americano_teams: {
+        Row: {
+          created_at: string
+          id: string
+          losses: number
+          matches_played: number
+          player1_name: string
+          player2_name: string
+          session_id: string
+          team_name: string
+          total_points: number
+          wins: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          losses?: number
+          matches_played?: number
+          player1_name: string
+          player2_name: string
+          session_id: string
+          team_name: string
+          total_points?: number
+          wins?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          losses?: number
+          matches_played?: number
+          player1_name?: string
+          player2_name?: string
+          session_id?: string
+          team_name?: string
+          total_points?: number
+          wins?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "americano_teams_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "americano_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       challenges: {
         Row: {

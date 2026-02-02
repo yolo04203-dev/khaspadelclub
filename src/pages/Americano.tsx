@@ -16,7 +16,9 @@ interface AmericanoSession {
   total_rounds: number;
   current_round: number;
   created_at: string;
+  mode: string;
   player_count?: number;
+  team_count?: number;
 }
 
 export default function Americano() {
@@ -38,14 +40,22 @@ export default function Americano() {
 
       if (error) throw error;
 
-      // Fetch player counts for each session
+      // Fetch player/team counts for each session
       const sessionsWithCounts = await Promise.all(
         (sessionsData || []).map(async (session) => {
-          const { count } = await supabase
-            .from("americano_players")
-            .select("*", { count: "exact", head: true })
-            .eq("session_id", session.id);
-          return { ...session, player_count: count || 0 };
+          if (session.mode === "team") {
+            const { count } = await supabase
+              .from("americano_teams")
+              .select("*", { count: "exact", head: true })
+              .eq("session_id", session.id);
+            return { ...session, team_count: count || 0 };
+          } else {
+            const { count } = await supabase
+              .from("americano_players")
+              .select("*", { count: "exact", head: true })
+              .eq("session_id", session.id);
+            return { ...session, player_count: count || 0 };
+          }
         })
       );
 
@@ -66,6 +76,23 @@ export default function Americano() {
     };
     const { variant, label } = variants[status] || variants.draft;
     return <Badge variant={variant}>{label}</Badge>;
+  };
+
+  const getModeBadge = (mode: string) => {
+    if (mode === "team") {
+      return (
+        <Badge variant="outline" className="gap-1">
+          <Users className="w-3 h-3" />
+          Team
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="gap-1">
+        <Shuffle className="w-3 h-3" />
+        Individual
+      </Badge>
+    );
   };
 
   if (authLoading) {
@@ -114,31 +141,59 @@ export default function Americano() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-foreground">Americano Mode</h1>
-                <p className="text-muted-foreground">Rotating partners, accumulating points</p>
+                <p className="text-muted-foreground">Individual rotating or fixed team competitions</p>
               </div>
             </div>
           </div>
 
-          {/* How it works card */}
-          <Card className="mb-8 bg-gradient-to-r from-success/5 to-success/10 border-success/20">
-            <CardContent className="py-6">
-              <h3 className="font-semibold text-foreground mb-3">How Americano Works</h3>
-              <div className="grid md:grid-cols-3 gap-4 text-sm text-muted-foreground">
-                <div className="flex items-start gap-2">
-                  <Users className="w-4 h-4 mt-0.5 text-success" />
-                  <span>Players rotate partners each round for balanced gameplay</span>
+          {/* How it works cards */}
+          <div className="grid md:grid-cols-2 gap-4 mb-8">
+            <Card className="bg-gradient-to-r from-success/5 to-success/10 border-success/20">
+              <CardContent className="py-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Shuffle className="w-5 h-5 text-success" />
+                  <h3 className="font-semibold text-foreground">Individual Mode</h3>
                 </div>
-                <div className="flex items-start gap-2">
-                  <Play className="w-4 h-4 mt-0.5 text-success" />
-                  <span>Points accumulate individually across all matches</span>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <div className="flex items-start gap-2">
+                    <Users className="w-4 h-4 mt-0.5 text-success" />
+                    <span>Players rotate partners each round</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Play className="w-4 h-4 mt-0.5 text-success" />
+                    <span>Points accumulate individually</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Trophy className="w-4 h-4 mt-0.5 text-success" />
+                    <span>Highest total points wins</span>
+                  </div>
                 </div>
-                <div className="flex items-start gap-2">
-                  <Trophy className="w-4 h-4 mt-0.5 text-success" />
-                  <span>Highest total points at the end wins the session</span>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+              <CardContent className="py-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Users className="w-5 h-5 text-primary" />
+                  <h3 className="font-semibold text-foreground">Team Mode</h3>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <div className="flex items-start gap-2">
+                    <Users className="w-4 h-4 mt-0.5 text-primary" />
+                    <span>Fixed teams of 2 players</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Play className="w-4 h-4 mt-0.5 text-primary" />
+                    <span>Round-robin: every team vs every team</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Trophy className="w-4 h-4 mt-0.5 text-primary" />
+                    <span>Team with most points wins</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Sessions List */}
           <div className="space-y-4">
@@ -174,22 +229,27 @@ export default function Americano() {
                   <Link key={session.id} to={`/americano/${session.id}`}>
                     <Card className="hover:border-success/50 transition-colors cursor-pointer h-full">
                       <CardHeader>
-                        <div className="flex items-start justify-between">
+                        <div className="flex items-start justify-between gap-2">
                           <CardTitle className="text-lg">{session.name}</CardTitle>
-                          {getStatusBadge(session.status)}
+                          <div className="flex flex-col gap-1 items-end">
+                            {getStatusBadge(session.status)}
+                            {getModeBadge(session.mode)}
+                          </div>
                         </div>
                         <CardDescription>
-                          {session.player_count} players • {session.total_rounds} rounds
+                          {session.mode === "team"
+                            ? `${session.team_count} teams • ${session.total_rounds} matches`
+                            : `${session.player_count} players • ${session.total_rounds} rounds`}
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-muted-foreground">
-                            Round {session.current_round} of {session.total_rounds}
+                            {session.mode === "team"
+                              ? `${session.current_round} of ${session.total_rounds} matches`
+                              : `Round ${session.current_round} of ${session.total_rounds}`}
                           </span>
-                          {session.status === "completed" && (
-                            <CheckCircle className="w-4 h-4 text-success" />
-                          )}
+                          {session.status === "completed" && <CheckCircle className="w-4 h-4 text-success" />}
                         </div>
                       </CardContent>
                     </Card>
