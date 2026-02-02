@@ -233,6 +233,13 @@ export default function TournamentDetail() {
   const generateGroupMatches = async () => {
     if (!tournament) return;
     
+    // Check if group matches already exist
+    const existingGroupMatches = matches.filter(m => m.stage === "group");
+    if (existingGroupMatches.length > 0) {
+      sonnerToast.error("Group matches already generated");
+      return;
+    }
+    
     // Generate round-robin matches for each group
     const matchesToCreate: any[] = [];
     
@@ -263,7 +270,7 @@ export default function TournamentDetail() {
       await supabase.from("tournaments")
         .update({ status: "in_progress", started_at: new Date().toISOString() })
         .eq("id", tournament.id);
-      sonnerToast.success("Group matches generated!");
+      sonnerToast.success(`Generated ${matchesToCreate.length} group matches!`);
       fetchData();
     }
   };
