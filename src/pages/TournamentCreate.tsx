@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trophy } from "lucide-react";
+import { ArrowLeft, Trophy, DollarSign } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
 type TournamentFormat = "single_elimination" | "double_elimination" | "round_robin";
@@ -25,6 +26,8 @@ export default function TournamentCreate() {
   const [maxTeams, setMaxTeams] = useState(8);
   const [numberOfGroups, setNumberOfGroups] = useState(2);
   const [deadline, setDeadline] = useState("");
+  const [entryFee, setEntryFee] = useState<number>(0);
+  const [entryFeeCurrency, setEntryFeeCurrency] = useState("PKR");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,6 +50,8 @@ export default function TournamentCreate() {
           max_teams: maxTeams,
           number_of_groups: numberOfGroups,
           registration_deadline: deadline || null,
+          entry_fee: entryFee,
+          entry_fee_currency: entryFeeCurrency,
           created_by: user!.id,
           status: "registration",
         })
@@ -171,6 +176,55 @@ export default function TournamentCreate() {
                     onChange={(e) => setDeadline(e.target.value)}
                   />
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Entry Fee Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="w-5 h-5" />
+                  Entry Fee
+                </CardTitle>
+                <CardDescription>Set the entry fee for participating teams</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="entryFee">Amount</Label>
+                    <Input
+                      id="entryFee"
+                      type="number"
+                      min={0}
+                      step={100}
+                      value={entryFee}
+                      onChange={(e) => setEntryFee(parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="currency">Currency</Label>
+                    <Select value={entryFeeCurrency} onValueChange={setEntryFeeCurrency}>
+                      <SelectTrigger id="currency">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PKR">PKR</SelectItem>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
+                        <SelectItem value="AED">AED</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {entryFee > 0 && (
+                  <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                    <p className="text-sm text-muted-foreground">
+                      Teams will be asked to pay <span className="font-semibold text-foreground">{entryFeeCurrency} {entryFee.toLocaleString()}</span> to confirm their registration.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

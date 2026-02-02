@@ -670,6 +670,7 @@ export type Database = {
       }
       tournament_participants: {
         Row: {
+          custom_team_name: string | null
           eliminated_at: string | null
           final_placement: number | null
           group_id: string | null
@@ -679,6 +680,10 @@ export type Database = {
           group_wins: number
           id: string
           is_eliminated: boolean
+          payment_confirmed_at: string | null
+          payment_confirmed_by: string | null
+          payment_notes: string | null
+          payment_status: string | null
           registered_at: string
           seed: number | null
           team_id: string
@@ -686,6 +691,7 @@ export type Database = {
           waitlist_position: number | null
         }
         Insert: {
+          custom_team_name?: string | null
           eliminated_at?: string | null
           final_placement?: number | null
           group_id?: string | null
@@ -695,6 +701,10 @@ export type Database = {
           group_wins?: number
           id?: string
           is_eliminated?: boolean
+          payment_confirmed_at?: string | null
+          payment_confirmed_by?: string | null
+          payment_notes?: string | null
+          payment_status?: string | null
           registered_at?: string
           seed?: number | null
           team_id: string
@@ -702,6 +712,7 @@ export type Database = {
           waitlist_position?: number | null
         }
         Update: {
+          custom_team_name?: string | null
           eliminated_at?: string | null
           final_placement?: number | null
           group_id?: string | null
@@ -711,6 +722,10 @@ export type Database = {
           group_wins?: number
           id?: string
           is_eliminated?: boolean
+          payment_confirmed_at?: string | null
+          payment_confirmed_by?: string | null
+          payment_notes?: string | null
+          payment_status?: string | null
           registered_at?: string
           seed?: number | null
           team_id?: string
@@ -747,6 +762,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          entry_fee: number | null
+          entry_fee_currency: string | null
           format: Database["public"]["Enums"]["tournament_format"]
           id: string
           max_teams: number
@@ -764,6 +781,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          entry_fee?: number | null
+          entry_fee_currency?: string | null
           format?: Database["public"]["Enums"]["tournament_format"]
           id?: string
           max_teams?: number
@@ -781,6 +800,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          entry_fee?: number | null
+          entry_fee_currency?: string | null
           format?: Database["public"]["Enums"]["tournament_format"]
           id?: string
           max_teams?: number
