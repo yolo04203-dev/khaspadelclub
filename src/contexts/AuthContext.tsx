@@ -24,18 +24,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserRole = async (userId: string) => {
     try {
+      // Fetch all roles for the user (they may have multiple)
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", userId)
-        .maybeSingle();
+        .eq("user_id", userId);
 
       if (error) {
         console.error("Error fetching user role:", error);
         return null;
       }
 
-      return data?.role as UserRole | null;
+      // If user has admin role, prioritize it
+      if (data?.some(r => r.role === "admin")) {
+        return "admin" as UserRole;
+      }
+      
+      // Otherwise return the first role or default to player
+      return (data?.[0]?.role as UserRole) || "player";
     } catch (error) {
       console.error("Error fetching user role:", error);
       return null;
