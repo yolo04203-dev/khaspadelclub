@@ -28,6 +28,7 @@ export default function TournamentCreate() {
   const [deadline, setDeadline] = useState("");
   const [entryFee, setEntryFee] = useState<number>(0);
   const [entryFeeCurrency, setEntryFeeCurrency] = useState("PKR");
+  const [paymentInstructions, setPaymentInstructions] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,6 +53,7 @@ export default function TournamentCreate() {
           registration_deadline: deadline || null,
           entry_fee: entryFee,
           entry_fee_currency: entryFeeCurrency,
+          payment_instructions: paymentInstructions.trim() || null,
           created_by: user!.id,
           status: "registration",
         })
@@ -225,6 +227,20 @@ export default function TournamentCreate() {
                     </p>
                   </div>
                 )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="paymentInstructions">Payment Instructions (optional)</Label>
+                  <Textarea
+                    id="paymentInstructions"
+                    placeholder="e.g., Bank: HBL, Account: 1234567890, Title: Tournament Name&#10;Or: JazzCash/Easypaisa: 03001234567"
+                    value={paymentInstructions}
+                    onChange={(e) => setPaymentInstructions(e.target.value)}
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This will be shown to participants when they register
+                  </p>
+                </div>
               </CardContent>
             </Card>
 

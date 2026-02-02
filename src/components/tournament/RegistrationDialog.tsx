@@ -20,6 +20,7 @@ interface RegistrationDialogProps {
   tournamentName: string;
   entryFee: number;
   entryFeeCurrency: string;
+  paymentInstructions?: string | null;
   isFull: boolean;
   userTeam: UserTeam | null;
   onRegister: (teamId: string | null, customTeamName: string | null) => Promise<void>;
@@ -31,6 +32,7 @@ export function RegistrationDialog({
   tournamentName,
   entryFee,
   entryFeeCurrency,
+  paymentInstructions,
   isFull,
   userTeam,
   onRegister,
@@ -132,10 +134,19 @@ export function RegistrationDialog({
               <div className="text-2xl font-bold text-foreground">
                 {formatCurrency(entryFee, entryFeeCurrency)}
               </div>
-              <p className="text-sm text-muted-foreground">
-                Your slot will be confirmed once payment is verified by the organizer.
-                Please contact the tournament admin for payment details.
-              </p>
+              {paymentInstructions ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-foreground">Payment Instructions:</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-line">
+                    {paymentInstructions}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Your slot will be confirmed once payment is verified by the organizer.
+                  Please contact the tournament admin for payment details.
+                </p>
+              )}
             </div>
           )}
 
