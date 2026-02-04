@@ -36,6 +36,8 @@ interface Tournament {
   payment_instructions: string | null;
   venue: string | null;
   registration_deadline: string | null;
+  start_date: string | null;
+  end_date: string | null;
   created_at: string;
 }
 
@@ -917,11 +919,54 @@ export default function TournamentDetail() {
                     </div>
                   )}
 
+                  {/* Event Dates */}
+                  {(tournament.start_date || tournament.end_date) && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <Calendar className="w-4 h-4" />
+                        Event Dates
+                      </div>
+                      <p className="text-foreground">
+                        {tournament.start_date && tournament.end_date ? (
+                          <>
+                            {new Date(tournament.start_date).toLocaleDateString('en-US', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                            {' — '}
+                            {new Date(tournament.end_date).toLocaleDateString('en-US', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </>
+                        ) : tournament.start_date ? (
+                          new Date(tournament.start_date).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })
+                        ) : (
+                          `Ends ${new Date(tournament.end_date!).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}`
+                        )}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Registration Deadline */}
                   {tournament.registration_deadline && (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        <Calendar className="w-4 h-4" />
+                        <Clock className="w-4 h-4" />
                         Registration Deadline
                       </div>
                       <p className="text-foreground">
