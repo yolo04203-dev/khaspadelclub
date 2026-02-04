@@ -182,7 +182,7 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <Button variant="outline" asChild>
-                        <Link to="/leaderboard">View Ladder</Link>
+                        <Link to="/ladders">View Ladders</Link>
                       </Button>
                     </div>
                   </CardContent>
@@ -273,19 +273,7 @@ export default function Dashboard() {
                     <Layers className="w-5 h-5 text-accent" />
                     Ladders
                   </CardTitle>
-                  <CardDescription>Skill-based divisions with rankings</CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
-
-            <Link to="/leaderboard">
-              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-accent" />
-                    Leaderboard
-                  </CardTitle>
-                  <CardDescription>View current rankings and ladder positions</CardDescription>
+                  <CardDescription>View and compete in ladder rankings</CardDescription>
                 </CardHeader>
               </Card>
             </Link>
