@@ -947,6 +947,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          end_date: string | null
           entry_fee: number | null
           entry_fee_currency: string | null
           format: Database["public"]["Enums"]["tournament_format"]
@@ -957,6 +958,7 @@ export type Database = {
           payment_instructions: string | null
           registration_deadline: string | null
           sets_per_match: number
+          start_date: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["tournament_status"]
           updated_at: string
@@ -968,6 +970,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          end_date?: string | null
           entry_fee?: number | null
           entry_fee_currency?: string | null
           format?: Database["public"]["Enums"]["tournament_format"]
@@ -978,6 +981,7 @@ export type Database = {
           payment_instructions?: string | null
           registration_deadline?: string | null
           sets_per_match?: number
+          start_date?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["tournament_status"]
           updated_at?: string
@@ -989,6 +993,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          end_date?: string | null
           entry_fee?: number | null
           entry_fee_currency?: string | null
           format?: Database["public"]["Enums"]["tournament_format"]
@@ -999,6 +1004,7 @@ export type Database = {
           payment_instructions?: string | null
           registration_deadline?: string | null
           sets_per_match?: number
+          start_date?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["tournament_status"]
           updated_at?: string

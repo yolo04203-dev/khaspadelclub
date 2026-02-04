@@ -33,6 +33,8 @@ export default function TournamentCreate() {
   const [maxTeams, setMaxTeams] = useState(8);
   const [numberOfGroups, setNumberOfGroups] = useState(2);
   const [deadline, setDeadline] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [entryFee, setEntryFee] = useState<number>(0);
   const [entryFeeCurrency, setEntryFeeCurrency] = useState("PKR");
   const [paymentInstructions, setPaymentInstructions] = useState("");
@@ -79,6 +81,8 @@ export default function TournamentCreate() {
           max_teams: maxTeams,
           number_of_groups: numberOfGroups,
           registration_deadline: deadline || null,
+          start_date: startDate || null,
+          end_date: endDate || null,
           entry_fee: entryFee,
           entry_fee_currency: entryFeeCurrency,
           payment_instructions: paymentInstructions.trim() || null,
@@ -225,6 +229,26 @@ export default function TournamentCreate() {
                     value={deadline}
                     onChange={(e) => setDeadline(e.target.value)}
                   />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="startDate">Event Start Date</Label>
+                    <Input
+                      id="startDate"
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="endDate">Event End Date</Label>
+                    <Input
+                      id="endDate"
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="venue" className="flex items-center gap-2">
