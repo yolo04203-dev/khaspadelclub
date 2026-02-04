@@ -90,6 +90,28 @@ export function JoinRequestsManagement({
     setProcessingId(request.id);
 
     try {
+      // Check how many ladders the team is already in
+      const { count: existingMemberships } = await supabase
+        .from("ladder_rankings")
+        .select("*", { count: "exact", head: true })
+        .eq("team_id", request.team_id);
+
+      if (existingMemberships && existingMemberships >= 2) {
+        throw new Error("This team is already participating in 2 ladders. Teams can only be in up to 2 ladders simultaneously.");
+      }
+
+      // Check if team is already in this specific category
+      const { data: existingInCategory } = await supabase
+        .from("ladder_rankings")
+        .select("id")
+        .eq("team_id", request.team_id)
+        .eq("ladder_category_id", request.ladder_category_id)
+        .maybeSingle();
+
+      if (existingInCategory) {
+        throw new Error("This team is already in this ladder category.");
+      }
+
       // Get the current max rank in the category
       const { data: rankings } = await supabase
         .from("ladder_rankings")
@@ -115,7 +137,10 @@ export function JoinRequestsManagement({
 
       if (rankingError) {
         if (rankingError.code === "23505") {
-          throw new Error("This team is already in a ladder category.");
+          throw new Error("This team is already in this ladder category.");
+        }
+        if (rankingError.message?.includes("maximum of 2 ladders")) {
+          throw new Error("This team is already participating in 2 ladders.");
         }
         throw rankingError;
       }
