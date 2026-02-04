@@ -7,7 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
-import Leaderboard from "./pages/Leaderboard";
+
 import Ladders from "./pages/Ladders";
 import LadderDetail from "./pages/LadderDetail";
 import LadderCreate from "./pages/LadderCreate";
@@ -40,7 +40,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
+            
             <Route path="/ladders" element={<Ladders />} />
             <Route path="/ladders/create" element={<LadderCreate />} />
             <Route path="/ladders/:id" element={<LadderDetail />} />
