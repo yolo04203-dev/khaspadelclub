@@ -1,227 +1,153 @@
 
 
-# Team Americano Mode Implementation
-
-This plan adds a new "Team Americano" mode alongside the existing individual Americano mode. In Team Americano, fixed teams compete against each other in a round-robin format where every team plays against every other team.
-
----
+# Admin Team Freeze & Challenge History Feature
 
 ## Overview
 
-**What is Team Americano?**
-- Teams are fixed (no rotating partners)
-- Every team plays against every other team (round-robin)
-- Teams earn points for each match based on the score
-- The team with the highest total points at the end wins
-
-**Key Differences from Individual Americano:**
-
-| Aspect | Individual Americano | Team Americano |
-|--------|---------------------|----------------|
-| Partners | Rotate each round | Fixed teams |
-| Scoring | Individual points | Team points |
-| Format | Random pairings | Round-robin (all vs all) |
-| Minimum | 4 players | 2 teams |
+This plan implements two new admin capabilities:
+1. **Team Freeze**: Allow admins to freeze a team for a specified duration, preventing other teams from challenging them
+2. **Challenge History with Timestamps**: Display when challenges were created with full date and time information
 
 ---
 
-## User Experience
+## 1. Database Changes
 
-### For Session Creation:
+### Add Freeze Columns to Teams Table
 
-1. User navigates to `/americano/create`
-2. **New:** User sees a toggle to choose between "Individual" or "Team" mode
-3. For Team mode:
-   - Enter session name and points per match
-   - Add teams (each with a team name and 2 player names)
-   - Minimum 2 teams, recommended 4-8 teams
-4. System automatically calculates total rounds based on round-robin schedule
+A new migration will add the following columns to the `teams` table:
 
-### For Session Play:
-
-1. All matches are pre-generated (round-robin schedule)
-2. Each round can have multiple matches running in parallel
-3. Admin enters scores for completed matches
-4. Team standings update in real-time showing:
-   - Total points accumulated
-   - Matches played
-   - Wins/Losses
-5. Session completes when all matches are finished
+| Column | Type | Purpose |
+|--------|------|---------|
+| `is_frozen` | boolean | Whether the team is currently frozen |
+| `frozen_until` | timestamp | When the freeze period ends |
+| `frozen_reason` | text | Optional reason for freezing (e.g., "Travelling") |
+| `frozen_by` | uuid | Which admin froze the team |
+| `frozen_at` | timestamp | When the freeze was applied |
 
 ---
 
-## Database Changes
+## 2. Admin Teams Tab Enhancements
 
-### 1. Update americano_sessions Table
+### New "Freeze Team" Action
 
-Add a new column to distinguish between individual and team modes:
+Add a new option in the team dropdown menu:
+- **Freeze Team** - Opens a dialog where admin can:
+  - Select freeze duration (1 day, 3 days, 1 week, 2 weeks, custom date)
+  - Optionally enter a reason (e.g., "Travelling", "Injury")
+  
+- **Unfreeze Team** - Immediately removes the freeze
 
-```sql
-ALTER TABLE americano_sessions
-ADD COLUMN mode TEXT NOT NULL DEFAULT 'individual' 
-  CHECK (mode IN ('individual', 'team'));
-```
+### Visual Indicator
 
-### 2. Create americano_teams Table
-
-New table to store teams in a Team Americano session:
-
-```sql
-CREATE TABLE americano_teams (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id UUID NOT NULL REFERENCES americano_sessions(id) ON DELETE CASCADE,
-  team_name TEXT NOT NULL,
-  player1_name TEXT NOT NULL,
-  player2_name TEXT NOT NULL,
-  total_points INTEGER NOT NULL DEFAULT 0,
-  matches_played INTEGER NOT NULL DEFAULT 0,
-  wins INTEGER NOT NULL DEFAULT 0,
-  losses INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
-);
-```
-
-### 3. Create americano_team_matches Table
-
-New table to store team vs team matches:
-
-```sql
-CREATE TABLE americano_team_matches (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id UUID NOT NULL REFERENCES americano_sessions(id) ON DELETE CASCADE,
-  round_number INTEGER NOT NULL,
-  court_number INTEGER NOT NULL DEFAULT 1,
-  team1_id UUID NOT NULL REFERENCES americano_teams(id),
-  team2_id UUID NOT NULL REFERENCES americano_teams(id),
-  team1_score INTEGER,
-  team2_score INTEGER,
-  completed_at TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
-);
-```
-
-### 4. RLS Policies
-
-Apply similar RLS policies as existing Americano tables:
-- Anyone can view teams and matches
-- Session creator can manage teams and matches
+Teams that are frozen will display:
+- A snowflake icon next to the team name
+- "Frozen until [date]" badge in the table
+- The reason if provided
 
 ---
 
-## Feature Implementation
+## 3. Challenge Prevention Logic
 
-### 1. Update AmericanoCreate Page
+### Update Ladder Detail Page
 
-**File:** `src/pages/AmericanoCreate.tsx`
+Modify the `canChallenge()` function to check if the target team is frozen:
+- If `is_frozen` is true AND `frozen_until` is in the future, the challenge button is disabled
+- Show tooltip: "This team is frozen until [date]"
 
-Add mode selection and team input:
-- Toggle between "Individual" and "Team" mode at the top
-- For Team mode: show team input cards instead of individual player inputs
-- Each team card has: Team Name, Player 1, Player 2
-- Add/remove team buttons
-- Validation: minimum 2 teams for Team mode
-- Calculate total rounds (round-robin: each team plays every other team once)
+### Update Challenges Page
 
-### 2. Update AmericanoSession Page
-
-**File:** `src/pages/AmericanoSession.tsx`
-
-Add conditional rendering based on session mode:
-- For team mode: show team standings instead of individual standings
-- Team standings columns: Rank, Team Name, W, L, Points
-- Match display shows team names instead of player pairs
-- Score submission updates team stats (points, wins, losses)
-
-### 3. Update Americano List Page
-
-**File:** `src/pages/Americano.tsx`
-
-- Show mode badge on session cards ("Individual" or "Team")
-- Update player count display to show team count for team sessions
-
-### 4. Round-Robin Match Generation Logic
-
-Generate all matches when session starts:
-```typescript
-function generateRoundRobinSchedule(teams: Team[]): Match[] {
-  const matches = [];
-  for (let i = 0; i < teams.length; i++) {
-    for (let j = i + 1; j < teams.length; j++) {
-      matches.push({ team1: teams[i], team2: teams[j] });
-    }
-  }
-  // Distribute into rounds for parallel play
-  return distributeIntoRounds(matches, courts);
-}
-```
-
-Total matches = n(n-1)/2 where n = number of teams
-- 4 teams = 6 matches
-- 6 teams = 15 matches
-- 8 teams = 28 matches
+If a team tries to view challenges while frozen:
+- Show an info banner: "Your team is frozen until [date]. You cannot be challenged during this time."
 
 ---
 
-## Files to Create
+## 4. Admin Challenges Tab (New)
 
-1. None (all functionality added to existing files)
+### Add New Tab in Admin Portal
 
-## Files to Modify
+Create a new **Challenges** tab in the admin portal that displays:
 
-1. `src/pages/AmericanoCreate.tsx` - Add mode selection and team input UI
-2. `src/pages/AmericanoSession.tsx` - Handle team mode display and scoring
-3. `src/pages/Americano.tsx` - Show mode badge on session cards
+| Column | Description |
+|--------|-------------|
+| Date & Time | Full timestamp when challenge was created |
+| Challenger | Team that sent the challenge |
+| Challenged | Team that received the challenge |
+| Status | pending, accepted, declined, etc. |
+| Responded At | When the challenge was responded to (if applicable) |
+| Actions | Cancel/View details |
 
-## Database Migrations
-
-1. Add `mode` column to `americano_sessions`
-2. Create `americano_teams` table
-3. Create `americano_team_matches` table
-4. Add RLS policies for new tables
+This provides the admin visibility into when exactly each challenge was sent.
 
 ---
 
-## UI Components
+## 5. File Changes Summary
 
-The implementation will use existing UI components:
-- **RadioGroup** - For mode selection (Individual/Team)
-- **Card** - For team input sections
-- **Input** - For team name and player names
-- **Badge** - For mode indicator on session cards
-- **Table** - For team standings
-- **Button** - For add/remove team actions
+### New Files
+- None (enhancements to existing components)
+
+### Modified Files
+
+| File | Changes |
+|------|---------|
+| `src/components/admin/TeamsTab.tsx` | Add freeze/unfreeze actions, freeze dialog, frozen indicator |
+| `src/pages/LadderDetail.tsx` | Update `canChallenge()` to check freeze status |
+| `src/pages/Admin.tsx` | Add Challenges tab, fetch challenge data with timestamps |
+| `src/pages/Challenges.tsx` | Show freeze status banner if user's team is frozen |
+
+### Database Migration
+- Add `is_frozen`, `frozen_until`, `frozen_reason`, `frozen_by`, `frozen_at` columns to `teams` table
 
 ---
 
 ## Technical Details
 
-### Team Mode Session Flow:
+### Freeze Team Dialog Component
 
-1. **Creation:**
-   - User selects "Team" mode
-   - Enters teams with player names
-   - Session saved with `mode: 'team'`
-   - Teams saved to `americano_teams` table
+```text
+┌──────────────────────────────────────┐
+│         Freeze Team                   │
+│                                       │
+│  Duration:                            │
+│  ┌─────────────────────────────────┐  │
+│  │ 1 week                      ▼   │  │
+│  └─────────────────────────────────┘  │
+│                                       │
+│  Reason (optional):                   │
+│  ┌─────────────────────────────────┐  │
+│  │ Travelling                      │  │
+│  └─────────────────────────────────┘  │
+│                                       │
+│        [Cancel]  [Freeze Team]        │
+└──────────────────────────────────────┘
+```
 
-2. **Start Session:**
-   - Generate round-robin schedule
-   - All matches created in `americano_team_matches`
-   - Distribute matches into rounds for parallel play
+### Challenge Visibility Query
 
-3. **Score Entry:**
-   - Admin enters match scores
-   - Team stats updated (points accumulated, wins/losses)
-   - Both teams get their respective scores as points
+The admin challenges query will select:
+- `id`, `created_at` (full timestamp with time)
+- Challenger and challenged team names
+- `status`, `responded_at`, `expires_at`
 
-4. **Completion:**
-   - All matches completed
-   - Final standings calculated
-   - Winner is team with most points
+### Auto-Unfreeze Logic
 
-### Standings Calculation:
+The freeze is checked at query time by comparing `frozen_until` with the current timestamp. No background job is needed - when the date passes, the team becomes challengeable again.
 
-Teams ranked by:
-1. Total points (primary)
-2. Number of wins (tiebreaker)
-3. Point difference (secondary tiebreaker)
+---
+
+## User Experience
+
+### For Teams
+- When frozen, they cannot receive new challenges
+- A banner on the Challenges page informs them of their frozen status
+- Existing accepted challenges remain active (they can still play scheduled matches)
+
+### For Challengers
+- The Challenge button is disabled for frozen teams
+- A tooltip explains why: "Team is frozen until Feb 10"
+- Frozen teams show a visual indicator in the ladder rankings
+
+### For Admins
+- Easy one-click access to freeze/unfreeze teams
+- Full visibility into challenge timestamps
+- Clear freeze status visible in the Teams table
 
