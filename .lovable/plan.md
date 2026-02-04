@@ -1,153 +1,88 @@
 
-
-# Admin Team Freeze & Challenge History Feature
+# Add Pagination to Challenges Tab
 
 ## Overview
 
-This plan implements two new admin capabilities:
-1. **Team Freeze**: Allow admins to freeze a team for a specified duration, preventing other teams from challenging them
-2. **Challenge History with Timestamps**: Display when challenges were created with full date and time information
+This plan adds pagination to the Challenges tab in the Admin portal, displaying 20 challenges per page with Previous/Next navigation controls. This improves performance and usability when there are many challenges in the system.
 
 ---
 
-## 1. Database Changes
+## How It Will Work
 
-### Add Freeze Columns to Teams Table
-
-A new migration will add the following columns to the `teams` table:
-
-| Column | Type | Purpose |
-|--------|------|---------|
-| `is_frozen` | boolean | Whether the team is currently frozen |
-| `frozen_until` | timestamp | When the freeze period ends |
-| `frozen_reason` | text | Optional reason for freezing (e.g., "Travelling") |
-| `frozen_by` | uuid | Which admin froze the team |
-| `frozen_at` | timestamp | When the freeze was applied |
+Instead of loading all 100 challenges at once, the system will:
+1. Load only 20 challenges at a time
+2. Track the current page number
+3. Show navigation controls at the bottom of the table
+4. Display the current range (e.g., "Showing 1-20 of 87 challenges")
 
 ---
 
-## 2. Admin Teams Tab Enhancements
+## User Interface
 
-### New "Freeze Team" Action
+The pagination controls will appear below the table:
 
-Add a new option in the team dropdown menu:
-- **Freeze Team** - Opens a dialog where admin can:
-  - Select freeze duration (1 day, 3 days, 1 week, 2 weeks, custom date)
-  - Optionally enter a reason (e.g., "Travelling", "Injury")
-  
-- **Unfreeze Team** - Immediately removes the freeze
-
-### Visual Indicator
-
-Teams that are frozen will display:
-- A snowflake icon next to the team name
-- "Frozen until [date]" badge in the table
-- The reason if provided
-
----
-
-## 3. Challenge Prevention Logic
-
-### Update Ladder Detail Page
-
-Modify the `canChallenge()` function to check if the target team is frozen:
-- If `is_frozen` is true AND `frozen_until` is in the future, the challenge button is disabled
-- Show tooltip: "This team is frozen until [date]"
-
-### Update Challenges Page
-
-If a team tries to view challenges while frozen:
-- Show an info banner: "Your team is frozen until [date]. You cannot be challenged during this time."
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  Challenge History                                          │
+│  View all challenges with full timestamps                   │
+├─────────────────────────────────────────────────────────────┤
+│  Date & Time  │ Challenger │ Challenged │ Status │ Actions │
+├───────────────┼────────────┼────────────┼────────┼─────────┤
+│  Feb 4, 2026  │ Team A     │ Team B     │ Pending│   •••   │
+│  Feb 3, 2026  │ Team C     │ Team D     │ Accepted│  •••   │
+│     ...       │    ...     │    ...     │   ...  │   ...   │
+├─────────────────────────────────────────────────────────────┤
+│   Showing 1-20 of 87 challenges                             │
+│                                                             │
+│               [← Previous]    1   2   3  ...  [Next →]      │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 4. Admin Challenges Tab (New)
+## Changes Summary
 
-### Add New Tab in Admin Portal
-
-Create a new **Challenges** tab in the admin portal that displays:
-
-| Column | Description |
-|--------|-------------|
-| Date & Time | Full timestamp when challenge was created |
-| Challenger | Team that sent the challenge |
-| Challenged | Team that received the challenge |
-| Status | pending, accepted, declined, etc. |
-| Responded At | When the challenge was responded to (if applicable) |
-| Actions | Cancel/View details |
-
-This provides the admin visibility into when exactly each challenge was sent.
-
----
-
-## 5. File Changes Summary
-
-### New Files
-- None (enhancements to existing components)
-
-### Modified Files
+### File Modified
 
 | File | Changes |
 |------|---------|
-| `src/components/admin/TeamsTab.tsx` | Add freeze/unfreeze actions, freeze dialog, frozen indicator |
-| `src/pages/LadderDetail.tsx` | Update `canChallenge()` to check freeze status |
-| `src/pages/Admin.tsx` | Add Challenges tab, fetch challenge data with timestamps |
-| `src/pages/Challenges.tsx` | Show freeze status banner if user's team is frozen |
-
-### Database Migration
-- Add `is_frozen`, `frozen_until`, `frozen_reason`, `frozen_by`, `frozen_at` columns to `teams` table
+| `src/components/admin/ChallengesTab.tsx` | Add pagination state, update query with range, add pagination controls UI |
 
 ---
 
 ## Technical Details
 
-### Freeze Team Dialog Component
+### State Management
 
-```text
-┌──────────────────────────────────────┐
-│         Freeze Team                   │
-│                                       │
-│  Duration:                            │
-│  ┌─────────────────────────────────┐  │
-│  │ 1 week                      ▼   │  │
-│  └─────────────────────────────────┘  │
-│                                       │
-│  Reason (optional):                   │
-│  ┌─────────────────────────────────┐  │
-│  │ Travelling                      │  │
-│  └─────────────────────────────────┘  │
-│                                       │
-│        [Cancel]  [Freeze Team]        │
-└──────────────────────────────────────┘
+New state variables:
+- `currentPage` - Tracks which page is displayed (starts at 1)
+- `totalCount` - Total number of challenges in the database
+- `pageSize` - Items per page (set to 20)
+
+### Database Query Changes
+
+The query will be updated to use Supabase's `.range()` method for efficient server-side pagination:
+
+```typescript
+// Calculate offset based on current page
+const from = (currentPage - 1) * pageSize;
+const to = from + pageSize - 1;
+
+// Fetch paginated data
+const { data, count } = await supabase
+  .from("challenges")
+  .select("...", { count: "exact" })
+  .order("created_at", { ascending: false })
+  .range(from, to);
 ```
 
-### Challenge Visibility Query
+### Navigation Logic
 
-The admin challenges query will select:
-- `id`, `created_at` (full timestamp with time)
-- Challenger and challenged team names
-- `status`, `responded_at`, `expires_at`
+- **Previous**: Disabled when on page 1
+- **Next**: Disabled when on the last page
+- **Page Numbers**: Show current page and nearby pages with ellipsis for gaps
+- **Info Text**: "Showing X-Y of Z challenges"
 
-### Auto-Unfreeze Logic
+### Re-fetch on Page Change
 
-The freeze is checked at query time by comparing `frozen_until` with the current timestamp. No background job is needed - when the date passes, the team becomes challengeable again.
-
----
-
-## User Experience
-
-### For Teams
-- When frozen, they cannot receive new challenges
-- A banner on the Challenges page informs them of their frozen status
-- Existing accepted challenges remain active (they can still play scheduled matches)
-
-### For Challengers
-- The Challenge button is disabled for frozen teams
-- A tooltip explains why: "Team is frozen until Feb 10"
-- Frozen teams show a visual indicator in the ladder rankings
-
-### For Admins
-- Easy one-click access to freeze/unfreeze teams
-- Full visibility into challenge timestamps
-- Clear freeze status visible in the Teams table
-
+When the user clicks Previous/Next or a page number, the component will re-fetch data for that page. After cancelling a challenge, the current page data will be refreshed.
