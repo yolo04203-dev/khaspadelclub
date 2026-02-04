@@ -395,6 +395,57 @@ export type Database = {
           },
         ]
       }
+      ladder_join_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          id: string
+          ladder_category_id: string
+          message: string | null
+          responded_at: string | null
+          responded_by: string | null
+          status: Database["public"]["Enums"]["ladder_request_status"]
+          team_id: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          id?: string
+          ladder_category_id: string
+          message?: string | null
+          responded_at?: string | null
+          responded_by?: string | null
+          status?: Database["public"]["Enums"]["ladder_request_status"]
+          team_id: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          id?: string
+          ladder_category_id?: string
+          message?: string | null
+          responded_at?: string | null
+          responded_by?: string | null
+          status?: Database["public"]["Enums"]["ladder_request_status"]
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ladder_join_requests_ladder_category_id_fkey"
+            columns: ["ladder_category_id"]
+            isOneToOne: false
+            referencedRelation: "ladder_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ladder_join_requests_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ladder_rankings: {
         Row: {
           created_at: string
@@ -1093,6 +1144,7 @@ export type Database = {
         | "expired"
         | "cancelled"
       game_mode: "ladder" | "americano" | "tournament"
+      ladder_request_status: "pending" | "approved" | "rejected"
       match_status:
         | "pending"
         | "scheduled"
@@ -1246,6 +1298,7 @@ export const Constants = {
         "cancelled",
       ],
       game_mode: ["ladder", "americano", "tournament"],
+      ladder_request_status: ["pending", "approved", "rejected"],
       match_status: [
         "pending",
         "scheduled",

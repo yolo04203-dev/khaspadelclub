@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, ArrowLeft, Users, TrendingDown, Flame, Swords, Loader2, Settings, Snowflake } from "lucide-react";
+import { Trophy, ArrowLeft, Users, TrendingDown, Flame, Swords, Loader2, Settings, Snowflake, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Logo } from "@/components/Logo";
@@ -14,6 +14,7 @@ import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { isFuture, format } from "date-fns";
+import { JoinLadderDialog } from "@/components/ladder/JoinLadderDialog";
 
 interface TeamMember {
   user_id: string;
@@ -122,6 +123,9 @@ export default function LadderDetail() {
   const [userTeamRank, setUserTeamRank] = useState<number | null>(null);
   const [challengingTeamId, setChallengingTeamId] = useState<string | null>(null);
   const [pendingChallenges, setPendingChallenges] = useState<Set<string>>(new Set());
+  const [userTeamName, setUserTeamName] = useState<string | null>(null);
+  const [pendingJoinRequests, setPendingJoinRequests] = useState<Set<string>>(new Set());
+  const [isInLadder, setIsInLadder] = useState(false);
 
   const fetchLadderData = async () => {
     if (!id) return;
@@ -245,9 +249,18 @@ export default function LadderDetail() {
         setUserTeamId(teamId);
 
         if (teamId) {
+          // Get team name
+          const { data: teamData } = await supabase
+            .from("teams")
+            .select("name")
+            .eq("id", teamId)
+            .single();
+          setUserTeamName(teamData?.name || null);
+
           const userRanking = rankingsData?.find((r) => (r.team as any)?.id === teamId);
           setUserTeamRank(userRanking?.rank || null);
           setUserCategoryId(userRanking?.ladder_category_id || null);
+          setIsInLadder(!!userRanking);
 
           // Fetch pending challenges
           const { data: challenges } = await supabase
@@ -257,6 +270,20 @@ export default function LadderDetail() {
             .eq("status", "pending");
 
           setPendingChallenges(new Set(challenges?.map((c) => c.challenged_team_id) || []));
+
+          // Fetch pending join requests for this team
+          const { data: joinRequests } = await supabase
+            .from("ladder_join_requests")
+            .select("ladder_category_id")
+            .eq("team_id", teamId)
+            .eq("status", "pending")
+            .in("ladder_category_id", categoryIds);
+
+          setPendingJoinRequests(new Set(joinRequests?.map((r) => r.ladder_category_id) || []));
+        } else {
+          setIsInLadder(false);
+          setUserTeamName(null);
+          setPendingJoinRequests(new Set());
         }
       }
     } catch (error) {
@@ -370,14 +397,36 @@ export default function LadderDetail() {
             <Logo size="sm" />
           </div>
 
-          {role === "admin" && (
-            <Button variant="outline" asChild>
-              <Link to={`/ladders/${id}/manage`}>
-                <Settings className="w-4 h-4 mr-2" />
-                Manage
-              </Link>
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Join Ladder Button - show if user has a team but is not in any category of this ladder */}
+            {user && userTeamId && !isInLadder && categories.length > 0 && (
+              <>
+                {pendingJoinRequests.size > 0 ? (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    Request Pending
+                  </Badge>
+                ) : (
+                  <JoinLadderDialog
+                    categories={categories}
+                    teamId={userTeamId}
+                    teamName={userTeamName || "Your Team"}
+                    existingRequests={pendingJoinRequests}
+                    onRequestSubmitted={fetchLadderData}
+                  />
+                )}
+              </>
+            )}
+
+            {role === "admin" && (
+              <Button variant="outline" asChild>
+                <Link to={`/ladders/${id}/manage`}>
+                  <Settings className="w-4 h-4 mr-2" />
+                  Manage
+                </Link>
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
