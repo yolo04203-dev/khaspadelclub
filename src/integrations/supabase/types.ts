@@ -509,6 +509,7 @@ export type Database = {
           created_by: string | null
           description: string | null
           id: string
+          max_teams: number
           name: string
           status: string
           updated_at: string
@@ -518,6 +519,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          max_teams?: number
           name: string
           status?: string
           updated_at?: string
@@ -527,6 +529,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          max_teams?: number
           name?: string
           status?: string
           updated_at?: string

@@ -44,6 +44,7 @@ export default function LadderManage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState("active");
+  const [maxTeams, setMaxTeams] = useState(16);
   const [categories, setCategories] = useState<LadderCategory[]>([]);
   const [teamsByCategory, setTeamsByCategory] = useState<Record<string, TeamInCategory[]>>({});
   const [availableTeams, setAvailableTeams] = useState<AvailableTeam[]>([]);
@@ -67,6 +68,7 @@ export default function LadderManage() {
         setName(ladder.name);
         setDescription(ladder.description || "");
         setStatus(ladder.status);
+        setMaxTeams(ladder.max_teams || 16);
 
         // Fetch categories
         const { data: categoriesData, error: categoriesError } = await supabase
@@ -135,6 +137,7 @@ export default function LadderManage() {
           name: name.trim(),
           description: description.trim() || null,
           status,
+          max_teams: maxTeams,
         })
         .eq("id", id);
 
@@ -346,6 +349,21 @@ export default function LadderManage() {
                         <SelectItem value="archived">Archived</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Maximum Teams</Label>
+                    <Input
+                      type="number"
+                      min={2}
+                      max={100}
+                      value={maxTeams}
+                      onChange={(e) => setMaxTeams(parseInt(e.target.value) || 16)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Maximum number of teams allowed across all categories
+                    </p>
                   </div>
                 </div>
                 <div className="space-y-2">

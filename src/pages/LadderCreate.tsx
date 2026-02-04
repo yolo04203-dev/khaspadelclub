@@ -25,6 +25,7 @@ export default function LadderCreate() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [maxTeams, setMaxTeams] = useState(16);
   const [categories, setCategories] = useState<CategoryInput[]>([
     { id: crypto.randomUUID(), name: "Category A", description: "Top tier players", challenge_range: 5 },
     { id: crypto.randomUUID(), name: "Category B", description: "Intermediate players", challenge_range: 5 },
@@ -94,6 +95,7 @@ export default function LadderCreate() {
           description: description.trim() || null,
           created_by: user?.id,
           status: "active",
+          max_teams: maxTeams,
         })
         .select()
         .single();
@@ -202,6 +204,20 @@ export default function LadderCreate() {
                     onChange={(e) => setName(e.target.value)}
                     required
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="maxTeams">Maximum Teams</Label>
+                  <Input
+                    id="maxTeams"
+                    type="number"
+                    min={2}
+                    max={100}
+                    value={maxTeams}
+                    onChange={(e) => setMaxTeams(parseInt(e.target.value) || 16)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Maximum number of teams allowed across all categories
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>
