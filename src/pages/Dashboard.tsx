@@ -8,6 +8,7 @@ import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 interface UserTeam {
   id: string;
   name: string;
@@ -329,7 +330,12 @@ export default function Dashboard() {
             </Link>
 
             <Link to="/challenges">
-              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
+              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full relative">
+                {incomingChallenges > 0 && (
+                  <Badge className="absolute -top-2 -right-2 bg-warning text-warning-foreground">
+                    {incomingChallenges}
+                  </Badge>
+                )}
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Swords className="w-5 h-5 text-accent" />
