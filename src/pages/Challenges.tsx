@@ -533,7 +533,7 @@ export default function Challenges() {
 
           {userTeam && (
             <Button asChild>
-              <Link to="/leaderboard">
+              <Link to="/find-opponents">
                 <Swords className="w-4 h-4 mr-2" />
                 Find Opponents
               </Link>
@@ -702,7 +702,7 @@ export default function Challenges() {
                         <Send className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
                         <p className="text-muted-foreground mb-4">No challenges sent</p>
                         <Button asChild>
-                          <Link to="/leaderboard">Browse Leaderboard</Link>
+                          <Link to="/find-opponents">Find Opponents</Link>
                         </Button>
                       </CardContent>
                     </Card>
