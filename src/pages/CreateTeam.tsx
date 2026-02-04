@@ -220,11 +220,11 @@ export default function CreateTeam() {
                         </li>
                         <li className="flex items-center gap-2">
                           <span className="w-1.5 h-1.5 rounded-full bg-accent" />
-                          Your team joins the ladder rankings
+                          Choose a ladder and request to join
                         </li>
                         <li className="flex items-center gap-2">
                           <span className="w-1.5 h-1.5 rounded-full bg-accent" />
-                          You can invite teammates later
+                          Start competing once admin approves
                         </li>
                       </ul>
                     </div>
