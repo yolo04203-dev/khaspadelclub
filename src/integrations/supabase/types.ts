@@ -497,7 +497,7 @@ export type Database = {
           {
             foreignKeyName: "ladder_rankings_team_id_fkey"
             columns: ["team_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "teams"
             referencedColumns: ["id"]
           },
