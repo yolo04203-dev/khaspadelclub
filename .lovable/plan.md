@@ -1,88 +1,108 @@
 
-# Add Pagination to Challenges Tab
+# Consolidate Leaderboard into Ladders
 
 ## Overview
 
-This plan adds pagination to the Challenges tab in the Admin portal, displaying 20 challenges per page with Previous/Next navigation controls. This improves performance and usability when there are many challenges in the system.
+This plan removes the separate "Leaderboard" page and consolidates all ranking functionality into the "Ladders" section. The Ladders page will become the single destination for viewing and managing all ladder rankings.
 
 ---
 
-## How It Will Work
+## Current Structure
 
-Instead of loading all 100 challenges at once, the system will:
-1. Load only 20 challenges at a time
-2. Track the current page number
-3. Show navigation controls at the bottom of the table
-4. Display the current range (e.g., "Showing 1-20 of 87 challenges")
+| Page | Route | Purpose |
+|------|-------|---------|
+| Leaderboard | `/leaderboard` | Shows ALL rankings (no ladder/category filter) |
+| Ladders | `/ladders` | Lists all ladders |
+| LadderDetail | `/ladders/:id` | Shows a specific ladder's categories and rankings |
+
+**Problem**: Leaderboard and LadderDetail do the same thing (show rankings with challenge functionality) but exist as separate pages, causing confusion.
 
 ---
 
-## User Interface
+## New Structure
 
-The pagination controls will appear below the table:
+| Page | Route | Purpose |
+|------|-------|---------|
+| Ladders | `/ladders` | Lists all ladders (unchanged) |
+| LadderDetail | `/ladders/:id` | Shows ladder rankings with full functionality |
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│  Challenge History                                          │
-│  View all challenges with full timestamps                   │
-├─────────────────────────────────────────────────────────────┤
-│  Date & Time  │ Challenger │ Challenged │ Status │ Actions │
-├───────────────┼────────────┼────────────┼────────┼─────────┤
-│  Feb 4, 2026  │ Team A     │ Team B     │ Pending│   •••   │
-│  Feb 3, 2026  │ Team C     │ Team D     │ Accepted│  •••   │
-│     ...       │    ...     │    ...     │   ...  │   ...   │
-├─────────────────────────────────────────────────────────────┤
-│   Showing 1-20 of 87 challenges                             │
-│                                                             │
-│               [← Previous]    1   2   3  ...  [Next →]      │
-└─────────────────────────────────────────────────────────────┘
-```
+The LadderDetail page already has all the functionality of Leaderboard:
+- Team rankings with rank badges (gold/silver/bronze)
+- Team member avatars
+- Win/loss stats and streaks
+- Challenge button with validation
+- Real-time updates
 
 ---
 
 ## Changes Summary
 
-### File Modified
+| File | Action | Description |
+|------|--------|-------------|
+| `src/pages/Leaderboard.tsx` | Delete | Remove the standalone Leaderboard page |
+| `src/pages/Dashboard.tsx` | Modify | Update "Leaderboard" card to link to `/ladders` instead; remove duplicate card |
+| `src/App.tsx` | Modify | Remove `/leaderboard` route |
 
-| File | Changes |
-|------|---------|
-| `src/components/admin/ChallengesTab.tsx` | Add pagination state, update query with range, add pagination controls UI |
+---
+
+## Dashboard Changes
+
+The Dashboard currently shows two separate cards:
+
+```text
+Current:
+[Ladders] - Skill-based divisions with rankings
+[Leaderboard] - View current rankings and ladder positions
+```
+
+After consolidation:
+
+```text
+New:
+[Ladders] - View and compete in skill-based ladder rankings
+```
+
+The "View Ladder" button on the Team Status card will also update to link to `/ladders`.
+
+---
+
+## Navigation Flow
+
+```text
+Before:
+Dashboard -> Leaderboard (shows all rankings)
+Dashboard -> Ladders -> Ladder Detail (shows category rankings)
+
+After:
+Dashboard -> Ladders -> Ladder Detail (shows category rankings)
+```
+
+Users will go to the Ladders page to see all available ladders, then select one to view its rankings and challenge other teams.
 
 ---
 
 ## Technical Details
 
-### State Management
+### Files to Delete
 
-New state variables:
-- `currentPage` - Tracks which page is displayed (starts at 1)
-- `totalCount` - Total number of challenges in the database
-- `pageSize` - Items per page (set to 20)
+- `src/pages/Leaderboard.tsx` - The entire file will be removed
 
-### Database Query Changes
+### Files to Modify
 
-The query will be updated to use Supabase's `.range()` method for efficient server-side pagination:
+**src/App.tsx**
+- Remove the import for `Leaderboard`
+- Remove the route `<Route path="/leaderboard" element={<Leaderboard />} />`
 
-```typescript
-// Calculate offset based on current page
-const from = (currentPage - 1) * pageSize;
-const to = from + pageSize - 1;
+**src/pages/Dashboard.tsx**
+- Remove the "Leaderboard" quick action card
+- Update the "Ladders" card description to: "View and compete in ladder rankings"
+- Change the "View Ladder" button in the Team Status card from `/leaderboard` to `/ladders`
 
-// Fetch paginated data
-const { data, count } = await supabase
-  .from("challenges")
-  .select("...", { count: "exact" })
-  .order("created_at", { ascending: false })
-  .range(from, to);
-```
+---
 
-### Navigation Logic
+## What Stays the Same
 
-- **Previous**: Disabled when on page 1
-- **Next**: Disabled when on the last page
-- **Page Numbers**: Show current page and nearby pages with ellipsis for gaps
-- **Info Text**: "Showing X-Y of Z challenges"
-
-### Re-fetch on Page Change
-
-When the user clicks Previous/Next or a page number, the component will re-fetch data for that page. After cancelling a challenge, the current page data will be refreshed.
+- The Ladders listing page (`/ladders`) - no changes needed
+- The LadderDetail page (`/ladders/:id`) - no changes needed, already has full functionality
+- Admin portal Ladders tab - no changes needed
+- All ladder management functionality - unchanged
