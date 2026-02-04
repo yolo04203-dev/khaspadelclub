@@ -98,6 +98,20 @@ export function TeamsTab({ teams, onRefresh }: TeamsTabProps) {
 
       if (error) throw error;
 
+      // Send email notification
+      try {
+        await supabase.functions.invoke("send-team-freeze-notification", {
+          body: {
+            teamId: team.id,
+            teamName: team.name,
+            action: "unfreeze",
+          },
+        });
+      } catch (emailError) {
+        console.error("Failed to send unfreeze notification email:", emailError);
+        // Don't fail the unfreeze operation if email fails
+      }
+
       toast.success(`${team.name} has been unfrozen`);
       onRefresh();
     } catch (error) {

@@ -95,6 +95,22 @@ export function FreezeTeamDialog({
 
       if (error) throw error;
 
+      // Send email notification
+      try {
+        await supabase.functions.invoke("send-team-freeze-notification", {
+          body: {
+            teamId: team.id,
+            teamName: team.name,
+            action: "freeze",
+            frozenUntil: freezeUntil.toISOString(),
+            reason: reason.trim() || undefined,
+          },
+        });
+      } catch (emailError) {
+        console.error("Failed to send freeze notification email:", emailError);
+        // Don't fail the freeze operation if email fails
+      }
+
       toast.success(`${team.name} frozen until ${format(freezeUntil, "PPP")}`);
       onSuccess();
       onOpenChange(false);
