@@ -100,7 +100,7 @@ export default function CreateTeam() {
         description: `"${data.name}" has been registered and added to the ladder.`,
       });
 
-      navigate("/leaderboard");
+      navigate("/ladders");
     } catch (error: any) {
       console.error("Error creating team:", error);
       toast({
@@ -170,7 +170,7 @@ export default function CreateTeam() {
                     <Link to="/dashboard">Back to Dashboard</Link>
                   </Button>
                   <Button className="flex-1" asChild>
-                    <Link to="/leaderboard">View Leaderboard</Link>
+                    <Link to="/ladders">View Ladders</Link>
                   </Button>
                 </div>
               </CardContent>
