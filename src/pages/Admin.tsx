@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid } from "lucide-react";
+import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { TeamsTab } from "@/components/admin/TeamsTab";
 import { MatchesTab } from "@/components/admin/MatchesTab";
 import { LaddersTab } from "@/components/admin/LaddersTab";
 import { TournamentsTab } from "@/components/admin/TournamentsTab";
+import { ChallengesTab } from "@/components/admin/ChallengesTab";
 
 interface Player {
   id: string;
@@ -29,6 +30,9 @@ interface Team {
   members_count: number;
   wins: number;
   losses: number;
+  is_frozen?: boolean;
+  frozen_until?: string | null;
+  frozen_reason?: string | null;
 }
 
 interface Match {
@@ -86,7 +90,7 @@ export default function Admin() {
 
       const { data: teamsData } = await supabase
         .from("teams")
-        .select("id, name");
+        .select("id, name, is_frozen, frozen_until, frozen_reason");
 
       const { data: roles } = await supabase
         .from("user_roles")
@@ -126,6 +130,9 @@ export default function Admin() {
           members_count: teamMemberCounts.get(t.id) || 0,
           wins: ranking?.wins || 0,
           losses: ranking?.losses || 0,
+          is_frozen: t.is_frozen ?? false,
+          frozen_until: t.frozen_until,
+          frozen_reason: t.frozen_reason,
         };
       }).sort((a, b) => (a.rank || 999) - (b.rank || 999));
 
@@ -286,7 +293,7 @@ export default function Admin() {
 
           {/* Tabs */}
           <Tabs defaultValue="players" className="w-full">
-            <TabsList className="grid w-full grid-cols-5 mb-6">
+            <TabsList className="grid w-full grid-cols-6 mb-6">
               <TabsTrigger value="players">
                 <Users className="w-4 h-4 mr-2 hidden sm:inline" />
                 Players
@@ -294,6 +301,10 @@ export default function Admin() {
               <TabsTrigger value="teams">
                 <Trophy className="w-4 h-4 mr-2 hidden sm:inline" />
                 Teams
+              </TabsTrigger>
+              <TabsTrigger value="challenges">
+                <Zap className="w-4 h-4 mr-2 hidden sm:inline" />
+                Challenges
               </TabsTrigger>
               <TabsTrigger value="matches">
                 <Swords className="w-4 h-4 mr-2 hidden sm:inline" />
@@ -315,6 +326,10 @@ export default function Admin() {
 
             <TabsContent value="teams">
               <TeamsTab teams={filteredTeams} onRefresh={fetchAdminData} />
+            </TabsContent>
+
+            <TabsContent value="challenges">
+              <ChallengesTab />
             </TabsContent>
 
             <TabsContent value="matches">

@@ -625,7 +625,12 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           created_by: string | null
+          frozen_at: string | null
+          frozen_by: string | null
+          frozen_reason: string | null
+          frozen_until: string | null
           id: string
+          is_frozen: boolean | null
           name: string
           updated_at: string
         }
@@ -633,7 +638,12 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           created_by?: string | null
+          frozen_at?: string | null
+          frozen_by?: string | null
+          frozen_reason?: string | null
+          frozen_until?: string | null
           id?: string
+          is_frozen?: boolean | null
           name: string
           updated_at?: string
         }
@@ -641,7 +651,12 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           created_by?: string | null
+          frozen_at?: string | null
+          frozen_by?: string | null
+          frozen_reason?: string | null
+          frozen_until?: string | null
           id?: string
+          is_frozen?: boolean | null
           name?: string
           updated_at?: string
         }
