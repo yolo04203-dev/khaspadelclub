@@ -11,7 +11,9 @@ import {
   Inbox,
   Loader2,
   Trophy,
-  Target
+  Target,
+  Snowflake,
+  Info
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,9 +22,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { SetScoreDialog } from "@/components/challenges/SetScoreDialog";
+import { isFuture, format } from "date-fns";
 
 interface Challenge {
   id: string;
@@ -49,6 +53,9 @@ interface UserTeam {
   name: string;
   rank: number | null;
   is_captain: boolean;
+  is_frozen?: boolean;
+  frozen_until?: string | null;
+  frozen_reason?: string | null;
 }
 
 export default function Challenges() {
@@ -76,7 +83,7 @@ export default function Challenges() {
 
     const { data: teamData } = await supabase
       .from("teams")
-      .select("id, name")
+      .select("id, name, is_frozen, frozen_until, frozen_reason")
       .eq("id", memberData.team_id)
       .single();
 
@@ -92,9 +99,14 @@ export default function Challenges() {
       id: teamData.id,
       name: teamData.name,
       rank: rankData?.rank || null,
-      is_captain: memberData.is_captain,
+      is_captain: memberData.is_captain ?? false,
+      is_frozen: teamData.is_frozen ?? false,
+      frozen_until: teamData.frozen_until,
+      frozen_reason: teamData.frozen_reason,
     };
   };
+
+  const isTeamFrozen = userTeam?.is_frozen && userTeam?.frozen_until && isFuture(new Date(userTeam.frozen_until));
 
   const fetchChallenges = async (teamId: string) => {
     // Fetch incoming challenges
@@ -543,6 +555,21 @@ export default function Challenges() {
               Manage your incoming and outgoing ladder challenges
             </p>
           </div>
+
+          {/* Frozen Team Banner */}
+          {isTeamFrozen && userTeam && (
+            <Alert className="mb-6">
+              <Snowflake className="h-4 w-4" />
+              <AlertDescription className="flex items-center gap-2">
+                <span>
+                  Your team is frozen until{" "}
+                  <strong>{format(new Date(userTeam.frozen_until!), "MMMM d, yyyy")}</strong>.
+                  {userTeam.frozen_reason && ` Reason: ${userTeam.frozen_reason}.`}
+                  {" "}You cannot be challenged during this time.
+                </span>
+              </AlertDescription>
+            </Alert>
+          )}
 
           {!userTeam ? (
             <Card className="text-center py-12">

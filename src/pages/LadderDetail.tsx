@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, ArrowLeft, Users, TrendingDown, Flame, Swords, Loader2, Settings } from "lucide-react";
+import { Trophy, ArrowLeft, Users, TrendingDown, Flame, Swords, Loader2, Settings, Snowflake } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Logo } from "@/components/Logo";
@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { isFuture, format } from "date-fns";
 
 interface TeamMember {
   user_id: string;
@@ -30,6 +32,9 @@ interface TeamRanking {
     id: string;
     name: string;
     avatar_url: string | null;
+    is_frozen?: boolean;
+    frozen_until?: string | null;
+    frozen_reason?: string | null;
   } | null;
   members: TeamMember[];
 }
@@ -167,7 +172,10 @@ export default function LadderDetail() {
           team:teams (
             id,
             name,
-            avatar_url
+            avatar_url,
+            is_frozen,
+            frozen_until,
+            frozen_reason
           )
         `)
         .in("ladder_category_id", categoryIds)
@@ -260,11 +268,22 @@ export default function LadderDetail() {
 
   const activeCategoryData = categories.find((c) => c.id === activeCategory);
 
-  const canChallenge = (targetRank: number, targetTeamId: string, categoryId: string): boolean => {
+  const isTeamFrozen = (team: TeamRanking["team"]): boolean => {
+    if (!team) return false;
+    return !!team.is_frozen && !!team.frozen_until && isFuture(new Date(team.frozen_until));
+  };
+
+  const getFrozenUntilDate = (team: TeamRanking["team"]): string | null => {
+    if (!team || !team.frozen_until) return null;
+    return format(new Date(team.frozen_until), "MMM d");
+  };
+
+  const canChallenge = (targetRank: number, targetTeamId: string, categoryId: string, team: TeamRanking["team"]): boolean => {
     if (!userTeamId || !userTeamRank || !userCategoryId) return false;
     if (userCategoryId !== categoryId) return false;
     if (targetTeamId === userTeamId) return false;
     if (pendingChallenges.has(targetTeamId)) return false;
+    if (isTeamFrozen(team)) return false;
     const challengeRange = activeCategoryData?.challenge_range || 5;
     return targetRank < userTeamRank && userTeamRank - targetRank <= challengeRange;
   };
@@ -519,8 +538,25 @@ export default function LadderDetail() {
                                       {getStreakDisplay(ranking.streak)}
                                     </div>
 
-                                    {/* Challenge Button */}
-                                    {user && ranking.team && canChallenge(ranking.rank, ranking.team.id, category.id) && (
+                                    {/* Challenge Button or Frozen Badge */}
+                                    {user && ranking.team && isTeamFrozen(ranking.team) && (
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Badge variant="secondary" className="hidden sm:flex gap-1">
+                                              <Snowflake className="w-3 h-3" />
+                                              Frozen
+                                            </Badge>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            Team frozen until {getFrozenUntilDate(ranking.team)}
+                                            {ranking.team.frozen_reason && ` • ${ranking.team.frozen_reason}`}
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    )}
+
+                                    {user && ranking.team && canChallenge(ranking.rank, ranking.team.id, category.id, ranking.team) && (
                                       <Button
                                         size="sm"
                                         variant="outline"
