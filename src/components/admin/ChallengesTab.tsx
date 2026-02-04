@@ -29,7 +29,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { toast } from "sonner";
+
+const PAGE_SIZE = 20;
 
 interface AdminChallenge {
   id: string;
@@ -46,10 +57,16 @@ export function ChallengesTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [challengeToCancel, setChallengeToCancel] = useState<AdminChallenge | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   const fetchChallenges = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const { data: challengesData, error } = await supabase
+      const from = (currentPage - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      const { data: challengesData, error, count } = await supabase
         .from("challenges")
         .select(`
           id,
@@ -59,11 +76,12 @@ export function ChallengesTab() {
           expires_at,
           challenger_team_id,
           challenged_team_id
-        `)
+        `, { count: "exact" })
         .order("created_at", { ascending: false })
-        .limit(100);
-
+        .range(from, to);
       if (error) throw error;
+
+      setTotalCount(count || 0);
 
       // Get team names
       const teamIds = [
@@ -95,7 +113,7 @@ export function ChallengesTab() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentPage]);
 
   useEffect(() => {
     fetchChallenges();
@@ -143,6 +161,37 @@ export function ChallengesTab() {
 
   const formatDateTime = (dateStr: string) => {
     return format(new Date(dateStr), "MMM d, yyyy 'at' h:mm a");
+  };
+
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  const getPageNumbers = () => {
+    const pages: (number | "ellipsis")[] = [];
+    
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      
+      if (currentPage > 3) {
+        pages.push("ellipsis");
+      }
+      
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      
+      for (let i = start; i <= end; i++) {
+        if (!pages.includes(i)) pages.push(i);
+      }
+      
+      if (currentPage < totalPages - 2) {
+        pages.push("ellipsis");
+      }
+      
+      if (!pages.includes(totalPages)) pages.push(totalPages);
+    }
+    
+    return pages;
   };
 
   if (isLoading) {
@@ -221,6 +270,49 @@ export function ChallengesTab() {
               )}
             </TableBody>
           </Table>
+
+          {/* Pagination Controls */}
+          {totalCount > 0 && (
+            <div className="flex flex-col items-center gap-4 pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                Showing {Math.min((currentPage - 1) * PAGE_SIZE + 1, totalCount)}-
+                {Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount} challenges
+              </p>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                  
+                  {getPageNumbers().map((page, index) => (
+                    <PaginationItem key={index}>
+                      {page === "ellipsis" ? (
+                        <PaginationEllipsis />
+                      ) : (
+                        <PaginationLink
+                          onClick={() => setCurrentPage(page)}
+                          isActive={currentPage === page}
+                          className="cursor-pointer"
+                        >
+                          {page}
+                        </PaginationLink>
+                      )}
+                    </PaginationItem>
+                  ))}
+                  
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
 
