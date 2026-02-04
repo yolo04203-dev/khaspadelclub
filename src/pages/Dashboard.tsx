@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Navigate, Link } from "react-router-dom";
-import { motion } from "framer-motion";
-import { LogOut, User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { LogOut, User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers, Bell, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
+import { Alert, AlertDescription } from "@/components/ui/alert";
 interface UserTeam {
   id: string;
   name: string;
@@ -31,6 +31,8 @@ export default function Dashboard() {
     losses: 0,
     pendingChallenges: 0,
   });
+  const [incomingChallenges, setIncomingChallenges] = useState(0);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   useEffect(() => {
     const fetchUserTeamAndStats = async () => {
@@ -88,6 +90,15 @@ export default function Dashboard() {
             .select("*", { count: "exact", head: true })
             .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
             .eq("status", "pending");
+
+          // Incoming challenges (challenges sent TO user's team - needs response)
+          const { count: incomingCount } = await supabase
+            .from("challenges")
+            .select("*", { count: "exact", head: true })
+            .eq("challenged_team_id", teamId)
+            .eq("status", "pending");
+
+          setIncomingChallenges(incomingCount || 0);
 
           setStats({
             matchesPlayed: matchesCount || 0,
@@ -162,6 +173,45 @@ export default function Dashboard() {
                 : "View your rankings and challenge other players"}
             </p>
           </div>
+
+          {/* Challenge Notification Banner */}
+          <AnimatePresence>
+            {incomingChallenges > 0 && !bannerDismissed && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="mb-8"
+              >
+                <Alert className="bg-gradient-to-r from-warning/20 to-accent/20 border-warning/50">
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-warning/30 flex items-center justify-center">
+                        <Bell className="w-5 h-5 text-warning animate-pulse" />
+                      </div>
+                      <AlertDescription className="text-foreground font-medium">
+                        You have <span className="font-bold text-warning">{incomingChallenges}</span> incoming {incomingChallenges === 1 ? "challenge" : "challenges"} awaiting your response!
+                      </AlertDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button asChild size="sm" variant="default">
+                        <Link to="/challenges">View Challenges</Link>
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={() => setBannerDismissed(true)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </Alert>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Team Status Card */}
           {!teamLoading && (
