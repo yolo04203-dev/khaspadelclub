@@ -236,9 +236,11 @@ export default function LadderManage() {
 
   const handleRemoveTeamFromCategory = async (categoryId: string, rankingId: string, teamId: string, teamName: string) => {
     try {
+      // Delete the ranking record entirely (not just set category to null)
+      // This allows the team to request to join again
       const { error } = await supabase
         .from("ladder_rankings")
-        .update({ ladder_category_id: null })
+        .delete()
         .eq("id", rankingId);
 
       if (error) throw error;
