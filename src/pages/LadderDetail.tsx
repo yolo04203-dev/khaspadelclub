@@ -190,18 +190,30 @@ export default function LadderDetail() {
       // Get all team IDs
       const teamIds = rankingsData?.map((r) => (r.team as any)?.id).filter(Boolean) || [];
 
-      // Fetch team members
-      const { data: membersData } = await supabase
-        .from("team_members")
-        .select("team_id, user_id")
-        .in("team_id", teamIds);
+      // Fetch team members (only for teams already in this ladder)
+      let membersData: { team_id: string; user_id: string }[] = [];
+      if (teamIds.length > 0) {
+        const { data, error } = await supabase
+          .from("team_members")
+          .select("team_id, user_id")
+          .in("team_id", teamIds);
+
+        if (error) throw error;
+        membersData = data || [];
+      }
 
       // Get user IDs and fetch profiles
-      const userIds = [...new Set(membersData?.map((m) => m.user_id) || [])];
-      const { data: profilesData } = await supabase
-        .from("profiles")
-        .select("user_id, display_name, avatar_url")
-        .in("user_id", userIds);
+      const userIds = [...new Set(membersData.map((m) => m.user_id))];
+      let profilesData: { user_id: string; display_name: string | null; avatar_url: string | null }[] = [];
+      if (userIds.length > 0) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("user_id, display_name, avatar_url")
+          .in("user_id", userIds);
+
+        if (error) throw error;
+        profilesData = data || [];
+      }
 
       const profilesMap = new Map(profilesData?.map((p) => [p.user_id, p]) || []);
 
@@ -244,19 +256,29 @@ export default function LadderDetail() {
 
       // Check user's team
       if (user) {
-        const userMembership = membersData?.find((m) => m.user_id === user.id);
-        const teamId = userMembership?.team_id || null;
+        // IMPORTANT: user team membership is independent of ladder rankings.
+        // If the user's team is not ranked yet, it won't appear in `membersData`.
+        const { data: userMembership, error: userMembershipError } = await supabase
+          .from("team_members")
+          .select(
+            `
+              team_id,
+              team:teams (
+                id,
+                name
+              )
+            `
+          )
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (userMembershipError) throw userMembershipError;
+
+        const teamId = (userMembership as any)?.team_id || null;
         setUserTeamId(teamId);
+        setUserTeamName(((userMembership as any)?.team as any)?.name || null);
 
         if (teamId) {
-          // Get team name
-          const { data: teamData } = await supabase
-            .from("teams")
-            .select("name")
-            .eq("id", teamId)
-            .single();
-          setUserTeamName(teamData?.name || null);
-
           const userRanking = rankingsData?.find((r) => (r.team as any)?.id === teamId);
           setUserTeamRank(userRanking?.rank || null);
           setUserCategoryId(userRanking?.ladder_category_id || null);
