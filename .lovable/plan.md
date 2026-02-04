@@ -1,102 +1,63 @@
 
-
-# Add 10 Random Teams to Each Category in Chiniot Ladder
+# Add Challenge Notification Banner to Dashboard
 
 ## Overview
+Add a prominent notification banner at the top of the dashboard that alerts users when they have incoming pending challenges that need their response. This will be more visible than the current stat card and encourage timely responses.
 
-This plan adds 10 random teams to each category (Category A and Category B) in the Chiniot Ladder. The ladder already has the same ranking and challenge functionality as the old Leaderboard - we just need to populate it with teams.
+## What You'll See
+- A colorful alert banner appears at the top of your dashboard when you have incoming challenges
+- Shows the number of pending challenges with a call-to-action button to view them
+- The banner is dismissible but will reappear on page refresh if challenges are still pending
+- Subtle animation to draw attention without being intrusive
+
+## Implementation Details
+
+### 1. Enhance Data Fetching in Dashboard
+**File: `src/pages/Dashboard.tsx`**
+
+Currently, the dashboard fetches total pending challenges (both incoming and outgoing combined). We need to also fetch **incoming challenges** separately to show a more relevant notification - users need to respond to incoming challenges, not just be aware of outgoing ones.
+
+Add new state to track:
+- `incomingChallenges`: number of challenges sent TO the user's team that are awaiting response
+
+Update the fetch logic to query:
+```sql
+-- Incoming pending challenges (challenges sent to user's team)
+SELECT count(*) FROM challenges 
+WHERE challenged_team_id = {teamId} AND status = 'pending'
+```
+
+### 2. Add Notification Banner Component
+**File: `src/pages/Dashboard.tsx`**
+
+Add an Alert component (already available in the codebase) that displays:
+- An icon (Bell or Swords) to indicate challenge notifications
+- Message like "You have 2 incoming challenges awaiting your response!"
+- A button linking to `/challenges` page
+- Styled with accent/warning colors to stand out
+
+The banner will:
+- Only appear when `incomingChallenges > 0`
+- Be positioned above the Team Status Card for high visibility
+- Use framer-motion for a subtle entrance animation
+- Include a dismiss button (optional, stored in local state)
+
+### 3. Visual Design
+- Background: gradient with warning/accent tones (orange/yellow)
+- Icon: Animated bell or swords icon
+- Text: Bold count + descriptive message
+- CTA Button: "View Challenges" linking to `/challenges`
+- Border: subtle accent border for definition
 
 ---
 
-## Current State
+## Technical Changes Summary
 
-| Item | Status |
+| File | Change |
 |------|--------|
-| Chiniot Ladder | Exists and active |
-| Category A | Top tier players - 0 teams |
-| Category B | Intermediate players - 0 teams |
-| Available Teams | 25 teams in the database |
+| `src/pages/Dashboard.tsx` | Add `incomingChallenges` state, update fetch query, add Alert banner component |
 
----
-
-## What Will Be Added
-
-| Category | Teams | Starting Ranks |
-|----------|-------|----------------|
-| Category A | 10 random teams | Ranked 1-10 |
-| Category B | 10 different teams | Ranked 1-10 |
-
-Each team will get:
-- A rank (1-10) within their category
-- Starting points: 1000
-- Wins/Losses: 0
-- Streak: 0
-
----
-
-## Functionality (Already Built)
-
-Once teams are added, users will see the full ladder functionality:
-
-- Team rankings with gold/silver/bronze badges for top 3
-- Team member avatars
-- Win/loss statistics and streaks
-- Challenge button (within the configured challenge range)
-- Real-time updates when matches complete
-- Frozen team indicators (snowflake icons)
-
----
-
-## Implementation
-
-This is a **data-only change** - no code modifications needed. I will use a database query to insert 20 ladder_rankings records:
-
-### Teams to Add
-
-**Category A (10 teams):**
-1. Ace Attackers
-2. Court Commanders
-3. Drop Shot Dynasty
-4. Net Ninjas
-5. Paddle Pros
-6. Rally Kings
-7. Serve Savages
-8. Smash Brothers
-9. Thunder Smashers
-10. Volley Vikings
-
-**Category B (10 different teams):**
-1. Baseline Bandits
-2. Court Crushers
-3. KHAS
-4. Lob Legends
-5. Net Guardians
-6. Paddle Pirates
-7. Paddle Warriors
-8. Point Predators
-9. Rally Renegades
-10. Spin Masters
-
----
-
-## Database Changes
-
-Insert records into `ladder_rankings` table with:
-- `team_id`: The team's UUID
-- `ladder_category_id`: Category A or B UUID
-- `rank`: 1-10
-- `points`: 1000 (default)
-- `wins`: 0 (default)
-- `losses`: 0 (default)
-- `streak`: 0 (default)
-
----
-
-## Result
-
-After this change, visiting the Chiniot Ladder will show:
-- Category A tab with 10 ranked teams
-- Category B tab with 10 different ranked teams
-- Full challenge functionality active
-- Stats bar showing team counts and matches
-
+## Notes
+- No database changes required - using existing `challenges` table
+- Uses existing UI components (Alert, Button, Badge)
+- Responsive design for mobile and desktop
