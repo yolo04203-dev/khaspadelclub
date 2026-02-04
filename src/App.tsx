@@ -14,6 +14,7 @@ import LadderCreate from "./pages/LadderCreate";
 import LadderManage from "./pages/LadderManage";
 import CreateTeam from "./pages/CreateTeam";
 import Challenges from "./pages/Challenges";
+import FindOpponents from "./pages/FindOpponents";
 import Americano from "./pages/Americano";
 import AmericanoCreate from "./pages/AmericanoCreate";
 import AmericanoSession from "./pages/AmericanoSession";
@@ -47,6 +48,7 @@ const App = () => (
             <Route path="/ladders/:id/manage" element={<LadderManage />} />
             <Route path="/teams/create" element={<CreateTeam />} />
             <Route path="/challenges" element={<Challenges />} />
+            <Route path="/find-opponents" element={<FindOpponents />} />
             <Route path="/americano" element={<Americano />} />
             <Route path="/americano/create" element={<AmericanoCreate />} />
             <Route path="/americano/:id" element={<AmericanoSession />} />
