@@ -1,108 +1,102 @@
 
-# Consolidate Leaderboard into Ladders
+
+# Add 10 Random Teams to Each Category in Chiniot Ladder
 
 ## Overview
 
-This plan removes the separate "Leaderboard" page and consolidates all ranking functionality into the "Ladders" section. The Ladders page will become the single destination for viewing and managing all ladder rankings.
+This plan adds 10 random teams to each category (Category A and Category B) in the Chiniot Ladder. The ladder already has the same ranking and challenge functionality as the old Leaderboard - we just need to populate it with teams.
 
 ---
 
-## Current Structure
+## Current State
 
-| Page | Route | Purpose |
-|------|-------|---------|
-| Leaderboard | `/leaderboard` | Shows ALL rankings (no ladder/category filter) |
-| Ladders | `/ladders` | Lists all ladders |
-| LadderDetail | `/ladders/:id` | Shows a specific ladder's categories and rankings |
-
-**Problem**: Leaderboard and LadderDetail do the same thing (show rankings with challenge functionality) but exist as separate pages, causing confusion.
+| Item | Status |
+|------|--------|
+| Chiniot Ladder | Exists and active |
+| Category A | Top tier players - 0 teams |
+| Category B | Intermediate players - 0 teams |
+| Available Teams | 25 teams in the database |
 
 ---
 
-## New Structure
+## What Will Be Added
 
-| Page | Route | Purpose |
-|------|-------|---------|
-| Ladders | `/ladders` | Lists all ladders (unchanged) |
-| LadderDetail | `/ladders/:id` | Shows ladder rankings with full functionality |
+| Category | Teams | Starting Ranks |
+|----------|-------|----------------|
+| Category A | 10 random teams | Ranked 1-10 |
+| Category B | 10 different teams | Ranked 1-10 |
 
-The LadderDetail page already has all the functionality of Leaderboard:
-- Team rankings with rank badges (gold/silver/bronze)
+Each team will get:
+- A rank (1-10) within their category
+- Starting points: 1000
+- Wins/Losses: 0
+- Streak: 0
+
+---
+
+## Functionality (Already Built)
+
+Once teams are added, users will see the full ladder functionality:
+
+- Team rankings with gold/silver/bronze badges for top 3
 - Team member avatars
-- Win/loss stats and streaks
-- Challenge button with validation
-- Real-time updates
+- Win/loss statistics and streaks
+- Challenge button (within the configured challenge range)
+- Real-time updates when matches complete
+- Frozen team indicators (snowflake icons)
 
 ---
 
-## Changes Summary
+## Implementation
 
-| File | Action | Description |
-|------|--------|-------------|
-| `src/pages/Leaderboard.tsx` | Delete | Remove the standalone Leaderboard page |
-| `src/pages/Dashboard.tsx` | Modify | Update "Leaderboard" card to link to `/ladders` instead; remove duplicate card |
-| `src/App.tsx` | Modify | Remove `/leaderboard` route |
+This is a **data-only change** - no code modifications needed. I will use a database query to insert 20 ladder_rankings records:
 
----
+### Teams to Add
 
-## Dashboard Changes
+**Category A (10 teams):**
+1. Ace Attackers
+2. Court Commanders
+3. Drop Shot Dynasty
+4. Net Ninjas
+5. Paddle Pros
+6. Rally Kings
+7. Serve Savages
+8. Smash Brothers
+9. Thunder Smashers
+10. Volley Vikings
 
-The Dashboard currently shows two separate cards:
-
-```text
-Current:
-[Ladders] - Skill-based divisions with rankings
-[Leaderboard] - View current rankings and ladder positions
-```
-
-After consolidation:
-
-```text
-New:
-[Ladders] - View and compete in skill-based ladder rankings
-```
-
-The "View Ladder" button on the Team Status card will also update to link to `/ladders`.
-
----
-
-## Navigation Flow
-
-```text
-Before:
-Dashboard -> Leaderboard (shows all rankings)
-Dashboard -> Ladders -> Ladder Detail (shows category rankings)
-
-After:
-Dashboard -> Ladders -> Ladder Detail (shows category rankings)
-```
-
-Users will go to the Ladders page to see all available ladders, then select one to view its rankings and challenge other teams.
+**Category B (10 different teams):**
+1. Baseline Bandits
+2. Court Crushers
+3. KHAS
+4. Lob Legends
+5. Net Guardians
+6. Paddle Pirates
+7. Paddle Warriors
+8. Point Predators
+9. Rally Renegades
+10. Spin Masters
 
 ---
 
-## Technical Details
+## Database Changes
 
-### Files to Delete
-
-- `src/pages/Leaderboard.tsx` - The entire file will be removed
-
-### Files to Modify
-
-**src/App.tsx**
-- Remove the import for `Leaderboard`
-- Remove the route `<Route path="/leaderboard" element={<Leaderboard />} />`
-
-**src/pages/Dashboard.tsx**
-- Remove the "Leaderboard" quick action card
-- Update the "Ladders" card description to: "View and compete in ladder rankings"
-- Change the "View Ladder" button in the Team Status card from `/leaderboard` to `/ladders`
+Insert records into `ladder_rankings` table with:
+- `team_id`: The team's UUID
+- `ladder_category_id`: Category A or B UUID
+- `rank`: 1-10
+- `points`: 1000 (default)
+- `wins`: 0 (default)
+- `losses`: 0 (default)
+- `streak`: 0 (default)
 
 ---
 
-## What Stays the Same
+## Result
 
-- The Ladders listing page (`/ladders`) - no changes needed
-- The LadderDetail page (`/ladders/:id`) - no changes needed, already has full functionality
-- Admin portal Ladders tab - no changes needed
-- All ladder management functionality - unchanged
+After this change, visiting the Chiniot Ladder will show:
+- Category A tab with 10 ranked teams
+- Category B tab with 10 different ranked teams
+- Full challenge functionality active
+- Stats bar showing team counts and matches
+
