@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { JoinRequestsManagement } from "@/components/ladder/JoinRequestsManagement";
 
 interface LadderCategory {
   id: string;
@@ -355,6 +356,18 @@ export default function LadderManage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Join Requests Management */}
+            {categories.length > 0 && (
+              <JoinRequestsManagement
+                ladderId={id!}
+                categoryIds={categories.map((c) => c.id)}
+                onRequestHandled={() => {
+                  // Refresh data when a request is handled
+                  window.location.reload();
+                }}
+              />
+            )}
 
             {/* Categories */}
             <Card>
