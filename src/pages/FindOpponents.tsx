@@ -76,152 +76,190 @@ export default function FindOpponents() {
   const [isSendingChallenge, setIsSendingChallenge] = useState(false);
   const [pendingChallenges, setPendingChallenges] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!user) {
+  const fetchData = async () => {
+    if (!user) {
+      setIsLoading(false);
+      return null;
+    }
+
+    try {
+      // Get user's team
+      const { data: memberData } = await supabase
+        .from("team_members")
+        .select("team_id, is_captain")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!memberData) {
         setIsLoading(false);
-        return;
+        return null;
       }
 
-      try {
-        // Get user's team
-        const { data: memberData } = await supabase
-          .from("team_members")
-          .select("team_id, is_captain")
-          .eq("user_id", user.id)
-          .maybeSingle();
+      const { data: teamData } = await supabase
+        .from("teams")
+        .select("id, name, is_frozen, frozen_until")
+        .eq("id", memberData.team_id)
+        .single();
 
-        if (!memberData) {
-          setIsLoading(false);
-          return;
-        }
+      if (!teamData) {
+        setIsLoading(false);
+        return null;
+      }
 
-        const { data: teamData } = await supabase
-          .from("teams")
-          .select("id, name, is_frozen, frozen_until")
-          .eq("id", memberData.team_id)
-          .single();
+      setUserTeam({
+        id: teamData.id,
+        name: teamData.name,
+        is_captain: memberData.is_captain ?? false,
+        is_frozen: teamData.is_frozen ?? false,
+        frozen_until: teamData.frozen_until,
+      });
 
-        if (!teamData) {
-          setIsLoading(false);
-          return;
-        }
+      // Get user's ladder memberships
+      const { data: rankings } = await supabase
+        .from("ladder_rankings")
+        .select(`
+          id,
+          rank,
+          wins,
+          losses,
+          streak,
+          points,
+          ladder_category_id,
+          ladder_categories!inner (
+            id,
+            name,
+            challenge_range,
+            ladder_id,
+            ladders!inner (
+              id,
+              name
+            )
+          )
+        `)
+        .eq("team_id", memberData.team_id);
 
-        setUserTeam({
-          id: teamData.id,
-          name: teamData.name,
-          is_captain: memberData.is_captain ?? false,
-          is_frozen: teamData.is_frozen ?? false,
-          frozen_until: teamData.frozen_until,
-        });
+      if (!rankings || rankings.length === 0) {
+        setIsLoading(false);
+        return memberData.team_id;
+      }
 
-        // Get user's ladder memberships
-        const { data: rankings } = await supabase
+      const memberships: LadderMembership[] = rankings.map((r: any) => ({
+        id: r.id,
+        rank: r.rank,
+        ladder_category_id: r.ladder_category_id,
+        category_name: r.ladder_categories.name,
+        ladder_id: r.ladder_categories.ladder_id,
+        ladder_name: r.ladder_categories.ladders.name,
+        challenge_range: r.ladder_categories.challenge_range,
+        wins: r.wins ?? 0,
+        losses: r.losses ?? 0,
+        streak: r.streak ?? 0,
+        points: r.points ?? 1000,
+      }));
+
+      setLadderMemberships(memberships);
+
+      // Get pending challenges to prevent duplicate challenges
+      const { data: pendingChallengesData } = await supabase
+        .from("challenges")
+        .select("challenged_team_id")
+        .eq("challenger_team_id", memberData.team_id)
+        .eq("status", "pending");
+
+      const pendingSet = new Set(
+        (pendingChallengesData || []).map(c => c.challenged_team_id)
+      );
+      setPendingChallenges(pendingSet);
+
+      // For each membership, get challengeable teams
+      const teamsData: Record<string, ChallengeableTeam[]> = {};
+
+      for (const membership of memberships) {
+        // Get teams ranked higher (lower rank number) within challenge range
+        const minRank = Math.max(1, membership.rank - membership.challenge_range);
+        
+        const { data: opponents } = await supabase
           .from("ladder_rankings")
           .select(`
-            id,
+            team_id,
             rank,
-            wins,
-            losses,
-            streak,
-            points,
             ladder_category_id,
-            ladder_categories!inner (
+            teams!inner (
               id,
               name,
-              challenge_range,
-              ladder_id,
-              ladders!inner (
-                id,
-                name
-              )
+              is_frozen,
+              frozen_until
             )
           `)
-          .eq("team_id", memberData.team_id);
+          .eq("ladder_category_id", membership.ladder_category_id)
+          .neq("team_id", memberData.team_id)
+          .lt("rank", membership.rank)
+          .gte("rank", minRank)
+          .order("rank", { ascending: true });
 
-        if (!rankings || rankings.length === 0) {
-          setIsLoading(false);
-          return;
-        }
-
-        const memberships: LadderMembership[] = rankings.map((r: any) => ({
-          id: r.id,
-          rank: r.rank,
-          ladder_category_id: r.ladder_category_id,
-          category_name: r.ladder_categories.name,
-          ladder_id: r.ladder_categories.ladder_id,
-          ladder_name: r.ladder_categories.ladders.name,
-          challenge_range: r.ladder_categories.challenge_range,
-          wins: r.wins ?? 0,
-          losses: r.losses ?? 0,
-          streak: r.streak ?? 0,
-          points: r.points ?? 1000,
+        teamsData[membership.ladder_category_id] = (opponents || []).map((o: any) => ({
+          team_id: o.team_id,
+          team_name: o.teams.name,
+          rank: o.rank,
+          ladder_category_id: o.ladder_category_id,
+          is_frozen: o.teams.is_frozen,
+          frozen_until: o.teams.frozen_until,
         }));
-
-        setLadderMemberships(memberships);
-
-        // Get pending challenges to prevent duplicate challenges
-        const { data: pendingChallengesData } = await supabase
-          .from("challenges")
-          .select("challenged_team_id")
-          .eq("challenger_team_id", memberData.team_id)
-          .eq("status", "pending");
-
-        const pendingSet = new Set(
-          (pendingChallengesData || []).map(c => c.challenged_team_id)
-        );
-        setPendingChallenges(pendingSet);
-
-        // For each membership, get challengeable teams
-        const teamsData: Record<string, ChallengeableTeam[]> = {};
-
-        for (const membership of memberships) {
-          // Get teams ranked higher (lower rank number) within challenge range
-          const minRank = Math.max(1, membership.rank - membership.challenge_range);
-          
-          const { data: opponents } = await supabase
-            .from("ladder_rankings")
-            .select(`
-              team_id,
-              rank,
-              ladder_category_id,
-              teams!inner (
-                id,
-                name,
-                is_frozen,
-                frozen_until
-              )
-            `)
-            .eq("ladder_category_id", membership.ladder_category_id)
-            .neq("team_id", memberData.team_id)
-            .lt("rank", membership.rank)
-            .gte("rank", minRank)
-            .order("rank", { ascending: true });
-
-          teamsData[membership.ladder_category_id] = (opponents || []).map((o: any) => ({
-            team_id: o.team_id,
-            team_name: o.teams.name,
-            rank: o.rank,
-            ladder_category_id: o.ladder_category_id,
-            is_frozen: o.teams.is_frozen,
-            frozen_until: o.teams.frozen_until,
-          }));
-        }
-
-        setChallengeableTeams(teamsData);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load ladder data",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
       }
-    };
 
+      setChallengeableTeams(teamsData);
+      return memberData.team_id;
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load ladder data",
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
+
+    // Subscribe to realtime changes on challenges and ladder_rankings
+    const challengesChannel = supabase
+      .channel('find-opponents-challenges')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'challenges',
+        },
+        () => {
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    const rankingsChannel = supabase
+      .channel('find-opponents-rankings')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ladder_rankings',
+        },
+        () => {
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(challengesChannel);
+      supabase.removeChannel(rankingsChannel);
+    };
   }, [user]);
 
   const isTeamFrozen = (team: ChallengeableTeam) => {
