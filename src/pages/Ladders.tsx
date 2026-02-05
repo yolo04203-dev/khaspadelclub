@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Trophy, ArrowLeft, Plus, Users, Layers } from "lucide-react";
+import { Trophy, Plus, Users, Layers } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Logo } from "@/components/Logo";
+import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -97,28 +97,19 @@ export default function Ladders() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card sticky top-0 z-40">
-        <div className="container flex items-center justify-between h-16">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" asChild>
-              <Link to={user ? "/dashboard" : "/"}>
-                <ArrowLeft className="w-4 h-4" />
-              </Link>
-            </Button>
-            <Logo size="sm" />
-          </div>
-
-          {role === "admin" && (
+      <AppHeader 
+        showBack 
+        actions={
+          role === "admin" && (
             <Button asChild>
               <Link to="/ladders/create">
                 <Plus className="w-4 h-4 mr-2" />
                 Create Ladder
               </Link>
             </Button>
-          )}
-        </div>
-      </header>
+          )
+        }
+      />
 
       {/* Main Content */}
       <main className="container py-8">

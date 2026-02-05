@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Swords, 
-  ArrowLeft, 
   Clock, 
   Check, 
   X, 
@@ -13,19 +12,21 @@ import {
   Trophy,
   Target,
   Snowflake,
-  Info
+  Calendar,
+  MapPin
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Logo } from "@/components/Logo";
+import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { SetScoreDialog } from "@/components/challenges/SetScoreDialog";
+import { ScheduleMatchDialog } from "@/components/challenges/ScheduleMatchDialog";
 import { isFuture, format } from "date-fns";
 
 interface Challenge {
@@ -36,6 +37,8 @@ interface Challenge {
   created_at: string;
   match_id: string | null;
   match_status: string | null;
+  match_scheduled_at: string | null;
+  match_venue: string | null;
   challenger_team: {
     id: string;
     name: string;
@@ -67,6 +70,7 @@ export default function Challenges() {
   const [isLoading, setIsLoading] = useState(true);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   const [scoreDialogOpen, setScoreDialogOpen] = useState(false);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [isSubmittingScore, setIsSubmittingScore] = useState(false);
 
@@ -191,32 +195,37 @@ export default function Challenges() {
     const teamsMap = new Map(teams?.map(t => [t.id, t]) || []);
     const ranksMap = new Map(ranks?.map(r => [r.team_id, r.rank]) || []);
 
-    // Fetch match statuses for accepted challenges
+    // Fetch match statuses and scheduling info for accepted challenges
     const matchIds = (accepted || []).map(c => c.match_id).filter(Boolean);
     const { data: matches } = matchIds.length > 0 
       ? await supabase
           .from("matches")
-          .select("id, status")
+          .select("id, status, scheduled_at, venue")
           .in("id", matchIds)
-      : { data: [] as { id: string; status: string }[] };
+      : { data: [] as { id: string; status: string; scheduled_at: string | null; venue: string | null }[] };
     
-    const matchStatusMap = new Map<string, string>(
-      (matches || []).map(m => [m.id, m.status])
+    const matchMap = new Map<string, { status: string; scheduled_at: string | null; venue: string | null }>(
+      (matches || []).map(m => [m.id, { status: m.status, scheduled_at: m.scheduled_at, venue: m.venue }])
     );
 
-    const mapChallenge = (c: any): Challenge => ({
-      id: c.id,
-      status: c.status,
-      message: c.message,
-      expires_at: c.expires_at,
-      created_at: c.created_at,
-      match_id: c.match_id,
-      match_status: c.match_id ? matchStatusMap.get(c.match_id) ?? null : null,
-      challenger_team: teamsMap.get(c.challenger_team_id) || null,
-      challenged_team: teamsMap.get(c.challenged_team_id) || null,
-      challenger_rank: ranksMap.get(c.challenger_team_id) || null,
-      challenged_rank: ranksMap.get(c.challenged_team_id) || null,
-    });
+    const mapChallenge = (c: any): Challenge => {
+      const matchInfo = c.match_id ? matchMap.get(c.match_id) : null;
+      return {
+        id: c.id,
+        status: c.status,
+        message: c.message,
+        expires_at: c.expires_at,
+        created_at: c.created_at,
+        match_id: c.match_id,
+        match_status: matchInfo?.status ?? null,
+        match_scheduled_at: matchInfo?.scheduled_at ?? null,
+        match_venue: matchInfo?.venue ?? null,
+        challenger_team: teamsMap.get(c.challenger_team_id) || null,
+        challenged_team: teamsMap.get(c.challenged_team_id) || null,
+        challenger_rank: ranksMap.get(c.challenger_team_id) || null,
+        challenged_rank: ranksMap.get(c.challenged_team_id) || null,
+      };
+    };
 
     setIncomingChallenges((incoming || []).map(mapChallenge));
     setOutgoingChallenges((outgoing || []).map(mapChallenge));
@@ -368,6 +377,11 @@ export default function Challenges() {
   const openScoreDialog = (challenge: Challenge) => {
     setSelectedChallenge(challenge);
     setScoreDialogOpen(true);
+  };
+
+  const openScheduleDialog = (challenge: Challenge) => {
+    setSelectedChallenge(challenge);
+    setScheduleDialogOpen(true);
   };
 
   const handleSubmitScore = async (
@@ -545,28 +559,19 @@ export default function Challenges() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card sticky top-0 z-40">
-        <div className="container flex items-center justify-between h-16">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" asChild>
-              <Link to="/dashboard">
-                <ArrowLeft className="w-4 h-4" />
-              </Link>
-            </Button>
-            <Logo size="sm" />
-          </div>
-
-          {userTeam && (
+      <AppHeader 
+        showBack 
+        actions={
+          userTeam && (
             <Button asChild>
               <Link to="/find-opponents">
                 <Swords className="w-4 h-4 mr-2" />
                 Find Opponents
               </Link>
             </Button>
-          )}
-        </div>
-      </header>
+          )
+        }
+      />
 
       {/* Main Content */}
       <main className="container py-8 max-w-2xl">
@@ -826,7 +831,7 @@ export default function Challenges() {
                                       vs {getOpponentName(challenge)}
                                     </span>
                                   </div>
-                                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                                     <span className="flex items-center gap-1">
                                       <Clock className="w-3 h-3" />
                                       Accepted {formatTimeAgo(challenge.created_at)}
@@ -841,6 +846,19 @@ export default function Challenges() {
                                       {challenge.match_status === "completed" ? "Completed" : "Ready to play"}
                                     </Badge>
                                   </div>
+                                  {/* Show scheduled date/time and venue if set */}
+                                  {challenge.match_scheduled_at && (
+                                    <div className="mt-2 flex items-center gap-2 text-sm text-foreground">
+                                      <Calendar className="w-3.5 h-3.5 text-accent" />
+                                      <span>{format(new Date(challenge.match_scheduled_at), "MMM d 'at' h:mm a")}</span>
+                                      {challenge.match_venue && (
+                                        <>
+                                          <MapPin className="w-3.5 h-3.5 text-muted-foreground ml-1" />
+                                          <span className="text-muted-foreground">{challenge.match_venue}</span>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
 
                                 {challenge.match_status === "completed" ? (
@@ -849,13 +867,23 @@ export default function Challenges() {
                                     Score Recorded
                                   </Badge>
                                 ) : (
-                                  <Button
-                                    size="sm"
-                                    onClick={() => openScoreDialog(challenge)}
-                                  >
-                                    <Trophy className="w-4 h-4 mr-2" />
-                                    Record Score
-                                  </Button>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => openScheduleDialog(challenge)}
+                                    >
+                                      <Calendar className="w-4 h-4 sm:mr-2" />
+                                      <span className="hidden sm:inline">Schedule</span>
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => openScoreDialog(challenge)}
+                                    >
+                                      <Trophy className="w-4 h-4 sm:mr-2" />
+                                      <span className="hidden sm:inline">Record Score</span>
+                                    </Button>
+                                  </div>
                                 )}
                               </div>
                             </CardContent>
@@ -880,6 +908,23 @@ export default function Challenges() {
         onSubmit={handleSubmitScore}
         isSubmitting={isSubmittingScore}
       />
+
+      {/* Schedule Dialog */}
+      {selectedChallenge?.match_id && (
+        <ScheduleMatchDialog
+          open={scheduleDialogOpen}
+          onOpenChange={setScheduleDialogOpen}
+          matchId={selectedChallenge.match_id}
+          opponentName={getOpponentName(selectedChallenge)}
+          currentScheduledAt={selectedChallenge.match_scheduled_at}
+          currentVenue={selectedChallenge.match_venue}
+          onScheduled={() => {
+            if (userTeam) {
+              fetchChallenges(userTeam.id);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
