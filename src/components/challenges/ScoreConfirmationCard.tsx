@@ -27,6 +27,7 @@ interface ScoreConfirmationCardProps {
   isDisputed: boolean;
   disputeReason: string | null;
   userTeamId: string;
+  ladderCategoryId?: string | null;
   onConfirmed: () => void;
 }
 
@@ -42,6 +43,7 @@ export function ScoreConfirmationCard({
   isDisputed,
   disputeReason,
   userTeamId,
+  ladderCategoryId,
   onConfirmed,
 }: ScoreConfirmationCardProps) {
   const [isConfirming, setIsConfirming] = useState(false);
@@ -80,8 +82,8 @@ export function ScoreConfirmationCard({
 
       if (error) throw error;
 
-      // Update ladder rankings
-      await updateLadderRankings(winnerId, loserId);
+      // Update ladder rankings with category filter
+      await updateLadderRankings(winnerId, loserId, ladderCategoryId);
 
       toast({
         title: "Score confirmed",
@@ -108,70 +110,106 @@ export function ScoreConfirmationCard({
     return data?.[`${team}_team_id`] || null;
   };
 
-  const updateLadderRankings = async (winnerId: string | null, loserId: string | null) => {
-    if (!winnerId || !loserId) return;
+  const updateLadderRankings = async (winnerId: string | null, loserId: string | null, categoryId?: string | null) => {
+    if (!winnerId || !loserId) {
+      console.error("Missing winner or loser ID for ranking update");
+      return;
+    }
 
-    const { data: rankings } = await supabase
+    // Build query with optional category filter
+    let query = supabase
       .from("ladder_rankings")
       .select("*")
       .in("team_id", [winnerId, loserId]);
+    
+    if (categoryId) {
+      query = query.eq("ladder_category_id", categoryId);
+    }
 
-    if (!rankings) return;
+    const { data: rankings, error: rankError } = await query;
+
+    if (rankError) {
+      console.error("Error fetching rankings:", rankError);
+      return;
+    }
+
+    if (!rankings || rankings.length === 0) {
+      console.error("No rankings found for teams:", winnerId, loserId, "in category:", categoryId);
+      return;
+    }
 
     const winnerRanking = rankings.find(r => r.team_id === winnerId);
     const loserRanking = rankings.find(r => r.team_id === loserId);
 
-    if (winnerRanking && loserRanking) {
-      // Update winner's stats
-      await supabase
-        .from("ladder_rankings")
-        .update({
-          wins: winnerRanking.wins + 1,
-          streak: winnerRanking.streak >= 0 ? winnerRanking.streak + 1 : 1,
-          last_match_at: new Date().toISOString(),
-          points: winnerRanking.points + 25,
-        })
-        .eq("id", winnerRanking.id);
+    if (!winnerRanking || !loserRanking) {
+      console.error("Could not find both rankings. Winner:", !!winnerRanking, "Loser:", !!loserRanking);
+      return;
+    }
 
-      // Update loser's stats
-      await supabase
-        .from("ladder_rankings")
-        .update({
-          losses: loserRanking.losses + 1,
-          streak: loserRanking.streak <= 0 ? loserRanking.streak - 1 : -1,
-          last_match_at: new Date().toISOString(),
-          points: Math.max(0, loserRanking.points - 10),
-        })
-        .eq("id", loserRanking.id);
+    // Update winner's stats
+    const { error: winnerError } = await supabase
+      .from("ladder_rankings")
+      .update({
+        wins: winnerRanking.wins + 1,
+        streak: winnerRanking.streak >= 0 ? winnerRanking.streak + 1 : 1,
+        last_match_at: new Date().toISOString(),
+        points: winnerRanking.points + 25,
+      })
+      .eq("id", winnerRanking.id);
 
-      // If lower-ranked team won: winner takes loser's rank, everyone between shifts down by 1
-      if (winnerRanking.rank > loserRanking.rank) {
-        const winnerOldRank = winnerRanking.rank;
-        const loserOldRank = loserRanking.rank;
-        
-        // Get all teams between the two ranks (exclusive of winner, inclusive of loser)
-        const { data: teamsBetween } = await supabase
-          .from("ladder_rankings")
-          .select("id, rank")
-          .gte("rank", loserOldRank)
-          .lt("rank", winnerOldRank);
-        
-        // Shift all teams between down by 1 rank
-        if (teamsBetween && teamsBetween.length > 0) {
-          for (const team of teamsBetween) {
-            await supabase
-              .from("ladder_rankings")
-              .update({ rank: team.rank + 1 })
-              .eq("id", team.id);
-          }
-        }
-        
-        // Winner takes the loser's old rank
-        await supabase
-          .from("ladder_rankings")
-          .update({ rank: loserOldRank })
-          .eq("id", winnerRanking.id);
+    if (winnerError) {
+      console.error("Error updating winner ranking:", winnerError);
+    }
+
+    // Update loser's stats
+    const { error: loserError } = await supabase
+      .from("ladder_rankings")
+      .update({
+        losses: loserRanking.losses + 1,
+        streak: loserRanking.streak <= 0 ? loserRanking.streak - 1 : -1,
+        last_match_at: new Date().toISOString(),
+        points: Math.max(0, loserRanking.points - 10),
+      })
+      .eq("id", loserRanking.id);
+
+    if (loserError) {
+      console.error("Error updating loser ranking:", loserError);
+    }
+
+    // If lower-ranked team won: winner takes loser's rank, everyone between shifts down by 1
+    if (winnerRanking.rank > loserRanking.rank) {
+      const winnerOldRank = winnerRanking.rank;
+      const loserOldRank = loserRanking.rank;
+      
+      // Get all teams between the two ranks (exclusive of winner, inclusive of loser)
+      // Filter by the same ladder category
+      let betweenQuery = supabase
+        .from("ladder_rankings")
+        .select("id, rank")
+        .gte("rank", loserOldRank)
+        .lt("rank", winnerOldRank);
+      
+      if (categoryId) {
+        betweenQuery = betweenQuery.eq("ladder_category_id", categoryId);
       }
+
+      const { data: teamsBetween } = await betweenQuery;
+      
+      // Shift all teams between down by 1 rank
+      if (teamsBetween && teamsBetween.length > 0) {
+        for (const team of teamsBetween) {
+          await supabase
+            .from("ladder_rankings")
+            .update({ rank: team.rank + 1 })
+            .eq("id", team.id);
+        }
+      }
+      
+      // Winner takes the loser's old rank
+      await supabase
+        .from("ladder_rankings")
+        .update({ rank: loserOldRank })
+        .eq("id", winnerRanking.id);
     }
   };
 
