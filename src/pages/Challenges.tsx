@@ -922,89 +922,93 @@ export default function Challenges() {
                         >
                           <Card className="border-accent/30 bg-accent/5">
                             <CardContent className="p-4">
-                              <div className="flex items-center justify-between gap-4">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <Swords className="w-4 h-4 text-accent" />
-                                    <span className="font-semibold text-foreground truncate">
-                                      vs {getOpponentName(challenge)}
-                                    </span>
+                              <div className="flex flex-col gap-3">
+                                {/* Header row with opponent name and status/actions */}
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <Swords className="w-4 h-4 text-accent" />
+                                      <span className="font-semibold text-foreground truncate">
+                                        vs {getOpponentName(challenge)}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                                      <span className="flex items-center gap-1">
+                                        <Clock className="w-3 h-3" />
+                                        Accepted {formatTimeAgo(challenge.created_at)}
+                                      </span>
+                                      <Badge 
+                                        variant={challenge.match_status === "completed" ? "secondary" : challenge.score_submitted_by ? "outline" : "default"} 
+                                        className={cn(
+                                          "text-xs",
+                                          challenge.match_status === "completed" ? "bg-muted" : 
+                                          challenge.score_submitted_by ? "border-yellow-500 text-yellow-600" : "bg-accent"
+                                        )}
+                                      >
+                                        {challenge.match_status === "completed" ? "Completed" : 
+                                         challenge.score_submitted_by ? "Awaiting Confirmation" : "Ready to play"}
+                                      </Badge>
+                                    </div>
+                                    {/* Show scheduled date/time and venue if set */}
+                                    {challenge.match_scheduled_at && (
+                                      <div className="mt-2 flex items-center gap-2 text-sm text-foreground">
+                                        <Calendar className="w-3.5 h-3.5 text-accent" />
+                                        <span>{format(new Date(challenge.match_scheduled_at), "MMM d 'at' h:mm a")}</span>
+                                        {challenge.match_venue && (
+                                          <>
+                                            <MapPin className="w-3.5 h-3.5 text-muted-foreground ml-1" />
+                                            <span className="text-muted-foreground">{challenge.match_venue}</span>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
-                                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                                    <span className="flex items-center gap-1">
-                                      <Clock className="w-3 h-3" />
-                                      Accepted {formatTimeAgo(challenge.created_at)}
-                                    </span>
-                                    <Badge 
-                                      variant={challenge.match_status === "completed" ? "secondary" : challenge.score_submitted_by ? "outline" : "default"} 
-                                      className={cn(
-                                        "text-xs",
-                                        challenge.match_status === "completed" ? "bg-muted" : 
-                                        challenge.score_submitted_by ? "border-yellow-500 text-yellow-600" : "bg-accent"
-                                      )}
-                                    >
-                                      {challenge.match_status === "completed" ? "Completed" : 
-                                       challenge.score_submitted_by ? "Awaiting Confirmation" : "Ready to play"}
+
+                                  {/* Actions - only show buttons when no score submitted yet */}
+                                  {challenge.match_status === "completed" && challenge.score_confirmed_by ? (
+                                    <Badge variant="outline" className="text-muted-foreground flex-shrink-0">
+                                      <Check className="w-4 h-4 mr-1" />
+                                      Score Confirmed
                                     </Badge>
-                                  </div>
-                                  {/* Show scheduled date/time and venue if set */}
-                                  {challenge.match_scheduled_at && (
-                                    <div className="mt-2 flex items-center gap-2 text-sm text-foreground">
-                                      <Calendar className="w-3.5 h-3.5 text-accent" />
-                                      <span>{format(new Date(challenge.match_scheduled_at), "MMM d 'at' h:mm a")}</span>
-                                      {challenge.match_venue && (
-                                        <>
-                                          <MapPin className="w-3.5 h-3.5 text-muted-foreground ml-1" />
-                                          <span className="text-muted-foreground">{challenge.match_venue}</span>
-                                        </>
-                                      )}
+                                  ) : !challenge.score_submitted_by && (
+                                    <div className="flex gap-2 flex-shrink-0">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => openScheduleDialog(challenge)}
+                                      >
+                                        <Calendar className="w-4 h-4 sm:mr-2" />
+                                        <span className="hidden sm:inline">Schedule</span>
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => openScoreDialog(challenge)}
+                                      >
+                                        <Trophy className="w-4 h-4 sm:mr-2" />
+                                        <span className="hidden sm:inline">Record Score</span>
+                                      </Button>
                                     </div>
                                   )}
                                 </div>
 
-                                {challenge.match_status === "completed" && challenge.score_confirmed_by ? (
-                                  <Badge variant="outline" className="text-muted-foreground">
-                                    <Check className="w-4 h-4 mr-1" />
-                                    Score Confirmed
-                                  </Badge>
-                                ) : challenge.score_submitted_by && !challenge.score_confirmed_by ? (
-                                  // Show confirmation card for the opponent
-                                  <div className="w-full mt-3">
-                                    <ScoreConfirmationCard
-                                      matchId={challenge.match_id!}
-                                      challengerTeamName={challenge.challenger_team?.name || "Team A"}
-                                      challengedTeamName={challenge.challenged_team?.name || "Team B"}
-                                      challengerScore={challenge.challenger_score || 0}
-                                      challengedScore={challenge.challenged_score || 0}
-                                      challengerSets={challenge.challenger_sets || []}
-                                      challengedSets={challenge.challenged_sets || []}
-                                      isSubmitter={challenge.score_submitted_by === user?.id}
-                                      isDisputed={challenge.score_disputed || false}
-                                      disputeReason={challenge.dispute_reason || null}
-                                      userTeamId={userTeam?.id || ""}
-                                      onConfirmed={() => {
-                                        if (userTeam) fetchChallenges(userTeam.id);
-                                      }}
-                                    />
-                                  </div>
-                                ) : (
-                                  <div className="flex gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => openScheduleDialog(challenge)}
-                                    >
-                                      <Calendar className="w-4 h-4 sm:mr-2" />
-                                      <span className="hidden sm:inline">Schedule</span>
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => openScoreDialog(challenge)}
-                                    >
-                                      <Trophy className="w-4 h-4 sm:mr-2" />
-                                      <span className="hidden sm:inline">Record Score</span>
-                                    </Button>
-                                  </div>
+                                {/* Score confirmation card - rendered below on its own row */}
+                                {challenge.score_submitted_by && !challenge.score_confirmed_by && (
+                                  <ScoreConfirmationCard
+                                    matchId={challenge.match_id!}
+                                    challengerTeamName={challenge.challenger_team?.name || "Team A"}
+                                    challengedTeamName={challenge.challenged_team?.name || "Team B"}
+                                    challengerScore={challenge.challenger_score || 0}
+                                    challengedScore={challenge.challenged_score || 0}
+                                    challengerSets={challenge.challenger_sets || []}
+                                    challengedSets={challenge.challenged_sets || []}
+                                    isSubmitter={challenge.score_submitted_by === user?.id}
+                                    isDisputed={challenge.score_disputed || false}
+                                    disputeReason={challenge.dispute_reason || null}
+                                    userTeamId={userTeam?.id || ""}
+                                    onConfirmed={() => {
+                                      if (userTeam) fetchChallenges(userTeam.id);
+                                    }}
+                                  />
                                 )}
                               </div>
                             </CardContent>
