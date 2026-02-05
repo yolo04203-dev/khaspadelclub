@@ -23,6 +23,9 @@ import Tournaments from "./pages/Tournaments";
 import TournamentCreate from "./pages/TournamentCreate";
 import TournamentDetail from "./pages/TournamentDetail";
 import Profile from "./pages/Profile";
+import Players from "./pages/Players";
+import PlayerProfile from "./pages/PlayerProfile";
+import Stats from "./pages/Stats";
 import Admin from "./pages/Admin";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
@@ -58,6 +61,9 @@ const App = () => (
               <Route path="/tournaments/create" element={<TournamentCreate />} />
               <Route path="/tournaments/:id" element={<TournamentDetail />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/players" element={<Players />} />
+              <Route path="/players/:id" element={<PlayerProfile />} />
+              <Route path="/stats" element={<Stats />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />

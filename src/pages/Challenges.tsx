@@ -13,7 +13,8 @@ import {
   Target,
   Snowflake,
   Calendar,
-  MapPin
+  MapPin,
+  History
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,12 +28,14 @@ import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { SetScoreDialog } from "@/components/challenges/SetScoreDialog";
 import { ScheduleMatchDialog } from "@/components/challenges/ScheduleMatchDialog";
+import { DeclineReasonDialog } from "@/components/challenges/DeclineReasonDialog";
 import { isFuture, format } from "date-fns";
 
 interface Challenge {
   id: string;
   status: string;
   message: string | null;
+  decline_reason: string | null;
   expires_at: string;
   created_at: string;
   match_id: string | null;
@@ -71,8 +74,10 @@ export default function Challenges() {
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   const [scoreDialogOpen, setScoreDialogOpen] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [declineDialogOpen, setDeclineDialogOpen] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [isSubmittingScore, setIsSubmittingScore] = useState(false);
+  const [isDeclining, setIsDeclining] = useState(false);
 
   const fetchUserTeam = async () => {
     if (!user) return null;
@@ -120,6 +125,7 @@ export default function Challenges() {
         id,
         status,
         message,
+        decline_reason,
         expires_at,
         created_at,
         match_id,
@@ -139,6 +145,7 @@ export default function Challenges() {
         id,
         status,
         message,
+        decline_reason,
         expires_at,
         created_at,
         match_id,
@@ -158,6 +165,7 @@ export default function Challenges() {
         id,
         status,
         message,
+        decline_reason,
         expires_at,
         created_at,
         match_id,
@@ -214,6 +222,7 @@ export default function Challenges() {
         id: c.id,
         status: c.status,
         message: c.message,
+        decline_reason: c.decline_reason ?? null,
         expires_at: c.expires_at,
         created_at: c.created_at,
         match_id: c.match_id,
@@ -311,24 +320,55 @@ export default function Challenges() {
           .eq("id", challengeId);
 
         if (updateError) throw updateError;
-      } else {
-        const { error } = await supabase
-          .from("challenges")
-          .update({
-            status: "declined",
-            responded_at: new Date().toISOString(),
-          })
-          .eq("id", challengeId);
+        
+        toast({
+          title: "Challenge accepted!",
+          description: "Record the match result when you've played.",
+        });
 
-        if (error) throw error;
+        if (userTeam) {
+          await fetchChallenges(userTeam.id);
+        }
       }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setRespondingTo(null);
+    }
+  };
+
+  const openDeclineDialog = (challenge: Challenge) => {
+    setSelectedChallenge(challenge);
+    setDeclineDialogOpen(true);
+  };
+
+  const handleDeclineWithReason = async (reason: string) => {
+    if (!selectedChallenge) return;
+    setIsDeclining(true);
+
+    try {
+      const { error } = await supabase
+        .from("challenges")
+        .update({
+          status: "declined",
+          responded_at: new Date().toISOString(),
+          decline_reason: reason,
+        })
+        .eq("id", selectedChallenge.id);
+
+      if (error) throw error;
 
       toast({
-        title: accept ? "Challenge accepted!" : "Challenge declined",
-        description: accept
-          ? "Record the match result when you've played."
-          : "The challenge has been declined.",
+        title: "Challenge declined",
+        description: "The challenge has been declined.",
       });
+
+      setDeclineDialogOpen(false);
+      setSelectedChallenge(null);
 
       if (userTeam) {
         await fetchChallenges(userTeam.id);
@@ -340,7 +380,7 @@ export default function Challenges() {
         variant: "destructive",
       });
     } finally {
-      setRespondingTo(null);
+      setIsDeclining(false);
     }
   };
 
@@ -698,7 +738,7 @@ export default function Challenges() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleRespond(challenge.id, false)}
+                                    onClick={() => openDeclineDialog(challenge)}
                                     disabled={respondingTo === challenge.id}
                                   >
                                     <X className="w-4 h-4" />
@@ -925,6 +965,15 @@ export default function Challenges() {
           }}
         />
       )}
+
+      {/* Decline Reason Dialog */}
+      <DeclineReasonDialog
+        open={declineDialogOpen}
+        onOpenChange={setDeclineDialogOpen}
+        challengerName={selectedChallenge?.challenger_team?.name || "Opponent"}
+        onConfirm={handleDeclineWithReason}
+        isLoading={isDeclining}
+      />
     </div>
   );
 }
