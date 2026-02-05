@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertCircle, Users, DollarSign, Tag } from "lucide-react";
+import { AlertCircle, Users, Banknote, Tag } from "lucide-react";
 
 interface UserTeam {
   id: string;
@@ -109,8 +109,8 @@ export function RegistrationDialog({
     }
   };
 
-  const formatCurrency = (amount: number, currency: string) => {
-    return `${currency} ${amount.toLocaleString()}`;
+  const formatCurrency = (amount: number) => {
+    return `PKR ${amount.toLocaleString()}`;
   };
 
   return (
@@ -217,11 +217,11 @@ export function RegistrationDialog({
           {displayedFee > 0 && (
             <div className="rounded-lg border border-warning/30 bg-warning/5 p-4 space-y-3">
               <div className="flex items-center gap-2 text-warning">
-                <DollarSign className="w-5 h-5" />
+                <Banknote className="w-5 h-5" />
                 <span className="font-semibold">Entry Fee Required</span>
               </div>
               <div className="text-2xl font-bold text-foreground">
-                {formatCurrency(displayedFee, entryFeeCurrency)}
+                {formatCurrency(displayedFee)}
               </div>
               {selectedCategory && (selectedCategory.entry_fee ?? 0) > 0 && (
                 <p className="text-xs text-muted-foreground">
