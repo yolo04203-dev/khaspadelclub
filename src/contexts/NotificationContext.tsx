@@ -6,6 +6,7 @@ interface NotificationCounts {
   incomingChallenges: number;
   scheduledMatches: number;
   ladderApprovals: number;
+  pendingScoreConfirmations: number;
   total: number;
 }
 
@@ -23,6 +24,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     incomingChallenges: 0,
     scheduledMatches: 0,
     ladderApprovals: 0,
+    pendingScoreConfirmations: 0,
     total: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -30,7 +32,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const fetchCounts = useCallback(async () => {
     if (!user) {
-      setCounts({ incomingChallenges: 0, scheduledMatches: 0, ladderApprovals: 0, total: 0 });
+      setCounts({ incomingChallenges: 0, scheduledMatches: 0, ladderApprovals: 0, pendingScoreConfirmations: 0, total: 0 });
       setIsLoading(false);
       return;
     }
@@ -47,7 +49,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       setUserTeamId(teamId || null);
 
       if (!teamId) {
-        setCounts({ incomingChallenges: 0, scheduledMatches: 0, ladderApprovals: 0, total: 0 });
+        setCounts({ incomingChallenges: 0, scheduledMatches: 0, ladderApprovals: 0, pendingScoreConfirmations: 0, total: 0 });
         setIsLoading(false);
         return;
       }
@@ -67,9 +69,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         .eq("status", "accepted");
 
       let scheduledCount = 0;
+      let pendingConfirmationsCount = 0;
+      
       if (acceptedChallenges && acceptedChallenges.length > 0) {
         const matchIds = acceptedChallenges.map(c => c.match_id).filter(Boolean);
         if (matchIds.length > 0) {
+          // Count scheduled matches
           const { count } = await supabase
             .from("matches")
             .select("*", { count: "exact", head: true })
@@ -77,6 +82,23 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             .not("scheduled_at", "is", null)
             .eq("status", "pending");
           scheduledCount = count || 0;
+
+          // Count pending score confirmations - matches where:
+          // - score was submitted (score_submitted_by is set)
+          // - not yet confirmed (score_confirmed_by is null)
+          // - current user is NOT the one who submitted (they need to confirm)
+          const { data: pendingConfirmations } = await supabase
+            .from("matches")
+            .select("id, score_submitted_by, challenger_team_id, challenged_team_id")
+            .in("id", matchIds)
+            .not("score_submitted_by", "is", null)
+            .is("score_confirmed_by", null)
+            .eq("score_disputed", false);
+          
+          // Filter to only count matches where WE need to confirm (we didn't submit)
+          pendingConfirmationsCount = (pendingConfirmations || []).filter(m => 
+            m.score_submitted_by !== user.id
+          ).length;
         }
       }
 
@@ -91,7 +113,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         incomingChallenges: incomingCount || 0,
         scheduledMatches: scheduledCount,
         ladderApprovals: approvalCount || 0,
-        total: (incomingCount || 0) + scheduledCount + (approvalCount || 0),
+        pendingScoreConfirmations: pendingConfirmationsCount,
+        total: (incomingCount || 0) + scheduledCount + (approvalCount || 0) + pendingConfirmationsCount,
       };
 
       setCounts(newCounts);

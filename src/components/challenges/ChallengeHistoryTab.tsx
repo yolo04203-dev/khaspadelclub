@@ -1,8 +1,18 @@
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { History, Trophy, Clock, X, Check, AlertCircle } from "lucide-react";
+import { History, Trophy, Clock, X, Check, AlertCircle, Filter } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { format, subDays, isAfter } from "date-fns";
 
 interface Challenge {
   id: string;
@@ -36,6 +46,9 @@ interface ChallengeHistoryTabProps {
 }
 
 export function ChallengeHistoryTab({ historyChallenges, userTeamId }: ChallengeHistoryTabProps) {
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("all");
+
   const formatTimeAgo = (dateStr: string) => {
     const date = new Date(dateStr);
     const now = new Date();
@@ -106,60 +119,143 @@ export function ChallengeHistoryTab({ historyChallenges, userTeamId }: Challenge
     return null;
   };
 
+  // Apply filters
+  const filteredChallenges = historyChallenges.filter(challenge => {
+    // Status filter
+    if (statusFilter !== "all" && challenge.status !== statusFilter) {
+      return false;
+    }
+
+    // Date filter
+    if (dateFilter !== "all") {
+      const challengeDate = new Date(challenge.created_at);
+      const now = new Date();
+      
+      switch (dateFilter) {
+        case "7days":
+          if (!isAfter(challengeDate, subDays(now, 7))) return false;
+          break;
+        case "30days":
+          if (!isAfter(challengeDate, subDays(now, 30))) return false;
+          break;
+        case "90days":
+          if (!isAfter(challengeDate, subDays(now, 90))) return false;
+          break;
+      }
+    }
+
+    return true;
+  });
+
   return (
-    <AnimatePresence mode="popLayout">
-      {historyChallenges.length === 0 ? (
-        <Card className="text-center py-8">
-          <CardContent>
-            <History className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
-            <p className="text-muted-foreground">No challenge history yet</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {historyChallenges.map((challenge) => (
-            <motion.div
-              key={challenge.id}
-              layout
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-            >
-              <Card className="opacity-90">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Trophy className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-semibold text-foreground truncate">
-                          vs {getOpponentName(challenge)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {formatTimeAgo(challenge.created_at)}
-                        </span>
-                        <span className="text-muted-foreground">
-                          {isChallenger(challenge) ? "You challenged" : "They challenged"}
-                        </span>
-                      </div>
-                      {/* Show decline reason if available */}
-                      {challenge.status === "declined" && challenge.decline_reason && (
-                        <div className="mt-2 flex items-start gap-2 text-sm text-muted-foreground">
-                          <AlertCircle className="w-3.5 h-3.5 mt-0.5 text-destructive" />
-                          <span className="italic">"{challenge.decline_reason}"</span>
-                        </div>
-                      )}
-                    </div>
-                    {getResultBadge(challenge)}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="flex gap-3 flex-wrap items-center">
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Filter:</span>
         </div>
-      )}
-    </AnimatePresence>
+        
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="declined">Declined</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+            <SelectItem value="expired">Expired</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={dateFilter} onValueChange={setDateFilter}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Date Range" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Time</SelectItem>
+            <SelectItem value="7days">Last 7 Days</SelectItem>
+            <SelectItem value="30days">Last 30 Days</SelectItem>
+            <SelectItem value="90days">Last 90 Days</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {(statusFilter !== "all" || dateFilter !== "all") && (
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => {
+              setStatusFilter("all");
+              setDateFilter("all");
+            }}
+          >
+            Clear filters
+          </Button>
+        )}
+      </div>
+
+      <AnimatePresence mode="popLayout">
+        {filteredChallenges.length === 0 ? (
+          <Card className="text-center py-8">
+            <CardContent>
+              <History className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+              <p className="text-muted-foreground">
+                {historyChallenges.length === 0 
+                  ? "No challenge history yet" 
+                  : "No challenges match your filters"}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {filteredChallenges.map((challenge) => (
+              <motion.div
+                key={challenge.id}
+                layout
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+              >
+                <Card className="opacity-90">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Trophy className="w-4 h-4 text-muted-foreground" />
+                          <span className="font-semibold text-foreground truncate">
+                            vs {getOpponentName(challenge)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {formatTimeAgo(challenge.created_at)}
+                          </span>
+                          <span>•</span>
+                          <span className="text-muted-foreground">
+                            {format(new Date(challenge.created_at), "MMM d, yyyy")}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {isChallenger(challenge) ? "You challenged" : "They challenged"}
+                          </span>
+                        </div>
+                        {/* Show decline reason if available */}
+                        {challenge.status === "declined" && challenge.decline_reason && (
+                          <div className="mt-2 flex items-start gap-2 text-sm text-muted-foreground">
+                            <AlertCircle className="w-3.5 h-3.5 mt-0.5 text-destructive" />
+                            <span className="italic">"{challenge.decline_reason}"</span>
+                          </div>
+                        )}
+                      </div>
+                      {getResultBadge(challenge)}
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
