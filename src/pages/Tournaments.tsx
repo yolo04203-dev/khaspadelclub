@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Trophy, Users, Calendar, ArrowLeft, Crown } from "lucide-react";
+import { Plus, Trophy, Users, Calendar, ArrowLeft, Crown, Banknote } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -16,6 +16,7 @@ interface Tournament {
   status: "draft" | "registration" | "in_progress" | "completed" | "cancelled";
   max_teams: number;
   registration_deadline: string | null;
+  entry_fee: number | null;
   created_at: string;
   participant_count?: number;
 }
@@ -193,12 +194,20 @@ export default function Tournaments() {
                             <Users className="w-4 h-4" />
                             <span>{tournament.participant_count} / {tournament.max_teams}</span>
                           </div>
-                          {tournament.registration_deadline && (
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <Calendar className="w-4 h-4" />
-                              <span>{new Date(tournament.registration_deadline).toLocaleDateString()}</span>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-3">
+                            {(tournament.entry_fee ?? 0) > 0 && (
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <Banknote className="w-4 h-4" />
+                                <span>PKR {tournament.entry_fee!.toLocaleString()}</span>
+                              </div>
+                            )}
+                            {tournament.registration_deadline && (
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <Calendar className="w-4 h-4" />
+                                <span>{new Date(tournament.registration_deadline).toLocaleDateString()}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
