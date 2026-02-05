@@ -350,15 +350,21 @@ export default function TournamentCreate() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="entryFee">Amount</Label>
-                    <Input
-                      id="entryFee"
-                      type="number"
-                      min={0}
-                      step={100}
-                      value={entryFee}
-                      onChange={(e) => setEntryFee(parseFloat(e.target.value) || 0)}
-                      placeholder="0"
-                    />
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
+                        PKR
+                      </span>
+                      <Input
+                        id="entryFee"
+                        type="number"
+                        min={0}
+                        step={100}
+                        value={entryFee}
+                        onChange={(e) => setEntryFee(parseFloat(e.target.value) || 0)}
+                        placeholder="0"
+                        className="pl-12"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="currency">Currency</Label>
