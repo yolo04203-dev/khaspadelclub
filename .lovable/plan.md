@@ -1,254 +1,426 @@
 
 
-# Combined Feature Implementation: Match Scheduling + In-App Badge Notifications
+# Comprehensive App Enhancement Plan
 
 ## Overview
 
-This plan combines two key missing features into a cohesive implementation:
-
-1. **Match Scheduling** - Allow teams to set venue and timing after a challenge is accepted
-2. **In-App Badge Notifications** - Global notification bell in the header showing alerts for challenges, scheduled matches, and ladder approvals
+This plan addresses all identified gaps and missing features to create a complete experience for players. The implementation is organized into phases for logical progression.
 
 ---
 
-## Part 1: Match Scheduling (Venue & Timing)
+## Phase 1: Quick Fixes & Database Foundation
 
-### What It Does
+### 1.1 Fix Broken Navigation
 
-After both teams agree to a challenge (when accepted), either team can update where and when they'll play. This removes the need for external coordination.
+**File: `src/pages/Profile.tsx`**
 
-### Database Change
+Fix the broken link that points to `/leaderboard` instead of `/ladders`.
 
-Add a `venue` column to the existing `matches` table:
+```typescript
+// Change from:
+<Link to="/leaderboard">View Ladder</Link>
+
+// Change to:
+<Link to="/ladders">View Ladder</Link>
+```
+
+### 1.2 Database Schema Updates
+
+Add missing columns to support new features:
 
 ```sql
-ALTER TABLE public.matches ADD COLUMN venue text;
-```
+-- Enhance profiles table
+ALTER TABLE public.profiles 
+  ADD COLUMN skill_level text,
+  ADD COLUMN phone_number text,
+  ADD COLUMN bio text,
+  ADD COLUMN is_looking_for_team boolean DEFAULT false,
+  ADD COLUMN preferred_play_times text[];
 
-Note: The `scheduled_at` column already exists in the matches table.
+-- Add team recruitment flag
+ALTER TABLE public.teams 
+  ADD COLUMN is_recruiting boolean DEFAULT false,
+  ADD COLUMN recruitment_message text;
 
-### New Component: ScheduleMatchDialog
+-- Add decline reason for challenges
+ALTER TABLE public.challenges 
+  ADD COLUMN decline_reason text;
 
-**File: `src/components/challenges/ScheduleMatchDialog.tsx`**
+-- Create team invitations table
+CREATE TABLE public.team_invitations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  team_id uuid NOT NULL REFERENCES public.teams(id) ON DELETE CASCADE,
+  invited_email text,
+  invited_user_id uuid,
+  invited_by uuid NOT NULL,
+  status text NOT NULL DEFAULT 'pending',
+  message text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  responded_at timestamptz,
+  expires_at timestamptz NOT NULL DEFAULT (now() + interval '7 days')
+);
 
-A dialog that allows users to:
-- Pick a date using the existing Calendar component
-- Select a time (dropdown or time input)
-- Enter a venue/location (text input)
-- See which team they're coordinating with
+-- Enable RLS on team_invitations
+ALTER TABLE public.team_invitations ENABLE ROW LEVEL SECURITY;
 
-```text
-+----------------------------------+
-| Schedule Your Match              |
-+----------------------------------+
-| vs [Opponent Team Name]          |
-|                                  |
-| Date                             |
-| [Calendar Picker]                |
-|                                  |
-| Time                             |
-| [Hour] : [Minute] [AM/PM]        |
-|                                  |
-| Venue / Location                 |
-| [__________________________]     |
-|                                  |
-| [Cancel]      [Save Schedule]    |
-+----------------------------------+
-```
+-- RLS Policies for team_invitations
+CREATE POLICY "Anyone can view their invitations"
+  ON public.team_invitations FOR SELECT
+  USING (invited_user_id = auth.uid() OR invited_email = auth.email());
 
-### UI Updates to Challenges Page
+CREATE POLICY "Team captains can create invitations"
+  ON public.team_invitations FOR INSERT
+  WITH CHECK (is_team_captain(auth.uid(), team_id));
 
-**File: `src/pages/Challenges.tsx`**
+CREATE POLICY "Invited users can update invitation status"
+  ON public.team_invitations FOR UPDATE
+  USING (invited_user_id = auth.uid() OR invited_email = auth.email());
 
-Update the "Active" tab (accepted challenges) to:
-- Display scheduled date/time and venue if set
-- Add a "Schedule" button (with calendar icon) next to "Record Score"
-- Join with matches table to fetch `scheduled_at` and `venue`
-
-```text
-Before:
-+----------------------------------------+
-| vs Opponent Team                       |
-| Accepted 2h ago | Ready to play        |
-|                         [Record Score] |
-+----------------------------------------+
-
-After:
-+----------------------------------------+
-| vs Opponent Team                       |
-| Accepted 2h ago | Ready to play        |
-| Mar 15 at 6:00 PM @ Club Courts       |
-|             [Schedule] [Record Score]  |
-+----------------------------------------+
+CREATE POLICY "Team captains can delete invitations"
+  ON public.team_invitations FOR DELETE
+  USING (is_team_captain(auth.uid(), team_id));
 ```
 
 ---
 
-## Part 2: In-App Badge Notification System
+## Phase 2: Enhanced Profile Page
 
-### What It Does
+### 2.1 Avatar Upload Functionality
 
-A global notification bell icon appears in the header of all authenticated pages. It shows a badge count for:
-- Incoming challenges awaiting response
-- Scheduled matches (matches with a set date/time)
-- Approved ladder join requests
+**Create Storage Bucket** (via Supabase):
+- Bucket name: `avatars`
+- Public access for reading
+- Authenticated upload only
 
-The badge updates in real-time using Supabase subscriptions.
+**File: `src/components/profile/AvatarUpload.tsx`** (new)
 
-### New Context: NotificationContext
-
-**File: `src/contexts/NotificationContext.tsx`**
-
-Tracks notification counts globally and subscribes to real-time changes:
+Component that handles:
+- File selection with drag-and-drop support
+- Image preview before upload
+- Upload to Supabase Storage
+- Update profile with new avatar URL
+- Loading and error states
 
 ```typescript
-interface NotificationCounts {
-  incomingChallenges: number;    // Challenges sent to you (pending)
-  scheduledMatches: number;      // Accepted matches with scheduled_at set
-  ladderApprovals: number;       // Join requests approved
-  total: number;                 // Sum of all
-}
-
-interface NotificationContextType {
-  counts: NotificationCounts;
-  isLoading: boolean;
-  refresh: () => void;
+interface AvatarUploadProps {
+  currentAvatarUrl?: string;
+  onUploadComplete: (url: string) => void;
 }
 ```
 
-Subscribes to real-time changes on:
-- `challenges` table
-- `matches` table
-- `ladder_join_requests` table
+### 2.2 Extended Profile Form
 
-### New Component: NotificationBell
+**File: `src/pages/Profile.tsx`** (update)
 
-**File: `src/components/NotificationBell.tsx`**
+Add new profile fields:
+- Skill level dropdown (Beginner, Intermediate, Advanced, Pro)
+- Phone number input (optional)
+- Bio textarea (max 200 characters)
+- "Looking for team" toggle
+- Preferred play times multi-select
 
-Bell icon with badge count and dropdown menu:
-- Shows total count as a badge
-- Dropdown lists categorized notifications with counts
-- Each category links to the relevant page
-- Gentle pulse animation when new notifications arrive
-
-### New Component: AppHeader
-
-**File: `src/components/AppHeader.tsx`**
-
-A shared header component used across all authenticated pages:
-- Logo (links to dashboard)
-- Optional back button
-- Notification bell with badge
-- User info and sign out button
-
-Props:
-```typescript
-interface AppHeaderProps {
-  showBack?: boolean;      // Show back arrow
-  backTo?: string;         // Back navigation target
-  actions?: React.ReactNode;  // Right-side action buttons
-}
+```text
++------------------------------------------+
+| Profile                                  |
++------------------------------------------+
+| [Avatar]  [Change Photo]                 |
+|                                          |
+| Display Name                             |
+| [_______________________]                |
+|                                          |
+| Skill Level                              |
+| [Intermediate        ▼]                  |
+|                                          |
+| Bio                                      |
+| [_______________________]                |
+| [_______________________]                |
+|                                          |
+| Phone (optional)                         |
+| [_______________________]                |
+|                                          |
+| [ ] I'm looking for a team to join       |
+|                                          |
+| Preferred Play Times                     |
+| [x] Weekday Mornings  [ ] Weekday Eves   |
+| [ ] Weekend Mornings  [x] Weekend Eves   |
+|                                          |
+| [Save Changes]                           |
++------------------------------------------+
 ```
 
-### App.tsx Update
+---
 
-Wrap the app with `<NotificationProvider>` inside the existing `AuthProvider`.
+## Phase 3: Team Invitation System
 
-### Pages to Update
+### 3.1 Invite Partner Component
 
-Replace inline headers with the new `<AppHeader />` component:
+**File: `src/components/team/InvitePartnerDialog.tsx`** (new)
 
-| Page | Current Header | Changes |
-|------|----------------|---------|
-| `Dashboard.tsx` | Inline header | Use `<AppHeader />` |
-| `Ladders.tsx` | Inline header | Use `<AppHeader showBack />` |
-| `LadderDetail.tsx` | Inline header | Use `<AppHeader showBack />` |
-| `LadderManage.tsx` | Inline header | Use `<AppHeader showBack />` |
-| `Challenges.tsx` | Inline header | Use `<AppHeader showBack />` |
-| `FindOpponents.tsx` | Inline header | Use `<AppHeader showBack />` |
-| `Tournaments.tsx` | Inline header | Use `<AppHeader showBack />` |
-| `TournamentDetail.tsx` | Inline header | Use `<AppHeader showBack />` |
-| `Americano.tsx` | Inline header | Use `<AppHeader showBack />` |
-| `AmericanoSession.tsx` | Inline header | Use `<AppHeader showBack />` |
-| `Profile.tsx` | Inline header | Use `<AppHeader showBack />` |
+Dialog for team captains to invite partners:
+- Search by email or display name
+- Autocomplete suggestions from profiles
+- Custom invitation message
+- Send invitation button
+
+```text
++----------------------------------+
+| Invite Partner to [Team Name]    |
++----------------------------------+
+| Find Player                      |
+| [@_________________________]     |
+| Suggestions:                     |
+|   • john@email.com               |
+|   • PlayerJohn                   |
+|                                  |
+| Message (optional)               |
+| [_________________________]      |
+|                                  |
+| [Cancel]      [Send Invitation]  |
++----------------------------------+
+```
+
+### 3.2 Team Invitations List
+
+**File: `src/components/team/PendingInvitations.tsx`** (new)
+
+Shows pending invitations for the user:
+- Team name and who invited them
+- Accept/Decline buttons
+- Invitation message preview
+- Expiration countdown
+
+### 3.3 Team Management Section
+
+**File: `src/pages/Profile.tsx`** (update)
+
+Enhance the Team section:
+- If captain: Show "Invite Partner" button
+- If captain: Show pending sent invitations
+- If no team: Show "My Invitations" section with pending invites
+- Recruitment toggle for captains
+
+---
+
+## Phase 4: Player Directory
+
+### 4.1 Player Directory Page
+
+**File: `src/pages/Players.tsx`** (new)
+
+A searchable directory of all players:
+
+```text
++--------------------------------------------------+
+| Find Players                                      |
++--------------------------------------------------+
+| [Search by name...              ] [🔍]           |
+|                                                  |
+| Filters:                                         |
+| Skill: [All ▼]  Looking for Team: [All ▼]       |
+|                                                  |
++--------------------------------------------------+
+| [Avatar] John Smith                              |
+|          Intermediate • Looking for team         |
+|          "Love playing weekends at City Courts"  |
+|                              [View] [Invite]     |
++--------------------------------------------------+
+| [Avatar] Sarah Johnson                           |
+|          Advanced • Has team (Smash Bros)        |
+|          "Competitive player, 3 years exp"       |
+|                              [View] [Challenge]  |
++--------------------------------------------------+
+```
+
+Features:
+- Search by display name
+- Filter by skill level
+- Filter by "looking for team" status
+- Show player's team (if any)
+- Quick actions: View profile, Invite to team, Challenge team
+
+### 4.2 Player Profile View
+
+**File: `src/pages/PlayerProfile.tsx`** (new)
+
+Public view of another player's profile:
+- Avatar and display name
+- Skill level badge
+- Bio
+- Team membership (with link)
+- Recent match history
+- Head-to-head record (if applicable)
+- "Invite to Team" or "Challenge" buttons
+
+---
+
+## Phase 5: Stats Dashboard
+
+### 5.1 Enhanced Dashboard Stats
+
+**File: `src/pages/Dashboard.tsx`** (update)
+
+Add detailed statistics section:
+
+```text
++--------------------------------------------------+
+| Your Performance                                  |
++--------------------------------------------------+
+|                                                  |
+| [Win Rate Chart - Line graph over time]          |
+|                                                  |
+| This Month        All Time                       |
+| 8 Wins / 3 Losses 45 Wins / 28 Losses           |
+| 72% Win Rate      61% Win Rate                   |
+|                                                  |
++--------------------------------------------------+
+| Recent Form: W W L W W (5 match streak)          |
++--------------------------------------------------+
+```
+
+### 5.2 Detailed Stats Page
+
+**File: `src/pages/Stats.tsx`** (new)
+
+Comprehensive statistics view:
+
+```text
++--------------------------------------------------+
+| Performance Stats                                 |
++--------------------------------------------------+
+|                                                  |
+| [Win Rate Over Time - Recharts Line Graph]       |
+|                                                  |
+| Period: [Last 30 Days ▼]                         |
+|                                                  |
++--------------------------------------------------+
+| Match History Timeline                            |
++--------------------------------------------------+
+| Mar 15 | vs Team Alpha    | W 3-1 | Ladder      |
+| Mar 12 | vs Smash Bros    | L 1-3 | Tournament  |
+| Mar 10 | vs Pro Players   | W 3-2 | Ladder      |
+| ...                                              |
++--------------------------------------------------+
+| Head-to-Head Records                              |
++--------------------------------------------------+
+| Team Alpha      | 5W - 2L | 71% | [View History] |
+| Smash Bros      | 3W - 4L | 43% | [View History] |
+| Pro Players     | 1W - 1L | 50% | [View History] |
++--------------------------------------------------+
+| Performance by Ladder                             |
++--------------------------------------------------+
+| Men's Open      | #3 | 12W-5L | 70%              |
+| Mixed Doubles   | #7 | 8W-6L  | 57%              |
++--------------------------------------------------+
+```
+
+Features:
+- Win rate trend chart (using Recharts)
+- Period selector (7 days, 30 days, all time)
+- Match history timeline with filters
+- Head-to-head breakdown by opponent
+- Performance breakdown by ladder/category
+- Current and best streak tracking
+
+---
+
+## Phase 6: Challenge Improvements
+
+### 6.1 Decline Reason
+
+**File: `src/pages/Challenges.tsx`** (update)
+
+When declining a challenge, prompt for reason:
+- Scheduling conflict
+- Already have pending match
+- Other (with text input)
+
+Store in `decline_reason` column for transparency.
+
+### 6.2 Challenge History
+
+Add "History" tab to Challenges page showing:
+- Past declined challenges with reasons
+- Completed matches with results
+- Expired challenges
 
 ---
 
 ## Implementation Summary
 
-### Database Migration
+### Database Migrations
 
 ```sql
--- Add venue column to matches table for scheduling
-ALTER TABLE public.matches ADD COLUMN venue text;
+-- Single migration with all schema changes
+ALTER TABLE public.profiles 
+  ADD COLUMN skill_level text,
+  ADD COLUMN phone_number text,
+  ADD COLUMN bio text,
+  ADD COLUMN is_looking_for_team boolean DEFAULT false,
+  ADD COLUMN preferred_play_times text[];
+
+ALTER TABLE public.teams 
+  ADD COLUMN is_recruiting boolean DEFAULT false,
+  ADD COLUMN recruitment_message text;
+
+ALTER TABLE public.challenges 
+  ADD COLUMN decline_reason text;
+
+-- Team invitations table with RLS
+CREATE TABLE public.team_invitations (...);
 ```
+
+### Storage Bucket
+
+Create `avatars` bucket with public read access.
 
 ### Files to Create
 
 | File | Purpose |
 |------|---------|
-| `src/contexts/NotificationContext.tsx` | Global notification state with real-time subscriptions |
-| `src/components/AppHeader.tsx` | Shared header with notification bell and user menu |
-| `src/components/NotificationBell.tsx` | Bell icon with badge and dropdown |
-| `src/components/challenges/ScheduleMatchDialog.tsx` | Dialog for setting match venue and time |
+| `src/components/profile/AvatarUpload.tsx` | Avatar upload with preview |
+| `src/components/team/InvitePartnerDialog.tsx` | Team invitation dialog |
+| `src/components/team/PendingInvitations.tsx` | List of received invitations |
+| `src/pages/Players.tsx` | Player directory with search |
+| `src/pages/PlayerProfile.tsx` | Public player profile view |
+| `src/pages/Stats.tsx` | Detailed statistics page |
+| `src/components/stats/WinRateChart.tsx` | Win rate trend chart |
+| `src/components/stats/HeadToHead.tsx` | H2H records component |
+| `src/components/stats/MatchTimeline.tsx` | Match history timeline |
 
 ### Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/App.tsx` | Wrap with `<NotificationProvider />` |
-| `src/pages/Challenges.tsx` | Add schedule button, display venue/time, fetch match details |
-| `src/pages/Dashboard.tsx` | Replace header with `<AppHeader />`, can remove banner |
-| `src/pages/Ladders.tsx` | Replace header with `<AppHeader />` |
-| `src/pages/LadderDetail.tsx` | Replace header with `<AppHeader />` |
-| `src/pages/LadderManage.tsx` | Replace header with `<AppHeader />` |
-| `src/pages/FindOpponents.tsx` | Replace header with `<AppHeader />` |
-| `src/pages/Tournaments.tsx` | Replace header with `<AppHeader />` |
-| `src/pages/TournamentDetail.tsx` | Replace header with `<AppHeader />` |
-| `src/pages/Americano.tsx` | Replace header with `<AppHeader />` |
-| `src/pages/AmericanoSession.tsx` | Replace header with `<AppHeader />` |
-| `src/pages/Profile.tsx` | Replace header with `<AppHeader />` |
+| `src/pages/Profile.tsx` | Fix /leaderboard link, add avatar upload, new profile fields, team invitations |
+| `src/pages/Dashboard.tsx` | Add stats preview section |
+| `src/pages/Challenges.tsx` | Add decline reason, history tab |
+| `src/App.tsx` | Add routes for /players, /players/:id, /stats |
+
+### New Routes
+
+| Route | Component | Purpose |
+|-------|-----------|---------|
+| `/players` | `Players.tsx` | Player directory |
+| `/players/:id` | `PlayerProfile.tsx` | View player profile |
+| `/stats` | `Stats.tsx` | Detailed statistics |
 
 ---
 
-## User Experience Flow
+## Priority Order
 
-### Scheduling a Match
-
-1. User accepts a challenge (or their challenge is accepted)
-2. Match appears in "Active" tab on Challenges page
-3. User clicks "Schedule" button on the match card
-4. Dialog opens with date picker, time selector, and venue input
-5. User fills in details and saves
-6. Both teams see the scheduled info on their challenge card
-7. Real-time updates sync changes instantly
-
-### Receiving Notifications
-
-1. User logs in and sees the notification bell in the header
-2. Bell shows a badge with the total count (e.g., "3")
-3. User clicks the bell to see breakdown:
-   - 2 New Challenges (links to /challenges)
-   - 1 Scheduled Match (links to /challenges)
-4. User navigates to handle the notifications
-5. Counts update in real-time as changes occur
+1. **Quick Fixes** - Fix broken link (immediate)
+2. **Database Schema** - All migrations in one batch
+3. **Avatar Upload** - High visibility, frequently requested
+4. **Team Invitations** - Critical for team formation
+5. **Player Directory** - Enables discovery and recruitment
+6. **Stats Dashboard** - Engagement and retention feature
+7. **Challenge Improvements** - Polish and transparency
 
 ---
 
-## Technical Notes
+## Dependencies
 
-### Real-time Subscriptions
-
-The NotificationContext will set up channels for:
-- `challenges` - new/updated challenges where user's team is challenged
-- `matches` - updates to matches where user's team is involved
-- `ladder_join_requests` - status changes on user's team's requests
-
-### Existing Patterns Used
-
-- Real-time subscriptions: Already implemented in `TournamentDetail.tsx` and `Challenges.tsx`
-- Calendar component: Already available in `src/components/ui/calendar.tsx`
-- Dialog pattern: Already used in `SetScoreDialog.tsx`
-- Badge component: Already available in `src/components/ui/badge.tsx`
-- Dropdown menu: Already available in `src/components/ui/dropdown-menu.tsx`
+- Recharts (already installed) for statistics charts
+- Supabase Storage for avatar uploads
+- Existing UI components (Dialog, Card, Button, Input, Select, etc.)
 
