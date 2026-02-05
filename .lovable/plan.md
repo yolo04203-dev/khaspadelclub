@@ -1,90 +1,254 @@
 
 
-# Implementation Plan: Per-Category Registration Fees
+# Combined Feature Implementation: Match Scheduling + In-App Badge Notifications
 
 ## Overview
-Currently, tournaments have a single entry fee that applies to all categories. This plan implements the ability to set different registration fees for each category (e.g., Men's A could be PKR 2,000 while Women's B could be PKR 1,500).
 
-## Current State
-- Tournament has a single `entry_fee` and `entry_fee_currency` stored in the `tournaments` table
-- Categories (`tournament_categories` table) only have: `name`, `description`, `max_teams`, `display_order`
-- The `RegistrationDialog` shows the tournament-level entry fee regardless of which category is selected
+This plan combines two key missing features into a cohesive implementation:
 
-## Implementation Steps
+1. **Match Scheduling** - Allow teams to set venue and timing after a challenge is accepted
+2. **In-App Badge Notifications** - Global notification bell in the header showing alerts for challenges, scheduled matches, and ladder approvals
 
-### 1. Database Schema Update
-Add `entry_fee` column to the `tournament_categories` table:
+---
+
+## Part 1: Match Scheduling (Venue & Timing)
+
+### What It Does
+
+After both teams agree to a challenge (when accepted), either team can update where and when they'll play. This removes the need for external coordination.
+
+### Database Change
+
+Add a `venue` column to the existing `matches` table:
 
 ```sql
-ALTER TABLE tournament_categories 
-ADD COLUMN entry_fee numeric DEFAULT 0;
+ALTER TABLE public.matches ADD COLUMN venue text;
 ```
 
-This allows each category to optionally override the tournament-level fee. A value of `0` or `NULL` will indicate "use tournament default fee."
+Note: The `scheduled_at` column already exists in the matches table.
 
-### 2. Update Tournament Creation Page
-**File: `src/pages/TournamentCreate.tsx`**
+### New Component: ScheduleMatchDialog
 
-- Add an `entryFee` field to the `CategoryInput` interface
-- Update the category input form to include a fee input for each category
-- When creating categories, save the per-category entry fee to the database
+**File: `src/components/challenges/ScheduleMatchDialog.tsx`**
 
-### 3. Update Category Management Component
-**File: `src/components/tournament/CategoryManagement.tsx`**
+A dialog that allows users to:
+- Pick a date using the existing Calendar component
+- Select a time (dropdown or time input)
+- Enter a venue/location (text input)
+- See which team they're coordinating with
 
-- Add entry fee field to the create/edit category dialog
-- Display the entry fee alongside max teams in the category list
-- Allow admins to update category fees during registration phase
+```text
++----------------------------------+
+| Schedule Your Match              |
++----------------------------------+
+| vs [Opponent Team Name]          |
+|                                  |
+| Date                             |
+| [Calendar Picker]                |
+|                                  |
+| Time                             |
+| [Hour] : [Minute] [AM/PM]        |
+|                                  |
+| Venue / Location                 |
+| [__________________________]     |
+|                                  |
+| [Cancel]      [Save Schedule]    |
++----------------------------------+
+```
 
-### 4. Update Registration Dialog
-**File: `src/components/tournament/RegistrationDialog.tsx`**
+### UI Updates to Challenges Page
 
-- Extend the `TournamentCategory` interface to include `entry_fee`
-- When a category is selected, display that category's entry fee instead of the tournament default
-- If category has no specific fee (0 or null), fall back to tournament-level fee
+**File: `src/pages/Challenges.tsx`**
 
-### 5. Update Tournament Detail Page
-**File: `src/pages/TournamentDetail.tsx`**
+Update the "Active" tab (accepted challenges) to:
+- Display scheduled date/time and venue if set
+- Add a "Schedule" button (with calendar icon) next to "Record Score"
+- Join with matches table to fetch `scheduled_at` and `venue`
 
-- Fetch and pass `entry_fee` from categories to the `RegistrationDialog`
-- Update the Info tab to show category-specific fees if they differ from tournament default
-- Update the category filter section to optionally show fees
+```text
+Before:
++----------------------------------------+
+| vs Opponent Team                       |
+| Accepted 2h ago | Ready to play        |
+|                         [Record Score] |
++----------------------------------------+
 
-### 6. Update Type Definitions
-The database types will auto-update after migration, but we need to update local interfaces:
+After:
++----------------------------------------+
+| vs Opponent Team                       |
+| Accepted 2h ago | Ready to play        |
+| Mar 15 at 6:00 PM @ Club Courts       |
+|             [Schedule] [Record Score]  |
++----------------------------------------+
+```
 
-- `TournamentCategory` interface in `CategoryManagement.tsx`
-- `TournamentCategory` interface in `RegistrationDialog.tsx`
+---
+
+## Part 2: In-App Badge Notification System
+
+### What It Does
+
+A global notification bell icon appears in the header of all authenticated pages. It shows a badge count for:
+- Incoming challenges awaiting response
+- Scheduled matches (matches with a set date/time)
+- Approved ladder join requests
+
+The badge updates in real-time using Supabase subscriptions.
+
+### New Context: NotificationContext
+
+**File: `src/contexts/NotificationContext.tsx`**
+
+Tracks notification counts globally and subscribes to real-time changes:
+
+```typescript
+interface NotificationCounts {
+  incomingChallenges: number;    // Challenges sent to you (pending)
+  scheduledMatches: number;      // Accepted matches with scheduled_at set
+  ladderApprovals: number;       // Join requests approved
+  total: number;                 // Sum of all
+}
+
+interface NotificationContextType {
+  counts: NotificationCounts;
+  isLoading: boolean;
+  refresh: () => void;
+}
+```
+
+Subscribes to real-time changes on:
+- `challenges` table
+- `matches` table
+- `ladder_join_requests` table
+
+### New Component: NotificationBell
+
+**File: `src/components/NotificationBell.tsx`**
+
+Bell icon with badge count and dropdown menu:
+- Shows total count as a badge
+- Dropdown lists categorized notifications with counts
+- Each category links to the relevant page
+- Gentle pulse animation when new notifications arrive
+
+### New Component: AppHeader
+
+**File: `src/components/AppHeader.tsx`**
+
+A shared header component used across all authenticated pages:
+- Logo (links to dashboard)
+- Optional back button
+- Notification bell with badge
+- User info and sign out button
+
+Props:
+```typescript
+interface AppHeaderProps {
+  showBack?: boolean;      // Show back arrow
+  backTo?: string;         // Back navigation target
+  actions?: React.ReactNode;  // Right-side action buttons
+}
+```
+
+### App.tsx Update
+
+Wrap the app with `<NotificationProvider>` inside the existing `AuthProvider`.
+
+### Pages to Update
+
+Replace inline headers with the new `<AppHeader />` component:
+
+| Page | Current Header | Changes |
+|------|----------------|---------|
+| `Dashboard.tsx` | Inline header | Use `<AppHeader />` |
+| `Ladders.tsx` | Inline header | Use `<AppHeader showBack />` |
+| `LadderDetail.tsx` | Inline header | Use `<AppHeader showBack />` |
+| `LadderManage.tsx` | Inline header | Use `<AppHeader showBack />` |
+| `Challenges.tsx` | Inline header | Use `<AppHeader showBack />` |
+| `FindOpponents.tsx` | Inline header | Use `<AppHeader showBack />` |
+| `Tournaments.tsx` | Inline header | Use `<AppHeader showBack />` |
+| `TournamentDetail.tsx` | Inline header | Use `<AppHeader showBack />` |
+| `Americano.tsx` | Inline header | Use `<AppHeader showBack />` |
+| `AmericanoSession.tsx` | Inline header | Use `<AppHeader showBack />` |
+| `Profile.tsx` | Inline header | Use `<AppHeader showBack />` |
+
+---
+
+## Implementation Summary
+
+### Database Migration
+
+```sql
+-- Add venue column to matches table for scheduling
+ALTER TABLE public.matches ADD COLUMN venue text;
+```
+
+### Files to Create
+
+| File | Purpose |
+|------|---------|
+| `src/contexts/NotificationContext.tsx` | Global notification state with real-time subscriptions |
+| `src/components/AppHeader.tsx` | Shared header with notification bell and user menu |
+| `src/components/NotificationBell.tsx` | Bell icon with badge and dropdown |
+| `src/components/challenges/ScheduleMatchDialog.tsx` | Dialog for setting match venue and time |
+
+### Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/App.tsx` | Wrap with `<NotificationProvider />` |
+| `src/pages/Challenges.tsx` | Add schedule button, display venue/time, fetch match details |
+| `src/pages/Dashboard.tsx` | Replace header with `<AppHeader />`, can remove banner |
+| `src/pages/Ladders.tsx` | Replace header with `<AppHeader />` |
+| `src/pages/LadderDetail.tsx` | Replace header with `<AppHeader />` |
+| `src/pages/LadderManage.tsx` | Replace header with `<AppHeader />` |
+| `src/pages/FindOpponents.tsx` | Replace header with `<AppHeader />` |
+| `src/pages/Tournaments.tsx` | Replace header with `<AppHeader />` |
+| `src/pages/TournamentDetail.tsx` | Replace header with `<AppHeader />` |
+| `src/pages/Americano.tsx` | Replace header with `<AppHeader />` |
+| `src/pages/AmericanoSession.tsx` | Replace header with `<AppHeader />` |
+| `src/pages/Profile.tsx` | Replace header with `<AppHeader />` |
+
+---
 
 ## User Experience Flow
 
-1. **Creating Tournament**: Admin adds categories with optional individual fees
-2. **Viewing Tournament**: Info tab shows if categories have different fees
-3. **Registering**: When user selects a category, the fee displayed updates to reflect that category's specific fee
-4. **Managing Categories**: Admin can edit category fees during registration phase
+### Scheduling a Match
 
-## Technical Details
+1. User accepts a challenge (or their challenge is accepted)
+2. Match appears in "Active" tab on Challenges page
+3. User clicks "Schedule" button on the match card
+4. Dialog opens with date picker, time selector, and venue input
+5. User fills in details and saves
+6. Both teams see the scheduled info on their challenge card
+7. Real-time updates sync changes instantly
 
-### Database Migration
-```sql
--- Add entry_fee column to tournament_categories
-ALTER TABLE tournament_categories 
-ADD COLUMN entry_fee numeric DEFAULT 0;
+### Receiving Notifications
 
--- Add comment for clarity
-COMMENT ON COLUMN tournament_categories.entry_fee IS 'Category-specific entry fee. 0 means use tournament default.';
-```
+1. User logs in and sees the notification bell in the header
+2. Bell shows a badge with the total count (e.g., "3")
+3. User clicks the bell to see breakdown:
+   - 2 New Challenges (links to /challenges)
+   - 1 Scheduled Match (links to /challenges)
+4. User navigates to handle the notifications
+5. Counts update in real-time as changes occur
 
-### Fee Display Logic
-```text
-displayedFee = selectedCategory?.entry_fee > 0 
-  ? selectedCategory.entry_fee 
-  : tournament.entry_fee
-```
+---
 
-### Files to Modify
-1. `src/pages/TournamentCreate.tsx` - Add fee input to category creation
-2. `src/components/tournament/CategoryManagement.tsx` - Add fee to category CRUD
-3. `src/components/tournament/RegistrationDialog.tsx` - Dynamic fee based on category
-4. `src/pages/TournamentDetail.tsx` - Pass category fees to dialog
+## Technical Notes
+
+### Real-time Subscriptions
+
+The NotificationContext will set up channels for:
+- `challenges` - new/updated challenges where user's team is challenged
+- `matches` - updates to matches where user's team is involved
+- `ladder_join_requests` - status changes on user's team's requests
+
+### Existing Patterns Used
+
+- Real-time subscriptions: Already implemented in `TournamentDetail.tsx` and `Challenges.tsx`
+- Calendar component: Already available in `src/components/ui/calendar.tsx`
+- Dialog pattern: Already used in `SetScoreDialog.tsx`
+- Badge component: Already available in `src/components/ui/badge.tsx`
+- Dropdown menu: Already available in `src/components/ui/dropdown-menu.tsx`
 
