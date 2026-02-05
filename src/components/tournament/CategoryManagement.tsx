@@ -20,20 +20,23 @@ export interface TournamentCategory {
   description: string | null;
   max_teams: number;
   display_order: number;
+  entry_fee?: number;
   participantCount?: number;
 }
 
 interface CategoryManagementProps {
   categories: TournamentCategory[];
   tournamentStatus: string;
-  onCreateCategory: (name: string, description: string, maxTeams: number) => Promise<void>;
-  onUpdateCategory: (id: string, name: string, description: string, maxTeams: number) => Promise<void>;
+  entryFeeCurrency?: string;
+  onCreateCategory: (name: string, description: string, maxTeams: number, entryFee: number) => Promise<void>;
+  onUpdateCategory: (id: string, name: string, description: string, maxTeams: number, entryFee: number) => Promise<void>;
   onDeleteCategory: (id: string) => Promise<void>;
 }
 
 export function CategoryManagement({
   categories,
   tournamentStatus,
+  entryFeeCurrency = "PKR",
   onCreateCategory,
   onUpdateCategory,
   onDeleteCategory,
@@ -43,6 +46,7 @@ export function CategoryManagement({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [maxTeams, setMaxTeams] = useState(8);
+  const [entryFee, setEntryFee] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const canEdit = tournamentStatus === "draft" || tournamentStatus === "registration";
@@ -52,6 +56,7 @@ export function CategoryManagement({
     setName("");
     setDescription("");
     setMaxTeams(8);
+    setEntryFee(0);
     setIsDialogOpen(true);
   };
 
@@ -60,6 +65,7 @@ export function CategoryManagement({
     setName(category.name);
     setDescription(category.description || "");
     setMaxTeams(category.max_teams);
+    setEntryFee(category.entry_fee || 0);
     setIsDialogOpen(true);
   };
 
@@ -68,9 +74,9 @@ export function CategoryManagement({
     setIsSubmitting(true);
     try {
       if (editingCategory) {
-        await onUpdateCategory(editingCategory.id, name.trim(), description.trim(), maxTeams);
+        await onUpdateCategory(editingCategory.id, name.trim(), description.trim(), maxTeams, entryFee);
       } else {
-        await onCreateCategory(name.trim(), description.trim(), maxTeams);
+        await onCreateCategory(name.trim(), description.trim(), maxTeams, entryFee);
       }
       setIsDialogOpen(false);
     } finally {
@@ -134,6 +140,11 @@ export function CategoryManagement({
                       <Users className="w-3 h-3" />
                       {category.participantCount ?? 0}/{category.max_teams}
                     </Badge>
+                    {(category.entry_fee ?? 0) > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {entryFeeCurrency} {(category.entry_fee ?? 0).toLocaleString()}
+                      </Badge>
+                    )}
                     {canEdit && (
                       <div className="flex gap-1">
                         <Button
@@ -202,6 +213,26 @@ export function CategoryManagement({
               />
               <p className="text-xs text-muted-foreground">
                 Maximum number of teams that can register in this category
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="categoryEntryFee">Entry Fee (optional)</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                  {entryFeeCurrency}
+                </span>
+                <Input
+                  id="categoryEntryFee"
+                  type="number"
+                  min={0}
+                  step={100}
+                  value={entryFee}
+                  onChange={(e) => setEntryFee(parseFloat(e.target.value) || 0)}
+                  className="pl-12"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Leave at 0 to use the tournament's default entry fee
               </p>
             </div>
           </div>

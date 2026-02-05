@@ -122,6 +122,7 @@ export default function TournamentDetail() {
       // Process categories with participant counts
       const cats = (categoriesRes.data || []).map(cat => ({
         ...cat,
+        entry_fee: (cat as any).entry_fee ?? 0,
         participantCount: (participantsRes.data || []).filter(p => p.category_id === cat.id && p.waitlist_position === null).length,
       }));
       setCategories(cats);
@@ -632,13 +633,14 @@ export default function TournamentDetail() {
   };
 
   // Category management functions
-  const createCategory = async (name: string, description: string, maxTeams: number) => {
+  const createCategory = async (name: string, description: string, maxTeams: number, entryFee: number) => {
     if (!tournament) return;
     const { error } = await supabase.from("tournament_categories").insert({
       tournament_id: tournament.id,
       name,
       description: description || null,
       max_teams: maxTeams,
+      entry_fee: entryFee,
       display_order: categories.length,
     });
     if (error) {
@@ -649,9 +651,9 @@ export default function TournamentDetail() {
     }
   };
 
-  const updateCategory = async (id: string, name: string, description: string, maxTeams: number) => {
+  const updateCategory = async (id: string, name: string, description: string, maxTeams: number, entryFee: number) => {
     const { error } = await supabase.from("tournament_categories")
-      .update({ name, description: description || null, max_teams: maxTeams })
+      .update({ name, description: description || null, max_teams: maxTeams, entry_fee: entryFee })
       .eq("id", id);
     if (error) {
       sonnerToast.error("Failed to update category");
@@ -838,6 +840,7 @@ export default function TournamentDetail() {
               name: c.name,
               max_teams: c.max_teams,
               participantCount: c.participantCount ?? 0,
+              entry_fee: c.entry_fee,
             }))}
             onRegister={registerTeam}
           />
@@ -1096,6 +1099,7 @@ export default function TournamentDetail() {
                 <CategoryManagement
                   categories={categories}
                   tournamentStatus={tournament.status}
+                  entryFeeCurrency={tournament.entry_fee_currency}
                   onCreateCategory={createCategory}
                   onUpdateCategory={updateCategory}
                   onDeleteCategory={deleteCategory}

@@ -721,6 +721,7 @@ export type Database = {
           created_at: string
           description: string | null
           display_order: number
+          entry_fee: number | null
           id: string
           max_teams: number
           name: string
@@ -730,6 +731,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           display_order?: number
+          entry_fee?: number | null
           id?: string
           max_teams?: number
           name: string
@@ -739,6 +741,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           display_order?: number
+          entry_fee?: number | null
           id?: string
           max_teams?: number
           name?: string

@@ -17,6 +17,7 @@ interface TournamentCategory {
   name: string;
   max_teams: number;
   participantCount: number;
+  entry_fee?: number;
 }
 
 interface RegistrationDialogProps {
@@ -81,6 +82,11 @@ export function RegistrationDialog({
   const isCategoryFull = selectedCategory 
     ? selectedCategory.participantCount >= selectedCategory.max_teams 
     : isFull;
+
+  // Determine which fee to display - category-specific or tournament default
+  const displayedFee = selectedCategory && (selectedCategory.entry_fee ?? 0) > 0
+    ? selectedCategory.entry_fee!
+    : entryFee;
 
   const handleSubmit = async () => {
     if (registrationType === "custom" && !isCustomFormValid) {
@@ -208,15 +214,20 @@ export function RegistrationDialog({
           </div>
 
           {/* Entry Fee Information */}
-          {entryFee > 0 && (
+          {displayedFee > 0 && (
             <div className="rounded-lg border border-warning/30 bg-warning/5 p-4 space-y-3">
               <div className="flex items-center gap-2 text-warning">
                 <DollarSign className="w-5 h-5" />
                 <span className="font-semibold">Entry Fee Required</span>
               </div>
               <div className="text-2xl font-bold text-foreground">
-                {formatCurrency(entryFee, entryFeeCurrency)}
+                {formatCurrency(displayedFee, entryFeeCurrency)}
               </div>
+              {selectedCategory && (selectedCategory.entry_fee ?? 0) > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Fee specific to {selectedCategory.name} category
+                </p>
+              )}
               {paymentInstructions ? (
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-foreground">Payment Instructions:</p>
