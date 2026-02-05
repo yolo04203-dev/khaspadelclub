@@ -1,63 +1,90 @@
 
-# Add Challenge Notification Banner to Dashboard
+
+# Implementation Plan: Per-Category Registration Fees
 
 ## Overview
-Add a prominent notification banner at the top of the dashboard that alerts users when they have incoming pending challenges that need their response. This will be more visible than the current stat card and encourage timely responses.
+Currently, tournaments have a single entry fee that applies to all categories. This plan implements the ability to set different registration fees for each category (e.g., Men's A could be PKR 2,000 while Women's B could be PKR 1,500).
 
-## What You'll See
-- A colorful alert banner appears at the top of your dashboard when you have incoming challenges
-- Shows the number of pending challenges with a call-to-action button to view them
-- The banner is dismissible but will reappear on page refresh if challenges are still pending
-- Subtle animation to draw attention without being intrusive
+## Current State
+- Tournament has a single `entry_fee` and `entry_fee_currency` stored in the `tournaments` table
+- Categories (`tournament_categories` table) only have: `name`, `description`, `max_teams`, `display_order`
+- The `RegistrationDialog` shows the tournament-level entry fee regardless of which category is selected
 
-## Implementation Details
+## Implementation Steps
 
-### 1. Enhance Data Fetching in Dashboard
-**File: `src/pages/Dashboard.tsx`**
+### 1. Database Schema Update
+Add `entry_fee` column to the `tournament_categories` table:
 
-Currently, the dashboard fetches total pending challenges (both incoming and outgoing combined). We need to also fetch **incoming challenges** separately to show a more relevant notification - users need to respond to incoming challenges, not just be aware of outgoing ones.
-
-Add new state to track:
-- `incomingChallenges`: number of challenges sent TO the user's team that are awaiting response
-
-Update the fetch logic to query:
 ```sql
--- Incoming pending challenges (challenges sent to user's team)
-SELECT count(*) FROM challenges 
-WHERE challenged_team_id = {teamId} AND status = 'pending'
+ALTER TABLE tournament_categories 
+ADD COLUMN entry_fee numeric DEFAULT 0;
 ```
 
-### 2. Add Notification Banner Component
-**File: `src/pages/Dashboard.tsx`**
+This allows each category to optionally override the tournament-level fee. A value of `0` or `NULL` will indicate "use tournament default fee."
 
-Add an Alert component (already available in the codebase) that displays:
-- An icon (Bell or Swords) to indicate challenge notifications
-- Message like "You have 2 incoming challenges awaiting your response!"
-- A button linking to `/challenges` page
-- Styled with accent/warning colors to stand out
+### 2. Update Tournament Creation Page
+**File: `src/pages/TournamentCreate.tsx`**
 
-The banner will:
-- Only appear when `incomingChallenges > 0`
-- Be positioned above the Team Status Card for high visibility
-- Use framer-motion for a subtle entrance animation
-- Include a dismiss button (optional, stored in local state)
+- Add an `entryFee` field to the `CategoryInput` interface
+- Update the category input form to include a fee input for each category
+- When creating categories, save the per-category entry fee to the database
 
-### 3. Visual Design
-- Background: gradient with warning/accent tones (orange/yellow)
-- Icon: Animated bell or swords icon
-- Text: Bold count + descriptive message
-- CTA Button: "View Challenges" linking to `/challenges`
-- Border: subtle accent border for definition
+### 3. Update Category Management Component
+**File: `src/components/tournament/CategoryManagement.tsx`**
 
----
+- Add entry fee field to the create/edit category dialog
+- Display the entry fee alongside max teams in the category list
+- Allow admins to update category fees during registration phase
 
-## Technical Changes Summary
+### 4. Update Registration Dialog
+**File: `src/components/tournament/RegistrationDialog.tsx`**
 
-| File | Change |
-|------|--------|
-| `src/pages/Dashboard.tsx` | Add `incomingChallenges` state, update fetch query, add Alert banner component |
+- Extend the `TournamentCategory` interface to include `entry_fee`
+- When a category is selected, display that category's entry fee instead of the tournament default
+- If category has no specific fee (0 or null), fall back to tournament-level fee
 
-## Notes
-- No database changes required - using existing `challenges` table
-- Uses existing UI components (Alert, Button, Badge)
-- Responsive design for mobile and desktop
+### 5. Update Tournament Detail Page
+**File: `src/pages/TournamentDetail.tsx`**
+
+- Fetch and pass `entry_fee` from categories to the `RegistrationDialog`
+- Update the Info tab to show category-specific fees if they differ from tournament default
+- Update the category filter section to optionally show fees
+
+### 6. Update Type Definitions
+The database types will auto-update after migration, but we need to update local interfaces:
+
+- `TournamentCategory` interface in `CategoryManagement.tsx`
+- `TournamentCategory` interface in `RegistrationDialog.tsx`
+
+## User Experience Flow
+
+1. **Creating Tournament**: Admin adds categories with optional individual fees
+2. **Viewing Tournament**: Info tab shows if categories have different fees
+3. **Registering**: When user selects a category, the fee displayed updates to reflect that category's specific fee
+4. **Managing Categories**: Admin can edit category fees during registration phase
+
+## Technical Details
+
+### Database Migration
+```sql
+-- Add entry_fee column to tournament_categories
+ALTER TABLE tournament_categories 
+ADD COLUMN entry_fee numeric DEFAULT 0;
+
+-- Add comment for clarity
+COMMENT ON COLUMN tournament_categories.entry_fee IS 'Category-specific entry fee. 0 means use tournament default.';
+```
+
+### Fee Display Logic
+```text
+displayedFee = selectedCategory?.entry_fee > 0 
+  ? selectedCategory.entry_fee 
+  : tournament.entry_fee
+```
+
+### Files to Modify
+1. `src/pages/TournamentCreate.tsx` - Add fee input to category creation
+2. `src/components/tournament/CategoryManagement.tsx` - Add fee to category CRUD
+3. `src/components/tournament/RegistrationDialog.tsx` - Dynamic fee based on category
+4. `src/pages/TournamentDetail.tsx` - Pass category fees to dialog
+
