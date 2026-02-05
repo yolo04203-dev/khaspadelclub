@@ -27,6 +27,8 @@ interface Player {
   is_looking_for_team: boolean;
   team_id: string | null;
   team_name: string | null;
+  team_is_recruiting: boolean;
+  team_recruitment_message: string | null;
 }
 
 const SKILL_LEVELS = ["Beginner", "Intermediate", "Advanced", "Pro"];
@@ -38,6 +40,7 @@ export default function Players() {
   const [searchQuery, setSearchQuery] = useState("");
   const [skillFilter, setSkillFilter] = useState<string>("all");
   const [lookingForTeamFilter, setLookingForTeamFilter] = useState<string>("all");
+  const [recruitingFilter, setRecruitingFilter] = useState<string>("all");
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -76,22 +79,30 @@ export default function Players() {
         const teamIds = [...new Set(teamMembers?.map(m => m.team_id) || [])];
         const { data: teams } = await supabase
           .from("teams")
-          .select("id, name")
+          .select("id, name, is_recruiting, recruitment_message")
           .in("id", teamIds);
 
         const teamMemberMap = new Map(teamMembers?.map(m => [m.user_id, m.team_id]) || []);
-        const teamsMap = new Map(teams?.map(t => [t.id, t.name]) || []);
+        const teamsMap = new Map(teams?.map(t => [t.id, { name: t.name, is_recruiting: t.is_recruiting, recruitment_message: t.recruitment_message }]) || []);
 
-        setPlayers(
-          (profiles || []).map(p => {
+        let playersData = (profiles || []).map(p => {
             const teamId = teamMemberMap.get(p.user_id) || null;
+            const teamInfo = teamId ? teamsMap.get(teamId) : null;
             return {
               ...p,
               team_id: teamId,
-              team_name: teamId ? teamsMap.get(teamId) || null : null,
+              team_name: teamInfo?.name || null,
+              team_is_recruiting: teamInfo?.is_recruiting || false,
+              team_recruitment_message: teamInfo?.recruitment_message || null,
             };
-          })
-        );
+          });
+
+        // Apply recruiting filter
+        if (recruitingFilter === "yes") {
+          playersData = playersData.filter(p => p.team_is_recruiting);
+        }
+
+        setPlayers(playersData);
       } catch (error) {
         console.error("Error fetching players:", error);
       } finally {
@@ -101,7 +112,7 @@ export default function Players() {
 
     const debounce = setTimeout(fetchPlayers, 300);
     return () => clearTimeout(debounce);
-  }, [user?.id, searchQuery, skillFilter, lookingForTeamFilter]);
+  }, [user?.id, searchQuery, skillFilter, lookingForTeamFilter, recruitingFilter]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -160,6 +171,16 @@ export default function Players() {
                   <SelectItem value="no">Has Team</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Select value={recruitingFilter} onValueChange={setRecruitingFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Team Recruiting" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="yes">Teams Recruiting</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -216,9 +237,21 @@ export default function Players() {
                           </div>
 
                           {player.team_name && (
-                            <p className="text-sm text-muted-foreground mt-0.5">
-                              Team: {player.team_name}
-                            </p>
+                            <div className="mt-0.5">
+                              <p className="text-sm text-muted-foreground">
+                                Team: {player.team_name}
+                                {player.team_is_recruiting && (
+                                  <Badge variant="outline" className="ml-2 text-xs border-accent text-accent">
+                                    Recruiting
+                                  </Badge>
+                                )}
+                              </p>
+                              {player.team_is_recruiting && player.team_recruitment_message && (
+                                <p className="text-xs text-muted-foreground italic mt-1">
+                                  "{player.team_recruitment_message}"
+                                </p>
+                              )}
+                            </div>
                           )}
 
                           {player.bio && (

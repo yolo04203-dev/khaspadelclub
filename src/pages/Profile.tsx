@@ -15,6 +15,7 @@ import { toast } from "@/hooks/use-toast";
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
 import { InvitePartnerDialog } from "@/components/team/InvitePartnerDialog";
 import { PendingInvitations } from "@/components/team/PendingInvitations";
+import { TeamRecruitmentToggle } from "@/components/team/TeamRecruitmentToggle";
 import {
   Select,
   SelectContent,
@@ -38,6 +39,8 @@ interface UserTeam {
   name: string;
   rank: number | null;
   is_captain: boolean;
+  is_recruiting: boolean;
+  recruitment_message: string | null;
 }
 
 interface MatchHistory {
@@ -108,7 +111,7 @@ export default function ProfilePage() {
       if (memberData) {
         const { data: teamData } = await supabase
           .from("teams")
-          .select("id, name")
+          .select("id, name, is_recruiting, recruitment_message")
           .eq("id", memberData.team_id)
           .single();
 
@@ -124,6 +127,8 @@ export default function ProfilePage() {
             name: teamData.name,
             rank: rankData?.rank || null,
             is_captain: memberData.is_captain || false,
+            is_recruiting: teamData.is_recruiting || false,
+            recruitment_message: teamData.recruitment_message || null,
           });
         }
 
@@ -432,7 +437,18 @@ export default function ProfilePage() {
                       </Button>
                     </div>
                     
-                    <div className="flex gap-2">
+                    {userTeam.is_captain && (
+                      <div className="border-t pt-4">
+                        <TeamRecruitmentToggle
+                          teamId={userTeam.id}
+                          initialIsRecruiting={userTeam.is_recruiting}
+                          initialRecruitmentMessage={userTeam.recruitment_message}
+                          onUpdated={fetchData}
+                        />
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-2 pt-2">
                       {userTeam.is_captain && (
                         <Button 
                           variant="outline"

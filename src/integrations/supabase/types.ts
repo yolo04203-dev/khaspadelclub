@@ -549,9 +549,13 @@ export type Database = {
           challenger_team_id: string
           completed_at: string | null
           created_at: string
+          dispute_reason: string | null
           id: string
           notes: string | null
           scheduled_at: string | null
+          score_confirmed_by: string | null
+          score_disputed: boolean | null
+          score_submitted_by: string | null
           sets_won_challenged: number | null
           sets_won_challenger: number | null
           status: Database["public"]["Enums"]["match_status"]
@@ -568,9 +572,13 @@ export type Database = {
           challenger_team_id: string
           completed_at?: string | null
           created_at?: string
+          dispute_reason?: string | null
           id?: string
           notes?: string | null
           scheduled_at?: string | null
+          score_confirmed_by?: string | null
+          score_disputed?: boolean | null
+          score_submitted_by?: string | null
           sets_won_challenged?: number | null
           sets_won_challenger?: number | null
           status?: Database["public"]["Enums"]["match_status"]
@@ -587,9 +595,13 @@ export type Database = {
           challenger_team_id?: string
           completed_at?: string | null
           created_at?: string
+          dispute_reason?: string | null
           id?: string
           notes?: string | null
           scheduled_at?: string | null
+          score_confirmed_by?: string | null
+          score_disputed?: boolean | null
+          score_submitted_by?: string | null
           sets_won_challenged?: number | null
           sets_won_challenger?: number | null
           status?: Database["public"]["Enums"]["match_status"]

@@ -14,7 +14,8 @@ import {
   Snowflake,
   Calendar,
   MapPin,
-  History
+  History,
+  AlertCircle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -29,6 +30,8 @@ import { cn } from "@/lib/utils";
 import { SetScoreDialog } from "@/components/challenges/SetScoreDialog";
 import { ScheduleMatchDialog } from "@/components/challenges/ScheduleMatchDialog";
 import { DeclineReasonDialog } from "@/components/challenges/DeclineReasonDialog";
+import { ChallengeHistoryTab } from "@/components/challenges/ChallengeHistoryTab";
+import { ScoreConfirmationCard } from "@/components/challenges/ScoreConfirmationCard";
 import { isFuture, format } from "date-fns";
 
 interface Challenge {
@@ -52,6 +55,15 @@ interface Challenge {
   } | null;
   challenger_rank: number | null;
   challenged_rank: number | null;
+  winner_team_id?: string | null;
+  challenger_score?: number | null;
+  challenged_score?: number | null;
+  challenger_sets?: number[];
+  challenged_sets?: number[];
+  score_submitted_by?: string | null;
+  score_confirmed_by?: string | null;
+  score_disputed?: boolean;
+  dispute_reason?: string | null;
 }
 
 interface UserTeam {
@@ -70,6 +82,7 @@ export default function Challenges() {
   const [incomingChallenges, setIncomingChallenges] = useState<Challenge[]>([]);
   const [outgoingChallenges, setOutgoingChallenges] = useState<Challenge[]>([]);
   const [acceptedChallenges, setAcceptedChallenges] = useState<Challenge[]>([]);
+  const [historyChallenges, setHistoryChallenges] = useState<Challenge[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   const [scoreDialogOpen, setScoreDialogOpen] = useState(false);
@@ -178,6 +191,27 @@ export default function Challenges() {
 
     if (accError) console.error("Error fetching accepted:", accError);
 
+    // Fetch challenge history (declined, cancelled, expired, completed)
+    const { data: history, error: histError } = await supabase
+      .from("challenges")
+      .select(`
+        id,
+        status,
+        message,
+        decline_reason,
+        expires_at,
+        created_at,
+        match_id,
+        challenger_team_id,
+        challenged_team_id
+      `)
+      .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+      .in("status", ["declined", "cancelled", "expired"])
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (histError) console.error("Error fetching history:", histError);
+
     // Get all team IDs
     const allTeamIds = [
       ...(incoming?.map(c => c.challenger_team_id) || []),
@@ -186,6 +220,8 @@ export default function Challenges() {
       ...(outgoing?.map(c => c.challenged_team_id) || []),
       ...(accepted?.map(c => c.challenger_team_id) || []),
       ...(accepted?.map(c => c.challenged_team_id) || []),
+      ...(history?.map(c => c.challenger_team_id) || []),
+      ...(history?.map(c => c.challenged_team_id) || []),
     ].filter(Boolean);
 
     // Fetch team names
@@ -204,16 +240,19 @@ export default function Challenges() {
     const ranksMap = new Map(ranks?.map(r => [r.team_id, r.rank]) || []);
 
     // Fetch match statuses and scheduling info for accepted challenges
-    const matchIds = (accepted || []).map(c => c.match_id).filter(Boolean);
-    const { data: matches } = matchIds.length > 0 
+    const allMatchIds = [
+      ...(accepted || []).map(c => c.match_id).filter(Boolean),
+      ...(history || []).map(c => c.match_id).filter(Boolean),
+    ];
+    const { data: matches } = allMatchIds.length > 0 
       ? await supabase
           .from("matches")
-          .select("id, status, scheduled_at, venue")
-          .in("id", matchIds)
-      : { data: [] as { id: string; status: string; scheduled_at: string | null; venue: string | null }[] };
+          .select("id, status, scheduled_at, venue, winner_team_id, challenger_score, challenged_score, challenger_sets, challenged_sets, score_submitted_by, score_confirmed_by, score_disputed, dispute_reason")
+          .in("id", allMatchIds)
+      : { data: [] as any[] };
     
-    const matchMap = new Map<string, { status: string; scheduled_at: string | null; venue: string | null }>(
-      (matches || []).map(m => [m.id, { status: m.status, scheduled_at: m.scheduled_at, venue: m.venue }])
+    const matchMap = new Map<string, any>(
+      (matches || []).map(m => [m.id, m])
     );
 
     const mapChallenge = (c: any): Challenge => {
@@ -233,12 +272,22 @@ export default function Challenges() {
         challenged_team: teamsMap.get(c.challenged_team_id) || null,
         challenger_rank: ranksMap.get(c.challenger_team_id) || null,
         challenged_rank: ranksMap.get(c.challenged_team_id) || null,
+        winner_team_id: matchInfo?.winner_team_id ?? null,
+        challenger_score: matchInfo?.challenger_score ?? null,
+        challenged_score: matchInfo?.challenged_score ?? null,
+        challenger_sets: matchInfo?.challenger_sets ?? [],
+        challenged_sets: matchInfo?.challenged_sets ?? [],
+        score_submitted_by: matchInfo?.score_submitted_by ?? null,
+        score_confirmed_by: matchInfo?.score_confirmed_by ?? null,
+        score_disputed: matchInfo?.score_disputed ?? false,
+        dispute_reason: matchInfo?.dispute_reason ?? null,
       };
     };
 
     setIncomingChallenges((incoming || []).map(mapChallenge));
     setOutgoingChallenges((outgoing || []).map(mapChallenge));
     setAcceptedChallenges((accepted || []).map(mapChallenge));
+    setHistoryChallenges((history || []).map(mapChallenge));
   };
 
   useEffect(() => {
@@ -320,6 +369,24 @@ export default function Challenges() {
           .eq("id", challengeId);
 
         if (updateError) throw updateError;
+
+        // Send notification to challenger
+        try {
+          const challengeForNotif = incomingChallenges.find(c => c.id === challengeId);
+          if (challengeForNotif) {
+            await supabase.functions.invoke("send-challenge-notification", {
+              body: {
+                type: "challenge_accepted",
+                challengerTeamId: challengeForNotif.challenger_team?.id,
+                challengerTeamName: challengeForNotif.challenger_team?.name,
+                challengedTeamId: userTeam?.id,
+                challengedTeamName: userTeam?.name,
+              },
+            });
+          }
+        } catch (notifError) {
+          console.error("Failed to send notification:", notifError);
+        }
         
         toast({
           title: "Challenge accepted!",
@@ -361,6 +428,24 @@ export default function Challenges() {
         .eq("id", selectedChallenge.id);
 
       if (error) throw error;
+
+      // Send notification to challenger
+      try {
+        if (selectedChallenge) {
+          await supabase.functions.invoke("send-challenge-notification", {
+            body: {
+              type: "challenge_declined",
+              challengerTeamId: selectedChallenge.challenger_team?.id,
+              challengerTeamName: selectedChallenge.challenger_team?.name,
+              challengedTeamId: userTeam?.id,
+              challengedTeamName: userTeam?.name,
+              declineReason: reason,
+            },
+          });
+        }
+      } catch (notifError) {
+        console.error("Failed to send notification:", notifError);
+      }
 
       toast({
         title: "Challenge declined",
@@ -450,7 +535,10 @@ export default function Challenges() {
         ? selectedChallenge.challenged_team?.id 
         : selectedChallenge.challenger_team?.id;
 
-      // Update the match with set scores
+      // Get current user for score_submitted_by
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+      // Update the match with set scores - wait for confirmation before finalizing
       const { error: matchError } = await supabase
         .from("matches")
         .update({
@@ -461,83 +549,43 @@ export default function Challenges() {
           sets_won_challenger: setsWonChallenger,
           sets_won_challenged: setsWonChallenged,
           winner_team_id: winnerId,
-          status: "completed",
-          completed_at: new Date().toISOString(),
+          status: "pending", // Keep as pending until confirmed
+          score_submitted_by: currentUser?.id,
+          score_disputed: false,
+          dispute_reason: null,
         })
         .eq("id", selectedChallenge.match_id);
 
       if (matchError) throw matchError;
 
-      // Update ladder rankings
-      const { data: rankings } = await supabase
-        .from("ladder_rankings")
-        .select("*")
-        .in("team_id", [winnerId, loserId].filter(Boolean));
-
-      if (rankings) {
-        const winnerRanking = rankings.find(r => r.team_id === winnerId);
-        const loserRanking = rankings.find(r => r.team_id === loserId);
-
-        if (winnerRanking && loserRanking) {
-          // Update winner's stats
-          await supabase
-            .from("ladder_rankings")
-            .update({
-              wins: winnerRanking.wins + 1,
-              streak: winnerRanking.streak >= 0 ? winnerRanking.streak + 1 : 1,
-              last_match_at: new Date().toISOString(),
-              points: winnerRanking.points + 25,
-            })
-            .eq("id", winnerRanking.id);
-
-          // Update loser's stats
-          await supabase
-            .from("ladder_rankings")
-            .update({
-              losses: loserRanking.losses + 1,
-              streak: loserRanking.streak <= 0 ? loserRanking.streak - 1 : -1,
-              last_match_at: new Date().toISOString(),
-              points: Math.max(0, loserRanking.points - 10),
-            })
-            .eq("id", loserRanking.id);
-
-          // If lower-ranked team won: winner takes loser's rank, everyone between shifts down by 1
-          if (winnerRanking.rank > loserRanking.rank) {
-            const winnerOldRank = winnerRanking.rank;
-            const loserOldRank = loserRanking.rank;
-            
-            // Get all teams between the two ranks (exclusive of winner, inclusive of loser)
-            const { data: teamsBetween } = await supabase
-              .from("ladder_rankings")
-              .select("id, rank")
-              .gte("rank", loserOldRank)
-              .lt("rank", winnerOldRank);
-            
-            // Shift all teams between down by 1 rank
-            if (teamsBetween && teamsBetween.length > 0) {
-              for (const team of teamsBetween) {
-                await supabase
-                  .from("ladder_rankings")
-                  .update({ rank: team.rank + 1 })
-                  .eq("id", team.id);
-              }
-            }
-            
-            // Winner takes the loser's old rank
-            await supabase
-              .from("ladder_rankings")
-              .update({ rank: loserOldRank })
-              .eq("id", winnerRanking.id);
-          }
-        }
+      // Send notification to opponent team
+      try {
+        const opponentTeamId = isChallenger 
+          ? selectedChallenge.challenged_team?.id 
+          : selectedChallenge.challenger_team?.id;
+        const opponentTeamName = isChallenger 
+          ? selectedChallenge.challenged_team?.name 
+          : selectedChallenge.challenger_team?.name;
+        
+        await supabase.functions.invoke("send-challenge-notification", {
+          body: {
+            type: "score_submitted",
+            challengerTeamId: userTeam.id,
+            challengerTeamName: userTeam.name,
+            challengedTeamId: opponentTeamId,
+            challengedTeamName: opponentTeamName,
+          },
+        });
+      } catch (notifError) {
+        console.error("Failed to send notification:", notifError);
       }
 
       // Format set scores for display
       const setScoreDisplay = mySets.map((s, i) => `${s}-${opponentSets[i]}`).join(", ");
 
       toast({
-        title: "Match recorded!",
-        description: `Sets: ${setScoreDisplay}. You ${setsWonByMe > setsWonByOpponent ? "won" : "lost"} ${setsWonByMe}-${setsWonByOpponent}. Rankings updated.`,
+        title: "Score submitted",
+        description: `Sets: ${setScoreDisplay}. Waiting for opponent to confirm.`,
       });
 
       setScoreDialogOpen(false);
@@ -659,28 +707,32 @@ export default function Challenges() {
             </Card>
           ) : (
             <Tabs defaultValue="incoming" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 mb-6">
+              <TabsList className="grid w-full grid-cols-4 mb-6">
                 <TabsTrigger value="incoming" className="relative">
-                  <Inbox className="w-4 h-4 mr-2" />
-                  Incoming
+                  <Inbox className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Incoming</span>
                   {incomingChallenges.length > 0 && (
-                    <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                    <Badge variant="destructive" className="ml-1 sm:ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
                       {incomingChallenges.length}
                     </Badge>
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="outgoing">
-                  <Send className="w-4 h-4 mr-2" />
-                  Outgoing
+                  <Send className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Outgoing</span>
                 </TabsTrigger>
                 <TabsTrigger value="accepted" className="relative">
-                  <Target className="w-4 h-4 mr-2" />
-                  Active
+                  <Target className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Active</span>
                   {acceptedChallenges.length > 0 && (
-                    <Badge variant="default" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs bg-accent">
+                    <Badge variant="default" className="ml-1 sm:ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs bg-accent">
                       {acceptedChallenges.length}
                     </Badge>
                   )}
+                </TabsTrigger>
+                <TabsTrigger value="history">
+                  <History className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">History</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -816,6 +868,13 @@ export default function Challenges() {
                                       {challenge.status}
                                     </Badge>
                                   </div>
+                                  {/* Show decline reason if available */}
+                                  {challenge.status === "declined" && challenge.decline_reason && (
+                                    <div className="mt-2 flex items-start gap-2 text-sm text-muted-foreground">
+                                      <AlertCircle className="w-3.5 h-3.5 mt-0.5 text-destructive flex-shrink-0" />
+                                      <span className="italic">"{challenge.decline_reason}"</span>
+                                    </div>
+                                  )}
                                 </div>
 
                                 {challenge.status === "pending" && (
@@ -877,13 +936,15 @@ export default function Challenges() {
                                       Accepted {formatTimeAgo(challenge.created_at)}
                                     </span>
                                     <Badge 
-                                      variant={challenge.match_status === "completed" ? "secondary" : "default"} 
+                                      variant={challenge.match_status === "completed" ? "secondary" : challenge.score_submitted_by ? "outline" : "default"} 
                                       className={cn(
                                         "text-xs",
-                                        challenge.match_status === "completed" ? "bg-muted" : "bg-accent"
+                                        challenge.match_status === "completed" ? "bg-muted" : 
+                                        challenge.score_submitted_by ? "border-yellow-500 text-yellow-600" : "bg-accent"
                                       )}
                                     >
-                                      {challenge.match_status === "completed" ? "Completed" : "Ready to play"}
+                                      {challenge.match_status === "completed" ? "Completed" : 
+                                       challenge.score_submitted_by ? "Awaiting Confirmation" : "Ready to play"}
                                     </Badge>
                                   </div>
                                   {/* Show scheduled date/time and venue if set */}
@@ -901,11 +962,31 @@ export default function Challenges() {
                                   )}
                                 </div>
 
-                                {challenge.match_status === "completed" ? (
+                                {challenge.match_status === "completed" && challenge.score_confirmed_by ? (
                                   <Badge variant="outline" className="text-muted-foreground">
                                     <Check className="w-4 h-4 mr-1" />
-                                    Score Recorded
+                                    Score Confirmed
                                   </Badge>
+                                ) : challenge.score_submitted_by && !challenge.score_confirmed_by ? (
+                                  // Show confirmation card for the opponent
+                                  <div className="w-full mt-3">
+                                    <ScoreConfirmationCard
+                                      matchId={challenge.match_id!}
+                                      challengerTeamName={challenge.challenger_team?.name || "Team A"}
+                                      challengedTeamName={challenge.challenged_team?.name || "Team B"}
+                                      challengerScore={challenge.challenger_score || 0}
+                                      challengedScore={challenge.challenged_score || 0}
+                                      challengerSets={challenge.challenger_sets || []}
+                                      challengedSets={challenge.challenged_sets || []}
+                                      isSubmitter={challenge.score_submitted_by === user?.id}
+                                      isDisputed={challenge.score_disputed || false}
+                                      disputeReason={challenge.dispute_reason || null}
+                                      userTeamId={userTeam?.id || ""}
+                                      onConfirmed={() => {
+                                        if (userTeam) fetchChallenges(userTeam.id);
+                                      }}
+                                    />
+                                  </div>
                                 ) : (
                                   <div className="flex gap-2">
                                     <Button
@@ -933,6 +1014,14 @@ export default function Challenges() {
                     </div>
                   )}
                 </AnimatePresence>
+              </TabsContent>
+
+              {/* History Tab */}
+              <TabsContent value="history">
+                <ChallengeHistoryTab 
+                  historyChallenges={historyChallenges}
+                  userTeamId={userTeam?.id || ""}
+                />
               </TabsContent>
             </Tabs>
           )}
