@@ -64,6 +64,11 @@ interface Challenge {
   score_confirmed_by?: string | null;
   score_disputed?: boolean;
   dispute_reason?: string | null;
+  ladder_category?: {
+    id: string;
+    name: string;
+    ladder_name: string;
+  } | null;
 }
 
 interface UserTeam {
@@ -171,7 +176,7 @@ export default function Challenges() {
 
     if (outError) console.error("Error fetching outgoing:", outError);
 
-    // Fetch accepted challenges (both incoming and outgoing)
+    // Fetch accepted challenges (both incoming and outgoing) with ladder category
     const { data: accepted, error: accError } = await supabase
       .from("challenges")
       .select(`
@@ -183,7 +188,16 @@ export default function Challenges() {
         created_at,
         match_id,
         challenger_team_id,
-        challenged_team_id
+        challenged_team_id,
+        ladder_category_id,
+        ladder_categories!ladder_category_id (
+          id,
+          name,
+          ladders!ladder_id (
+            id,
+            name
+          )
+        )
       `)
       .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
       .eq("status", "accepted")
@@ -257,6 +271,7 @@ export default function Challenges() {
 
     const mapChallenge = (c: any): Challenge => {
       const matchInfo = c.match_id ? matchMap.get(c.match_id) : null;
+      const ladderCategory = c.ladder_categories;
       return {
         id: c.id,
         status: c.status,
@@ -281,6 +296,11 @@ export default function Challenges() {
         score_confirmed_by: matchInfo?.score_confirmed_by ?? null,
         score_disputed: matchInfo?.score_disputed ?? false,
         dispute_reason: matchInfo?.dispute_reason ?? null,
+        ladder_category: ladderCategory ? {
+          id: ladderCategory.id,
+          name: ladderCategory.name,
+          ladder_name: ladderCategory.ladders?.name || "Unknown Ladder",
+        } : null,
       };
     };
 
@@ -937,12 +957,17 @@ export default function Challenges() {
                                         <Clock className="w-3 h-3" />
                                         Accepted {formatTimeAgo(challenge.created_at)}
                                       </span>
+                                      {challenge.ladder_category && (
+                                        <Badge variant="outline" className="text-xs">
+                                          {challenge.ladder_category.ladder_name} • {challenge.ladder_category.name}
+                                        </Badge>
+                                      )}
                                       <Badge 
                                         variant={challenge.match_status === "completed" ? "secondary" : challenge.score_submitted_by ? "outline" : "default"} 
                                         className={cn(
                                           "text-xs",
                                           challenge.match_status === "completed" ? "bg-muted" : 
-                                          challenge.score_submitted_by ? "border-yellow-500 text-yellow-600" : "bg-accent"
+                                          challenge.score_submitted_by ? "border-warning text-warning-foreground" : "bg-accent"
                                         )}
                                       >
                                         {challenge.match_status === "completed" ? "Completed" : 
