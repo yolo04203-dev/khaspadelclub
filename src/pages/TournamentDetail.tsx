@@ -172,6 +172,75 @@ export default function TournamentDetail() {
       fetchData();
       if (user) fetchUserTeam();
     }
+
+    // Subscribe to realtime changes for tournament data
+    const matchesChannel = supabase
+      .channel(`tournament-${id}-matches`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tournament_matches',
+        },
+        () => {
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    const participantsChannel = supabase
+      .channel(`tournament-${id}-participants`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tournament_participants',
+        },
+        () => {
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    const groupsChannel = supabase
+      .channel(`tournament-${id}-groups`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tournament_groups',
+        },
+        () => {
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    const tournamentChannel = supabase
+      .channel(`tournament-${id}-tournament`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'tournaments',
+          filter: `id=eq.${id}`,
+        },
+        () => {
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(matchesChannel);
+      supabase.removeChannel(participantsChannel);
+      supabase.removeChannel(groupsChannel);
+      supabase.removeChannel(tournamentChannel);
+    };
   }, [id, user, fetchData, fetchUserTeam]);
 
   const registerTeam = async (teamId: string | null, customTeamName: string | null, player1Name?: string, player2Name?: string, categoryId?: string) => {
