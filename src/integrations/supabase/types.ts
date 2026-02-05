@@ -294,6 +294,7 @@ export type Database = {
           challenged_team_id: string
           challenger_team_id: string
           created_at: string
+          decline_reason: string | null
           expires_at: string
           id: string
           ladder_category_id: string | null
@@ -306,6 +307,7 @@ export type Database = {
           challenged_team_id: string
           challenger_team_id: string
           created_at?: string
+          decline_reason?: string | null
           expires_at?: string
           id?: string
           ladder_category_id?: string | null
@@ -318,6 +320,7 @@ export type Database = {
           challenged_team_id?: string
           challenger_team_id?: string
           created_at?: string
+          decline_reason?: string | null
           expires_at?: string
           id?: string
           ladder_category_id?: string | null
@@ -621,29 +624,91 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          bio: string | null
           created_at: string
           display_name: string | null
           id: string
+          is_looking_for_team: boolean | null
+          phone_number: string | null
+          preferred_play_times: string[] | null
+          skill_level: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           avatar_url?: string | null
+          bio?: string | null
           created_at?: string
           display_name?: string | null
           id?: string
+          is_looking_for_team?: boolean | null
+          phone_number?: string | null
+          preferred_play_times?: string[] | null
+          skill_level?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           avatar_url?: string | null
+          bio?: string | null
           created_at?: string
           display_name?: string | null
           id?: string
+          is_looking_for_team?: boolean | null
+          phone_number?: string | null
+          preferred_play_times?: string[] | null
+          skill_level?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: []
+      }
+      team_invitations: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          invited_by: string
+          invited_email: string | null
+          invited_user_id: string | null
+          message: string | null
+          responded_at: string | null
+          status: string
+          team_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invited_by: string
+          invited_email?: string | null
+          invited_user_id?: string | null
+          message?: string | null
+          responded_at?: string | null
+          status?: string
+          team_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          invited_email?: string | null
+          invited_user_id?: string | null
+          message?: string | null
+          responded_at?: string | null
+          status?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_invitations_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       team_members: {
         Row: {
@@ -688,7 +753,9 @@ export type Database = {
           frozen_until: string | null
           id: string
           is_frozen: boolean | null
+          is_recruiting: boolean | null
           name: string
+          recruitment_message: string | null
           updated_at: string
         }
         Insert: {
@@ -701,7 +768,9 @@ export type Database = {
           frozen_until?: string | null
           id?: string
           is_frozen?: boolean | null
+          is_recruiting?: boolean | null
           name: string
+          recruitment_message?: string | null
           updated_at?: string
         }
         Update: {
@@ -714,7 +783,9 @@ export type Database = {
           frozen_until?: string | null
           id?: string
           is_frozen?: boolean | null
+          is_recruiting?: boolean | null
           name?: string
+          recruitment_message?: string | null
           updated_at?: string
         }
         Relationships: []

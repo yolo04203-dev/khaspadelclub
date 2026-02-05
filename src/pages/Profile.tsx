@@ -9,12 +9,28 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
+import { AvatarUpload } from "@/components/profile/AvatarUpload";
+import { InvitePartnerDialog } from "@/components/team/InvitePartnerDialog";
+import { PendingInvitations } from "@/components/team/PendingInvitations";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Profile {
   display_name: string | null;
   avatar_url: string | null;
+  skill_level: string | null;
+  phone_number: string | null;
+  bio: string | null;
+  is_looking_for_team: boolean;
+  preferred_play_times: string[] | null;
 }
 
 interface UserTeam {
@@ -32,109 +48,129 @@ interface MatchHistory {
   date: string;
 }
 
+const SKILL_LEVELS = ["Beginner", "Intermediate", "Advanced", "Pro"];
+const PLAY_TIMES = ["Weekday Mornings", "Weekday Evenings", "Weekend Mornings", "Weekend Evenings"];
+
 export default function ProfilePage() {
-  const { user, isLoading: authLoading, signOut } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userTeam, setUserTeam] = useState<UserTeam | null>(null);
   const [matchHistory, setMatchHistory] = useState<MatchHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isLeavingTeam, setIsLeavingTeam] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  
+  // Form state
   const [displayName, setDisplayName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [skillLevel, setSkillLevel] = useState<string>("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [bio, setBio] = useState("");
+  const [isLookingForTeam, setIsLookingForTeam] = useState(false);
+  const [preferredPlayTimes, setPreferredPlayTimes] = useState<string[]>([]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!user) return;
+  const fetchData = async () => {
+    if (!user) return;
 
-      try {
-        // Fetch profile
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("display_name, avatar_url")
-          .eq("user_id", user.id)
+    try {
+      // Fetch profile
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("display_name, avatar_url, skill_level, phone_number, bio, is_looking_for_team, preferred_play_times")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (profileError && profileError.code !== "PGRST116") {
+        console.error("Error fetching profile:", profileError);
+      }
+
+      if (profileData) {
+        setProfile(profileData);
+        setDisplayName(profileData.display_name || "");
+        setAvatarUrl(profileData.avatar_url);
+        setSkillLevel(profileData.skill_level || "");
+        setPhoneNumber(profileData.phone_number || "");
+        setBio(profileData.bio || "");
+        setIsLookingForTeam(profileData.is_looking_for_team || false);
+        setPreferredPlayTimes(profileData.preferred_play_times || []);
+      } else {
+        setDisplayName(user.user_metadata?.display_name || user.email?.split("@")[0] || "");
+      }
+
+      // Fetch team membership
+      const { data: memberData } = await supabase
+        .from("team_members")
+        .select("team_id, is_captain")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (memberData) {
+        const { data: teamData } = await supabase
+          .from("teams")
+          .select("id, name")
+          .eq("id", memberData.team_id)
+          .single();
+
+        const { data: rankData } = await supabase
+          .from("ladder_rankings")
+          .select("rank")
+          .eq("team_id", memberData.team_id)
           .maybeSingle();
 
-        if (profileError && profileError.code !== "PGRST116") {
-          console.error("Error fetching profile:", profileError);
+        if (teamData) {
+          setUserTeam({
+            id: teamData.id,
+            name: teamData.name,
+            rank: rankData?.rank || null,
+            is_captain: memberData.is_captain || false,
+          });
         }
 
-        if (profileData) {
-          setProfile(profileData);
-          setDisplayName(profileData.display_name || "");
-        } else {
-          setDisplayName(user.user_metadata?.display_name || user.email?.split("@")[0] || "");
-        }
+        // Fetch match history
+        const { data: matches } = await supabase
+          .from("matches")
+          .select("id, challenger_team_id, challenged_team_id, challenger_score, challenged_score, winner_team_id, completed_at")
+          .or(`challenger_team_id.eq.${memberData.team_id},challenged_team_id.eq.${memberData.team_id}`)
+          .eq("status", "completed")
+          .order("completed_at", { ascending: false })
+          .limit(10);
 
-        // Fetch team membership
-        const { data: memberData } = await supabase
-          .from("team_members")
-          .select("team_id, is_captain")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (memberData) {
-          const { data: teamData } = await supabase
+        if (matches && matches.length > 0) {
+          const teamIds = [...new Set(matches.flatMap(m => [m.challenger_team_id, m.challenged_team_id]))];
+          const { data: teams } = await supabase
             .from("teams")
             .select("id, name")
-            .eq("id", memberData.team_id)
-            .single();
+            .in("id", teamIds);
 
-          const { data: rankData } = await supabase
-            .from("ladder_rankings")
-            .select("rank")
-            .eq("team_id", memberData.team_id)
-            .maybeSingle();
+          const teamsMap = new Map(teams?.map(t => [t.id, t.name]) || []);
 
-          if (teamData) {
-            setUserTeam({
-              id: teamData.id,
-              name: teamData.name,
-              rank: rankData?.rank || null,
-              is_captain: memberData.is_captain || false,
-            });
-          }
-
-          // Fetch match history
-          const { data: matches } = await supabase
-            .from("matches")
-            .select("id, challenger_team_id, challenged_team_id, challenger_score, challenged_score, winner_team_id, completed_at")
-            .or(`challenger_team_id.eq.${memberData.team_id},challenged_team_id.eq.${memberData.team_id}`)
-            .eq("status", "completed")
-            .order("completed_at", { ascending: false })
-            .limit(10);
-
-          if (matches && matches.length > 0) {
-            const teamIds = [...new Set(matches.flatMap(m => [m.challenger_team_id, m.challenged_team_id]))];
-            const { data: teams } = await supabase
-              .from("teams")
-              .select("id, name")
-              .in("id", teamIds);
-
-            const teamsMap = new Map(teams?.map(t => [t.id, t.name]) || []);
-
-            setMatchHistory(matches.map(m => {
-              const isChallenger = m.challenger_team_id === memberData.team_id;
-              const opponentId = isChallenger ? m.challenged_team_id : m.challenger_team_id;
-              const myScore = isChallenger ? m.challenger_score : m.challenged_score;
-              const theirScore = isChallenger ? m.challenged_score : m.challenger_score;
-              
-              return {
-                id: m.id,
-                opponent_name: teamsMap.get(opponentId) || "Unknown",
-                result: m.winner_team_id === memberData.team_id ? "win" : "loss",
-                score: `${myScore || 0} - ${theirScore || 0}`,
-                date: m.completed_at ? new Date(m.completed_at).toLocaleDateString() : "N/A",
-              };
-            }));
-          }
+          setMatchHistory(matches.map(m => {
+            const isChallenger = m.challenger_team_id === memberData.team_id;
+            const opponentId = isChallenger ? m.challenged_team_id : m.challenger_team_id;
+            const myScore = isChallenger ? m.challenger_score : m.challenged_score;
+            const theirScore = isChallenger ? m.challenged_score : m.challenger_score;
+            
+            return {
+              id: m.id,
+              opponent_name: teamsMap.get(opponentId) || "Unknown",
+              result: m.winner_team_id === memberData.team_id ? "win" : "loss",
+              score: `${myScore || 0} - ${theirScore || 0}`,
+              date: m.completed_at ? new Date(m.completed_at).toLocaleDateString() : "N/A",
+            };
+          }));
         }
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setIsLoading(false);
+      } else {
+        setUserTeam(null);
       }
-    };
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     if (user) fetchData();
   }, [user]);
 
@@ -148,6 +184,12 @@ export default function ProfilePage() {
         .upsert({
           user_id: user.id,
           display_name: displayName,
+          avatar_url: avatarUrl,
+          skill_level: skillLevel || null,
+          phone_number: phoneNumber || null,
+          bio: bio || null,
+          is_looking_for_team: isLookingForTeam,
+          preferred_play_times: preferredPlayTimes.length > 0 ? preferredPlayTimes : null,
           updated_at: new Date().toISOString(),
         }, { onConflict: "user_id" });
 
@@ -155,7 +197,7 @@ export default function ProfilePage() {
 
       toast({
         title: "Profile updated",
-        description: "Your display name has been saved.",
+        description: "Your profile has been saved.",
       });
     } catch (error: any) {
       toast({
@@ -207,6 +249,14 @@ export default function ProfilePage() {
     }
   };
 
+  const togglePlayTime = (time: string) => {
+    setPreferredPlayTimes(prev => 
+      prev.includes(time) 
+        ? prev.filter(t => t !== time)
+        : [...prev, time]
+    );
+  };
+
   if (authLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -223,7 +273,6 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-background">
       <AppHeader showBack />
 
-      {/* Main Content */}
       <main className="container py-8 max-w-2xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -236,7 +285,12 @@ export default function ProfilePage() {
           </div>
 
           <div className="space-y-6">
-            {/* Avatar Section */}
+            {/* Team Invitations (for users without a team) */}
+            {!userTeam && (
+              <PendingInvitations onAccepted={fetchData} />
+            )}
+
+            {/* Avatar & Account Info */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -245,17 +299,21 @@ export default function ProfilePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center gap-4">
-                  <Avatar className="w-20 h-20">
-                    <AvatarImage src={profile?.avatar_url || undefined} />
-                    <AvatarFallback className="text-2xl bg-accent/20 text-accent">
-                      {displayName.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium text-foreground">{displayName || "Player"}</p>
-                    <p className="text-sm text-muted-foreground">{user.email}</p>
-                  </div>
+                <AvatarUpload
+                  currentAvatarUrl={avatarUrl}
+                  displayName={displayName}
+                  userId={user.id}
+                  onUploadComplete={(url) => setAvatarUrl(url)}
+                />
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    value={user.email || ""}
+                    disabled
+                    className="bg-muted"
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -268,7 +326,78 @@ export default function ProfilePage() {
                   />
                 </div>
 
-                <Button onClick={handleSaveProfile} disabled={isSaving}>
+                <div className="space-y-2">
+                  <Label htmlFor="skillLevel">Skill Level</Label>
+                  <Select value={skillLevel} onValueChange={setSkillLevel}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select your skill level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SKILL_LEVELS.map(level => (
+                        <SelectItem key={level} value={level}>{level}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="bio">Bio</Label>
+                  <Textarea
+                    id="bio"
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value.slice(0, 200))}
+                    placeholder="Tell others about yourself..."
+                    rows={3}
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {bio.length}/200
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone (optional)</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="Your phone number"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="lookingForTeam">Looking for a team</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Let others know you're available
+                    </p>
+                  </div>
+                  <Switch
+                    id="lookingForTeam"
+                    checked={isLookingForTeam}
+                    onCheckedChange={setIsLookingForTeam}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Preferred Play Times</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {PLAY_TIMES.map(time => (
+                      <Button
+                        key={time}
+                        type="button"
+                        variant={preferredPlayTimes.includes(time) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => togglePlayTime(time)}
+                        className="justify-start"
+                      >
+                        {time}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <Button onClick={handleSaveProfile} disabled={isSaving} className="w-full">
                   {isSaving ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
@@ -299,22 +428,34 @@ export default function ProfilePage() {
                         </p>
                       </div>
                       <Button asChild variant="outline">
-                        <Link to="/leaderboard">View Ladder</Link>
+                        <Link to="/ladders">View Ladder</Link>
                       </Button>
                     </div>
-                    {!userTeam.is_captain && (
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        onClick={handleLeaveTeam}
-                        disabled={isLeavingTeam}
-                      >
-                        {isLeavingTeam ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : null}
-                        Leave Team
-                      </Button>
-                    )}
+                    
+                    <div className="flex gap-2">
+                      {userTeam.is_captain && (
+                        <Button 
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setInviteDialogOpen(true)}
+                        >
+                          Invite Partner
+                        </Button>
+                      )}
+                      {!userTeam.is_captain && (
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={handleLeaveTeam}
+                          disabled={isLeavingTeam}
+                        >
+                          {isLeavingTeam ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : null}
+                          Leave Team
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-4">
@@ -334,7 +475,9 @@ export default function ProfilePage() {
                   <Trophy className="w-5 h-5" />
                   Match History
                 </CardTitle>
-                <CardDescription>Your recent matches</CardDescription>
+                <CardDescription>
+                  Your recent matches • <Link to="/stats" className="text-accent hover:underline">View detailed stats</Link>
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {matchHistory.length === 0 ? (
@@ -368,6 +511,17 @@ export default function ProfilePage() {
           </div>
         </motion.div>
       </main>
+
+      {/* Invite Dialog */}
+      {userTeam && (
+        <InvitePartnerDialog
+          open={inviteDialogOpen}
+          onOpenChange={setInviteDialogOpen}
+          teamId={userTeam.id}
+          teamName={userTeam.name}
+          onInviteSent={fetchData}
+        />
+      )}
     </div>
   );
 }

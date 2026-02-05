@@ -286,6 +286,18 @@ export default function Dashboard() {
               </Card>
             </Link>
 
+            <Link to="/players">
+              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-accent" />
+                    Find Players
+                  </CardTitle>
+                  <CardDescription>Discover players and build your team</CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+
             <Link to="/americano">
               <Card className="hover:border-success/50 transition-colors cursor-pointer h-full">
                 <CardHeader>
@@ -306,6 +318,18 @@ export default function Dashboard() {
                     Tournaments
                   </CardTitle>
                   <CardDescription>Bracket-based competitions</CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+
+            <Link to="/stats">
+              <Card className="hover:border-accent/50 transition-colors cursor-pointer h-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-accent" />
+                    My Stats
+                  </CardTitle>
+                  <CardDescription>View your performance analytics</CardDescription>
                 </CardHeader>
               </Card>
             </Link>
