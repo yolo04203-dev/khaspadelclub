@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trophy, IndianRupee, Plus, Trash2, Tag, MapPin } from "lucide-react";
+import { ArrowLeft, Trophy, Banknote, Plus, Trash2, Tag, MapPin } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -341,7 +341,7 @@ export default function TournamentCreate() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <IndianRupee className="w-5 h-5" />
+                  <Banknote className="w-5 h-5" />
                   Entry Fee
                 </CardTitle>
                 <CardDescription>Set the entry fee for participating teams</CardDescription>
