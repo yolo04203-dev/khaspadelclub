@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { Navigate, Link } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
-import { LogOut, User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers, Bell, X } from "lucide-react";
+import { motion } from "framer-motion";
+import { User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Logo } from "@/components/Logo";
+import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 interface UserTeam {
   id: string;
@@ -33,7 +32,6 @@ export default function Dashboard() {
     pendingChallenges: 0,
   });
   const [incomingChallenges, setIncomingChallenges] = useState(0);
-  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   useEffect(() => {
     const fetchUserTeamAndStats = async () => {
@@ -136,26 +134,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container flex items-center justify-between h-16">
-          <Link to="/">
-            <Logo size="sm" />
-          </Link>
-
-          <div className="flex items-center gap-4">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-foreground">
-                {user.user_metadata?.display_name || user.email?.split("@")[0]}
-              </p>
-              <p className="text-xs text-muted-foreground capitalize">{role || "Player"}</p>
-            </div>
-            <Button variant="ghost" size="icon" onClick={signOut}>
-              <LogOut className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
       {/* Main Content */}
       <main className="container py-8">
@@ -174,45 +153,6 @@ export default function Dashboard() {
                 : "View your rankings and challenge other players"}
             </p>
           </div>
-
-          {/* Challenge Notification Banner */}
-          <AnimatePresence>
-            {incomingChallenges > 0 && !bannerDismissed && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3 }}
-                className="mb-8"
-              >
-                <Alert className="bg-gradient-to-r from-warning/20 to-accent/20 border-warning/50">
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-warning/30 flex items-center justify-center">
-                        <Bell className="w-5 h-5 text-warning animate-pulse" />
-                      </div>
-                      <AlertDescription className="text-foreground font-medium">
-                        You have <span className="font-bold text-warning">{incomingChallenges}</span> incoming {incomingChallenges === 1 ? "challenge" : "challenges"} awaiting your response!
-                      </AlertDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button asChild size="sm" variant="default">
-                        <Link to="/challenges">View Challenges</Link>
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        onClick={() => setBannerDismissed(true)}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </Alert>
-              </motion.div>
-            )}
-          </AnimatePresence>
 
           {/* Team Status Card */}
           {!teamLoading && (

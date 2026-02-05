@@ -553,6 +553,7 @@ export type Database = {
           sets_won_challenger: number | null
           status: Database["public"]["Enums"]["match_status"]
           updated_at: string
+          venue: string | null
           winner_team_id: string | null
         }
         Insert: {
@@ -571,6 +572,7 @@ export type Database = {
           sets_won_challenger?: number | null
           status?: Database["public"]["Enums"]["match_status"]
           updated_at?: string
+          venue?: string | null
           winner_team_id?: string | null
         }
         Update: {
@@ -589,6 +591,7 @@ export type Database = {
           sets_won_challenger?: number | null
           status?: Database["public"]["Enums"]["match_status"]
           updated_at?: string
+          venue?: string | null
           winner_team_id?: string | null
         }
         Relationships: [

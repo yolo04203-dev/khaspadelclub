@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Trophy, Users, Calendar, ArrowLeft, Crown, Banknote } from "lucide-react";
+import { Plus, Trophy, Users, Calendar, Crown, Banknote } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Logo } from "@/components/Logo";
+import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -88,26 +88,19 @@ export default function Tournaments() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card">
-        <div className="container flex items-center justify-between h-16">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" asChild>
-              <Link to="/dashboard">
-                <ArrowLeft className="w-4 h-4" />
-              </Link>
-            </Button>
-            <Logo size="sm" />
-          </div>
-          {role === "admin" && (
+      <AppHeader 
+        showBack 
+        actions={
+          role === "admin" && (
             <Button asChild>
               <Link to="/tournaments/create">
                 <Plus className="w-4 h-4 mr-2" />
                 New Tournament
               </Link>
             </Button>
-          )}
-        </div>
-      </header>
+          )
+        }
+      />
 
       <main className="container py-8">
         <motion.div
