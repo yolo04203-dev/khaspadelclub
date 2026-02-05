@@ -20,6 +20,7 @@ interface CategoryInput {
   name: string;
   description: string;
   maxTeams: number;
+  entryFee: number;
 }
 
 export default function TournamentCreate() {
@@ -45,16 +46,19 @@ export default function TournamentCreate() {
   const [categories, setCategories] = useState<CategoryInput[]>([]);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryMaxTeams, setNewCategoryMaxTeams] = useState(8);
+  const [newCategoryEntryFee, setNewCategoryEntryFee] = useState<number>(0);
 
   const addCategory = () => {
     if (!newCategoryName.trim()) return;
     setCategories([...categories, { 
       name: newCategoryName.trim(), 
       description: "", 
-      maxTeams: newCategoryMaxTeams 
+      maxTeams: newCategoryMaxTeams,
+      entryFee: newCategoryEntryFee,
     }]);
     setNewCategoryName("");
     setNewCategoryMaxTeams(8);
+    setNewCategoryEntryFee(0);
   };
 
   const removeCategory = (index: number) => {
@@ -102,6 +106,7 @@ export default function TournamentCreate() {
           name: cat.name,
           description: cat.description || null,
           max_teams: cat.maxTeams,
+          entry_fee: cat.entryFee,
           display_order: index,
         }));
 
@@ -289,6 +294,11 @@ export default function TournamentCreate() {
                           <span className="text-sm text-muted-foreground">
                             Max {cat.maxTeams} teams
                           </span>
+                          {cat.entryFee > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              PKR {cat.entryFee.toLocaleString()}
+                            </Badge>
+                          )}
                         </div>
                         <Button
                           type="button"
@@ -304,32 +314,51 @@ export default function TournamentCreate() {
                   </div>
                 )}
 
-                <div className="flex gap-2">
-                  <div className="flex-1">
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <Input
+                        placeholder="Category name (e.g., Men's A)"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addCategory();
+                          }
+                        }}
+                      />
+                    </div>
                     <Input
-                      placeholder="Category name (e.g., Men's A)"
-                      value={newCategoryName}
-                      onChange={(e) => setNewCategoryName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addCategory();
-                        }
-                      }}
+                      type="number"
+                      className="w-24"
+                      min={2}
+                      max={64}
+                      value={newCategoryMaxTeams}
+                      onChange={(e) => setNewCategoryMaxTeams(parseInt(e.target.value) || 8)}
+                      placeholder="Max teams"
                     />
                   </div>
-                  <Input
-                    type="number"
-                    className="w-24"
-                    min={2}
-                    max={64}
-                    value={newCategoryMaxTeams}
-                    onChange={(e) => setNewCategoryMaxTeams(parseInt(e.target.value) || 8)}
-                    placeholder="Max"
-                  />
-                  <Button type="button" variant="outline" onClick={addCategory}>
-                    <Plus className="w-4 h-4" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                        PKR
+                      </span>
+                      <Input
+                        type="number"
+                        min={0}
+                        step={100}
+                        value={newCategoryEntryFee}
+                        onChange={(e) => setNewCategoryEntryFee(parseFloat(e.target.value) || 0)}
+                        placeholder="Entry fee (optional)"
+                        className="pl-12"
+                      />
+                    </div>
+                    <Button type="button" variant="outline" onClick={addCategory}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add
+                    </Button>
+                  </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Leave empty for a single-category tournament. Each category will have its own groups and knockout bracket.
