@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock, DollarSign, Tag, Info, MapPin, Calendar, FileText } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock, Banknote, Tag, Info, MapPin, Calendar, FileText } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -771,8 +771,8 @@ export default function TournamentDetail() {
                     <p className="font-medium">Registration is open</p>
                     {tournament.entry_fee > 0 && (
                       <Badge variant="outline" className="text-xs">
-                        <DollarSign className="w-3 h-3 mr-1" />
-                        {tournament.entry_fee_currency} {tournament.entry_fee.toLocaleString()}
+                        <Banknote className="w-3 h-3 mr-1" />
+                        PKR {tournament.entry_fee.toLocaleString()}
                       </Badge>
                     )}
                   </div>
@@ -882,7 +882,7 @@ export default function TournamentDetail() {
               {isAdmin && <TabsTrigger value="manage"><Settings className="w-4 h-4 mr-2" />Manage</TabsTrigger>}
               {isAdmin && <TabsTrigger value="categories"><Tag className="w-4 h-4 mr-2" />Categories</TabsTrigger>}
               {isAdmin && tournament.entry_fee > 0 && (
-                <TabsTrigger value="payments"><DollarSign className="w-4 h-4 mr-2" />Payments</TabsTrigger>
+                <TabsTrigger value="payments"><Banknote className="w-4 h-4 mr-2" />Payments</TabsTrigger>
               )}
               <TabsTrigger value="groups">Groups</TabsTrigger>
               <TabsTrigger value="matches">Matches</TabsTrigger>
@@ -987,11 +987,11 @@ export default function TournamentDetail() {
                   {tournament.entry_fee > 0 && (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        <DollarSign className="w-4 h-4" />
+                        <Banknote className="w-4 h-4" />
                         Entry Fee
                       </div>
                       <p className="text-foreground font-semibold">
-                        {tournament.entry_fee_currency} {tournament.entry_fee.toLocaleString()}
+                        PKR {tournament.entry_fee.toLocaleString()}
                       </p>
                       {tournament.payment_instructions && (
                         <div className="p-3 rounded-lg bg-muted/50 border border-border mt-2">

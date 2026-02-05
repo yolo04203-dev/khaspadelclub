@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { DollarSign, Check, X, FileText, Filter } from "lucide-react";
+import { Banknote, Check, X, FileText, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -112,8 +112,8 @@ export function PaymentManagement({
     }
   };
 
-  const formatCurrency = (amount: number, currency: string) => {
-    return `${currency} ${amount.toLocaleString()}`;
+  const formatCurrency = (amount: number) => {
+    return `PKR ${amount.toLocaleString()}`;
   };
 
   const getStatusBadge = (status: string) => {
@@ -156,7 +156,7 @@ export function PaymentManagement({
         <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5">
           <CardContent className="pt-6">
             <div className="text-2xl font-bold text-emerald-500">
-              {formatCurrency(totalCollected, entryFeeCurrency)}
+              {formatCurrency(totalCollected)}
             </div>
             <p className="text-sm text-muted-foreground">Total Collected</p>
           </CardContent>
@@ -169,11 +169,11 @@ export function PaymentManagement({
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5" />
+                <Banknote className="w-5 h-5" />
                 Payment Tracking
               </CardTitle>
               <CardDescription>
-                Entry fee: {formatCurrency(entryFee, entryFeeCurrency)} per team
+                Entry fee: {formatCurrency(entryFee)} per team
               </CardDescription>
             </div>
             <Select value={filter} onValueChange={(v) => setFilter(v as any)}>
