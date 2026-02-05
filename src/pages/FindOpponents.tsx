@@ -8,7 +8,10 @@ import {
   Swords, 
   Send,
   Users,
-  Snowflake
+  Snowflake,
+  TrendingUp,
+  TrendingDown,
+  Minus
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,6 +19,7 @@ import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -37,6 +41,10 @@ interface LadderMembership {
   ladder_id: string;
   ladder_name: string;
   challenge_range: number;
+  wins: number;
+  losses: number;
+  streak: number;
+  points: number;
 }
 
 interface ChallengeableTeam {
@@ -113,6 +121,10 @@ export default function FindOpponents() {
           .select(`
             id,
             rank,
+            wins,
+            losses,
+            streak,
+            points,
             ladder_category_id,
             ladder_categories!inner (
               id,
@@ -140,6 +152,10 @@ export default function FindOpponents() {
           ladder_id: r.ladder_categories.ladder_id,
           ladder_name: r.ladder_categories.ladders.name,
           challenge_range: r.ladder_categories.challenge_range,
+          wins: r.wins ?? 0,
+          losses: r.losses ?? 0,
+          streak: r.streak ?? 0,
+          points: r.points ?? 1000,
         }));
 
         setLadderMemberships(memberships);
@@ -352,20 +368,73 @@ export default function FindOpponents() {
                 ))}
               </TabsList>
 
-              {ladderMemberships.map((membership) => (
+              {ladderMemberships.map((membership) => {
+                const totalMatches = membership.wins + membership.losses;
+                const winRate = totalMatches > 0 ? Math.round((membership.wins / totalMatches) * 100) : 0;
+                
+                return (
                 <TabsContent key={membership.ladder_category_id} value={membership.ladder_category_id}>
+                  {/* Stats Card */}
                   <Card className="mb-4">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-lg flex items-center gap-2">
                         {membership.category_name}
                         <Badge variant="outline">
-                          Your Rank: #{membership.rank}
+                          Rank #{membership.rank}
                         </Badge>
                       </CardTitle>
-                      <CardDescription>
-                        You can challenge teams ranked #{Math.max(1, membership.rank - membership.challenge_range)} - #{membership.rank - 1}
-                      </CardDescription>
                     </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                        <div className="text-center p-3 rounded-lg bg-accent/10">
+                          <div className="text-2xl font-bold text-accent">{membership.wins}</div>
+                          <div className="text-xs text-muted-foreground">Wins</div>
+                        </div>
+                        <div className="text-center p-3 rounded-lg bg-destructive/10">
+                          <div className="text-2xl font-bold text-destructive">{membership.losses}</div>
+                          <div className="text-xs text-muted-foreground">Losses</div>
+                        </div>
+                        <div className="text-center p-3 rounded-lg bg-muted">
+                          <div className="text-2xl font-bold text-foreground flex items-center justify-center gap-1">
+                            {membership.streak > 0 ? (
+                              <>
+                                <TrendingUp className="w-4 h-4 text-accent" />
+                                {membership.streak}
+                              </>
+                            ) : membership.streak < 0 ? (
+                              <>
+                                <TrendingDown className="w-4 h-4 text-destructive" />
+                                {Math.abs(membership.streak)}
+                              </>
+                            ) : (
+                              <>
+                                <Minus className="w-4 h-4" />
+                                0
+                              </>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground">Streak</div>
+                        </div>
+                        <div className="text-center p-3 rounded-lg bg-primary/10">
+                          <div className="text-2xl font-bold text-primary">{membership.points}</div>
+                          <div className="text-xs text-muted-foreground">Points</div>
+                        </div>
+                      </div>
+                      
+                      {totalMatches > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Win Rate</span>
+                            <span className="font-medium">{winRate}%</span>
+                          </div>
+                          <Progress value={winRate} className="h-2" />
+                        </div>
+                      )}
+                      
+                      <p className="text-sm text-muted-foreground mt-4">
+                        You can challenge teams ranked #{Math.max(1, membership.rank - membership.challenge_range)} - #{membership.rank - 1}
+                      </p>
+                    </CardContent>
                   </Card>
 
                   {challengeableTeams[membership.ladder_category_id]?.length === 0 ? (
@@ -439,7 +508,8 @@ export default function FindOpponents() {
                     </div>
                   )}
                 </TabsContent>
-              ))}
+              );
+              })}
             </Tabs>
           )}
         </motion.div>
