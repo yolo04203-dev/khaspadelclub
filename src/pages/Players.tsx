@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search, Users, Filter, User, Loader2 } from "lucide-react";
+import { Search, Users, Filter, User, Loader2, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppHeader } from "@/components/AppHeader";
@@ -25,6 +25,7 @@ interface Player {
   skill_level: string | null;
   bio: string | null;
   is_looking_for_team: boolean;
+  preferred_play_times: string[] | null;
   team_id: string | null;
   team_name: string | null;
   team_is_recruiting: boolean;
@@ -48,7 +49,7 @@ export default function Players() {
         // Fetch all profiles
         let query = supabase
           .from("profiles")
-          .select("user_id, display_name, avatar_url, skill_level, bio, is_looking_for_team")
+          .select("user_id, display_name, avatar_url, skill_level, bio, is_looking_for_team, preferred_play_times")
           .neq("user_id", user?.id || "");
 
         if (searchQuery) {
@@ -90,6 +91,7 @@ export default function Players() {
             const teamInfo = teamId ? teamsMap.get(teamId) : null;
             return {
               ...p,
+              preferred_play_times: p.preferred_play_times || null,
               team_id: teamId,
               team_name: teamInfo?.name || null,
               team_is_recruiting: teamInfo?.is_recruiting || false,
@@ -258,6 +260,17 @@ export default function Players() {
                             <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
                               {player.bio}
                             </p>
+                          )}
+
+                          {player.preferred_play_times && player.preferred_play_times.length > 0 && (
+                            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                              {player.preferred_play_times.map((time) => (
+                                <Badge key={time} variant="outline" className="text-xs">
+                                  {time}
+                                </Badge>
+                              ))}
+                            </div>
                           )}
                         </div>
 
