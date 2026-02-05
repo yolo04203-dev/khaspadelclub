@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Navigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers } from "lucide-react";
@@ -8,6 +8,9 @@ import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StatsCardSkeleton, DashboardCardSkeleton, TeamCardSkeleton } from "@/components/ui/skeleton-card";
+import { PullToRefresh } from "@/components/ui/pull-to-refresh";
+import { FAB, FABContainer } from "@/components/ui/fab";
 interface UserTeam {
   id: string;
   name: string;
@@ -120,10 +123,97 @@ export default function Dashboard() {
     ? Math.round((stats.wins / stats.matchesPlayed) * 100) 
     : 0;
 
+  const handleRefresh = useCallback(async () => {
+    // Re-fetch data by re-running the effect
+    if (user) {
+      const fetchData = async () => {
+        try {
+          const { data: memberData } = await supabase
+            .from("team_members")
+            .select("team_id")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+          if (memberData?.team_id) {
+            const { data: teamData } = await supabase
+              .from("teams")
+              .select("id, name")
+              .eq("id", memberData.team_id)
+              .single();
+
+            const { data: rankData } = await supabase
+              .from("ladder_rankings")
+              .select("rank, wins, losses")
+              .eq("team_id", memberData.team_id)
+              .maybeSingle();
+
+            if (teamData) {
+              setUserTeam({
+                id: teamData.id,
+                name: teamData.name,
+                rank: rankData?.rank || null,
+              });
+            }
+
+            const teamId = memberData.team_id;
+            const { count: matchesCount } = await supabase
+              .from("matches")
+              .select("*", { count: "exact", head: true })
+              .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+              .eq("status", "completed");
+
+            const { count: pendingCount } = await supabase
+              .from("challenges")
+              .select("*", { count: "exact", head: true })
+              .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+              .eq("status", "pending");
+
+            const { count: incomingCount } = await supabase
+              .from("challenges")
+              .select("*", { count: "exact", head: true })
+              .eq("challenged_team_id", teamId)
+              .eq("status", "pending");
+
+            setIncomingChallenges(incomingCount || 0);
+            setStats({
+              matchesPlayed: matchesCount || 0,
+              wins: rankData?.wins || 0,
+              losses: rankData?.losses || 0,
+              pendingChallenges: pendingCount || 0,
+            });
+          }
+        } catch (error) {
+          console.error("Error refreshing data:", error);
+        }
+      };
+      await fetchData();
+    }
+  }, [user]);
+
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-background">
+        <AppHeader />
+        <main className="container py-6 sm:py-8">
+          <div className="mb-6 sm:mb-8">
+            <div className="h-8 w-64 bg-muted rounded animate-pulse mb-2" />
+            <div className="h-4 w-48 bg-muted rounded animate-pulse" />
+          </div>
+          <div className="mb-8">
+            <TeamCardSkeleton />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+            <StatsCardSkeleton />
+            <StatsCardSkeleton />
+            <StatsCardSkeleton />
+            <StatsCardSkeleton />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <DashboardCardSkeleton />
+            <DashboardCardSkeleton />
+            <DashboardCardSkeleton />
+          </div>
+        </main>
       </div>
     );
   }
@@ -136,23 +226,37 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       <AppHeader />
 
-      {/* Main Content */}
-      <main className="container py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+      {/* Mobile FAB for quick challenge */}
+      <FABContainer show={!!userTeam}>
+        <FAB
+          icon={<Swords />}
+          label="Challenge"
+          showLabel
+          position="bottom-right"
+          asChild
         >
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-foreground">
-              Welcome, {user.user_metadata?.display_name || user.email?.split("@")[0]}!
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              {role === "admin"
-                ? "Manage your academy from the admin dashboard"
-                : "View your rankings and challenge other players"}
-            </p>
-          </div>
+          <Link to="/challenges" />
+        </FAB>
+      </FABContainer>
+
+      {/* Main Content */}
+      <PullToRefresh onRefresh={handleRefresh} className="min-h-[calc(100vh-4rem)]">
+        <main className="container py-6 sm:py-8 pb-24 sm:pb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <div className="mb-6 sm:mb-8">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+                Welcome, {user.user_metadata?.display_name || user.email?.split("@")[0]}!
+              </h1>
+              <p className="text-sm sm:text-base text-muted-foreground mt-2">
+                {role === "admin"
+                  ? "Manage your academy from the admin dashboard"
+                  : "View your rankings and challenge other players"}
+              </p>
+            </div>
 
           {/* Team Status Card */}
           {!teamLoading && (
@@ -362,6 +466,7 @@ export default function Dashboard() {
           </div>
         </motion.div>
       </main>
+    </PullToRefresh>
     </div>
   );
 }

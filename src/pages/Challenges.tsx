@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -15,7 +15,8 @@ import {
   Calendar,
   MapPin,
   History,
-  AlertCircle
+  AlertCircle,
+  Search
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -32,6 +33,9 @@ import { ScheduleMatchDialog } from "@/components/challenges/ScheduleMatchDialog
 import { DeclineReasonDialog } from "@/components/challenges/DeclineReasonDialog";
 import { ChallengeHistoryTab } from "@/components/challenges/ChallengeHistoryTab";
 import { ScoreConfirmationCard } from "@/components/challenges/ScoreConfirmationCard";
+import { ChallengeCardSkeleton } from "@/components/ui/skeleton-card";
+import { PullToRefresh } from "@/components/ui/pull-to-refresh";
+import { FAB, FABContainer } from "@/components/ui/fab";
 import { isFuture, format } from "date-fns";
 
 interface Challenge {
@@ -657,10 +661,27 @@ export default function Challenges() {
       : challenge.challenger_team?.name;
   };
 
+  const handleRefresh = useCallback(async () => {
+    if (userTeam) {
+      await fetchChallenges(userTeam.id);
+    }
+  }, [userTeam]);
+
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background">
+        <AppHeader showBack />
+        <main className="container py-6 sm:py-8 max-w-2xl">
+          <div className="mb-6 sm:mb-8 text-center">
+            <div className="h-8 w-40 bg-muted rounded mx-auto mb-2 animate-pulse" />
+            <div className="h-4 w-64 bg-muted rounded mx-auto animate-pulse" />
+          </div>
+          <div className="space-y-3">
+            <ChallengeCardSkeleton />
+            <ChallengeCardSkeleton />
+            <ChallengeCardSkeleton />
+          </div>
+        </main>
       </div>
     );
   }
@@ -671,7 +692,7 @@ export default function Challenges() {
         showBack 
         actions={
           userTeam && (
-            <Button asChild>
+            <Button asChild className="hidden sm:inline-flex">
               <Link to="/find-opponents">
                 <Swords className="w-4 h-4 mr-2" />
                 Find Opponents
@@ -681,19 +702,33 @@ export default function Challenges() {
         }
       />
 
-      {/* Main Content */}
-      <main className="container py-8 max-w-2xl">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+      {/* Mobile FAB for finding opponents */}
+      <FABContainer show={!!userTeam}>
+        <FAB
+          icon={<Search />}
+          label="Find Opponents"
+          showLabel
+          position="bottom-right"
+          asChild
         >
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-foreground mb-2">Challenges</h1>
-            <p className="text-muted-foreground">
-              Manage your incoming and outgoing ladder challenges
-            </p>
-          </div>
+          <Link to="/find-opponents" />
+        </FAB>
+      </FABContainer>
+
+      {/* Main Content */}
+      <PullToRefresh onRefresh={handleRefresh} className="min-h-[calc(100vh-4rem)]">
+        <main className="container py-6 sm:py-8 max-w-2xl pb-24 sm:pb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+          >
+            <div className="mb-6 sm:mb-8 text-center">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Challenges</h1>
+              <p className="text-sm sm:text-base text-muted-foreground">
+                Manage your incoming and outgoing ladder challenges
+              </p>
+            </div>
 
           {/* Frozen Team Banner */}
           {isTeamFrozen && userTeam && (
@@ -1057,6 +1092,7 @@ export default function Challenges() {
           )}
         </motion.div>
       </main>
+    </PullToRefresh>
 
       {/* Score Dialog */}
       <SetScoreDialog
