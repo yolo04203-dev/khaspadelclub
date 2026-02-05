@@ -22,7 +22,7 @@ interface Tournament {
 }
 
 export default function Tournaments() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, role, isLoading: authLoading } = useAuth();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -98,7 +98,7 @@ export default function Tournaments() {
             </Button>
             <Logo size="sm" />
           </div>
-          {user && (
+          {role === "admin" && (
             <Button asChild>
               <Link to="/tournaments/create">
                 <Plus className="w-4 h-4 mr-2" />
@@ -164,7 +164,7 @@ export default function Tournaments() {
                   <p className="text-sm text-muted-foreground mb-4">
                     Create your first tournament to get started
                   </p>
-                  {user && (
+                  {role === "admin" && (
                     <Button asChild>
                       <Link to="/tournaments/create">
                         <Plus className="w-4 h-4 mr-2" />

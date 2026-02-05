@@ -24,7 +24,7 @@ interface CategoryInput {
 }
 
 export default function TournamentCreate() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, role, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -139,6 +139,31 @@ export default function TournamentCreate() {
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  if (role !== "admin") {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b border-border bg-card">
+          <div className="container flex items-center h-16">
+            <Button variant="ghost" size="icon" asChild>
+              <Link to="/tournaments">
+                <ArrowLeft className="w-4 h-4" />
+              </Link>
+            </Button>
+            <Logo size="sm" className="ml-4" />
+          </div>
+        </header>
+        <main className="container py-8">
+          <Card className="text-center py-12">
+            <CardContent>
+              <h2 className="text-xl font-semibold">Access Denied</h2>
+              <p className="text-muted-foreground mt-2">Only administrators can create tournaments.</p>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
   }
 
   return (
