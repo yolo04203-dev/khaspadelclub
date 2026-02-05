@@ -370,6 +370,58 @@ export default function LadderDetail() {
 
   useEffect(() => {
     fetchLadderData();
+
+    // Subscribe to realtime changes for rankings, challenges, and teams
+    const rankingsChannel = supabase
+      .channel(`ladder-${id}-rankings`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ladder_rankings',
+        },
+        () => {
+          fetchLadderData();
+        }
+      )
+      .subscribe();
+
+    const challengesChannel = supabase
+      .channel(`ladder-${id}-challenges`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'challenges',
+        },
+        () => {
+          fetchLadderData();
+        }
+      )
+      .subscribe();
+
+    const teamsChannel = supabase
+      .channel(`ladder-${id}-teams`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'teams',
+        },
+        () => {
+          fetchLadderData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(rankingsChannel);
+      supabase.removeChannel(challengesChannel);
+      supabase.removeChannel(teamsChannel);
+    };
   }, [id, user]);
 
   if (isLoading) {
