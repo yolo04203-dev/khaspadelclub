@@ -1030,6 +1030,7 @@ export default function Challenges() {
                                     isDisputed={challenge.score_disputed || false}
                                     disputeReason={challenge.dispute_reason || null}
                                     userTeamId={userTeam?.id || ""}
+                                    ladderCategoryId={challenge.ladder_category?.id}
                                     onConfirmed={() => {
                                       if (userTeam) fetchChallenges(userTeam.id);
                                     }}
