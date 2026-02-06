@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Trophy, Plus, Users, Layers } from "lucide-react";
@@ -8,6 +7,12 @@ import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useAsyncData } from "@/hooks/useAsyncData";
+import { ErrorState } from "@/components/ui/error-state";
+import { EmptyState } from "@/components/ui/empty-state";
+import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
+import { safeArray } from "@/lib/safeData";
+import { logger } from "@/lib/logger";
 
 interface LadderCategory {
   id: string;
@@ -24,63 +29,62 @@ interface Ladder {
   teamCount: number;
 }
 
-export default function Ladders() {
-  const { user, role } = useAuth();
-  const [ladders, setLadders] = useState<Ladder[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+async function fetchLaddersData(): Promise<Ladder[]> {
+  // Fetch all ladders
+  const { data: laddersData, error: laddersError } = await supabase
+    .from("ladders")
+    .select("*")
+    .order("created_at", { ascending: false });
 
-  useEffect(() => {
-    const fetchLadders = async () => {
-      try {
-        // Fetch all ladders
-        const { data: laddersData, error: laddersError } = await supabase
-          .from("ladders")
-          .select("*")
-          .order("created_at", { ascending: false });
+  if (laddersError) {
+    logger.error("Error fetching ladders", laddersError);
+    throw new Error("Failed to load ladders. Please try again.");
+  }
 
-        if (laddersError) throw laddersError;
+  // Fetch categories for each ladder
+  const { data: categoriesData, error: categoriesError } = await supabase
+    .from("ladder_categories")
+    .select("*")
+    .order("display_order", { ascending: true });
 
-        // Fetch categories for each ladder
-        const { data: categoriesData, error: categoriesError } = await supabase
-          .from("ladder_categories")
-          .select("*")
-          .order("display_order", { ascending: true });
+  if (categoriesError) {
+    logger.error("Error fetching categories", categoriesError);
+    throw new Error("Failed to load ladder categories.");
+  }
 
-        if (categoriesError) throw categoriesError;
+  // Fetch team counts per category
+  const { data: rankingsData } = await supabase
+    .from("ladder_rankings")
+    .select("ladder_category_id")
+    .not("ladder_category_id", "is", null);
 
-        // Fetch team counts per category
-        const { data: rankingsData } = await supabase
-          .from("ladder_rankings")
-          .select("ladder_category_id")
-          .not("ladder_category_id", "is", null);
+  // Build ladder objects with categories and team counts
+  const laddersWithCategories: Ladder[] = safeArray(laddersData).map((ladder) => {
+    const categories = safeArray(categoriesData).filter(
+      (cat) => cat.ladder_id === ladder.id
+    );
+    const categoryIds = categories.map((c) => c.id);
+    const teamCount = safeArray(rankingsData).filter((r) =>
+      categoryIds.includes(r.ladder_category_id)
+    ).length;
 
-        // Build ladder objects with categories and team counts
-        const laddersWithCategories: Ladder[] = (laddersData || []).map((ladder) => {
-          const categories = (categoriesData || []).filter(
-            (cat) => cat.ladder_id === ladder.id
-          );
-          const categoryIds = categories.map((c) => c.id);
-          const teamCount = (rankingsData || []).filter(
-            (r) => categoryIds.includes(r.ladder_category_id)
-          ).length;
-
-          return {
-            ...ladder,
-            categories,
-            teamCount,
-          };
-        });
-
-        setLadders(laddersWithCategories);
-      } catch (error) {
-        console.error("Error fetching ladders:", error);
-      } finally {
-        setIsLoading(false);
-      }
+    return {
+      ...ladder,
+      categories,
+      teamCount,
     };
+  });
 
-    fetchLadders();
-  }, []);
+  return laddersWithCategories;
+}
+
+function LaddersContent() {
+  const { role } = useAuth();
+  const { data: ladders, isLoading, error, retry, isRefreshing } = useAsyncData(
+    fetchLaddersData,
+    [],
+    { retryCount: 3, timeout: 15000 }
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -97,8 +101,8 @@ export default function Ladders() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader 
-        showBack 
+      <AppHeader
+        showBack
         actions={
           role === "admin" && (
             <Button asChild>
@@ -111,7 +115,6 @@ export default function Ladders() {
         }
       />
 
-      {/* Main Content */}
       <main className="container py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -120,16 +123,24 @@ export default function Ladders() {
         >
           {/* Page Header */}
           <div className="mb-8 text-center">
-            <h1 className="text-4xl font-bold text-foreground mb-2">
-              Ladders
-            </h1>
+            <h1 className="text-4xl font-bold text-foreground mb-2">Ladders</h1>
             <p className="text-muted-foreground">
               Compete in skill-based divisions and climb the rankings
             </p>
           </div>
 
-          {/* Ladders Grid */}
-          {isLoading ? (
+          {/* Error State */}
+          {error && (
+            <ErrorState
+              error={error}
+              onRetry={retry}
+              isRetrying={isRefreshing}
+              title="Couldn't load ladders"
+            />
+          )}
+
+          {/* Loading State */}
+          {isLoading && !error && (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {[1, 2, 3].map((i) => (
                 <Card key={i} className="animate-pulse">
@@ -143,29 +154,28 @@ export default function Ladders() {
                 </Card>
               ))}
             </div>
-          ) : ladders.length === 0 ? (
-            <Card className="text-center py-12">
-              <CardContent>
-                <Trophy className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  No ladders yet
-                </h3>
-                <p className="text-muted-foreground mb-4">
-                  {role === "admin"
-                    ? "Create your first ladder to get started!"
-                    : "Check back later for upcoming ladder competitions."}
-                </p>
-                {role === "admin" && (
-                  <Button asChild>
-                    <Link to="/ladders/create">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create Ladder
-                    </Link>
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
+          )}
+
+          {/* Empty State */}
+          {!isLoading && !error && ladders && ladders.length === 0 && (
+            <EmptyState
+              icon={Trophy}
+              title="No ladders yet"
+              description={
+                role === "admin"
+                  ? "Create your first ladder to get started!"
+                  : "Check back later for upcoming ladder competitions."
+              }
+              action={
+                role === "admin"
+                  ? { label: "Create Ladder", href: "/ladders/create" }
+                  : undefined
+              }
+            />
+          )}
+
+          {/* Ladders Grid */}
+          {!isLoading && !error && ladders && ladders.length > 0 && (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {ladders.map((ladder) => (
                 <Link key={ladder.id} to={`/ladders/${ladder.id}`}>
@@ -191,7 +201,8 @@ export default function Ladders() {
                         <div className="flex items-center gap-1">
                           <Layers className="w-4 h-4" />
                           <span>
-                            {ladder.categories.length} categor{ladder.categories.length === 1 ? "y" : "ies"}
+                            {ladder.categories.length} categor
+                            {ladder.categories.length === 1 ? "y" : "ies"}
                           </span>
                         </div>
                         <div className="flex items-center gap-1">
@@ -217,5 +228,13 @@ export default function Ladders() {
         </motion.div>
       </main>
     </div>
+  );
+}
+
+export default function Ladders() {
+  return (
+    <RouteErrorBoundary routeName="Ladders">
+      <LaddersContent />
+    </RouteErrorBoundary>
   );
 }

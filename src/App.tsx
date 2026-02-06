@@ -8,6 +8,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingScreen } from "@/components/ui/loading-screen";
+import { OfflineBanner, SlowConnectionBanner } from "@/components/ui/error-state";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { logger } from "@/lib/logger";
 
 // Eager load critical pages
@@ -38,6 +40,21 @@ const Admin = lazy(() => import("./pages/Admin"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Contact = lazy(() => import("./pages/Contact"));
+
+// Network status wrapper component
+function NetworkStatusProvider({ children }: { children: React.ReactNode }) {
+  const { isOnline, isSlowConnection } = useNetworkStatus();
+
+  return (
+    <>
+      <OfflineBanner isVisible={!isOnline} />
+      <SlowConnectionBanner isVisible={isOnline && isSlowConnection} />
+      <div className={!isOnline ? "pt-8" : isSlowConnection ? "pt-8" : ""}>
+        {children}
+      </div>
+    </>
+  );
+}
 
 // Configure QueryClient with production-ready settings
 const queryClient = new QueryClient({
@@ -118,40 +135,42 @@ const App = () => {
               <Toaster />
               <Sonner />
               <BrowserRouter>
-                <Suspense fallback={<LoadingScreen message="Loading page..." />}>
-                  <Routes>
-                    {/* Critical routes - eagerly loaded */}
-                    <Route path="/" element={<Index />} />
-                    <Route path="/auth" element={<Auth />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    
-                    {/* Lazy loaded routes */}
-                    <Route path="/ladders" element={<Ladders />} />
-                    <Route path="/ladders/create" element={<LadderCreate />} />
-                    <Route path="/ladders/:id" element={<LadderDetail />} />
-                    <Route path="/ladders/:id/manage" element={<LadderManage />} />
-                    <Route path="/teams/create" element={<CreateTeam />} />
-                    <Route path="/challenges" element={<Challenges />} />
-                    <Route path="/find-opponents" element={<FindOpponents />} />
-                    <Route path="/americano" element={<Americano />} />
-                    <Route path="/americano/create" element={<AmericanoCreate />} />
-                    <Route path="/americano/:id" element={<AmericanoSession />} />
-                    <Route path="/tournaments" element={<Tournaments />} />
-                    <Route path="/tournaments/create" element={<TournamentCreate />} />
-                    <Route path="/tournaments/:id" element={<TournamentDetail />} />
-                    <Route path="/profile" element={<Profile />} />
-                    <Route path="/players" element={<Players />} />
-                    <Route path="/players/:id" element={<PlayerProfile />} />
-                    <Route path="/stats" element={<Stats />} />
-                    <Route path="/admin" element={<Admin />} />
-                    <Route path="/privacy" element={<Privacy />} />
-                    <Route path="/terms" element={<Terms />} />
-                    <Route path="/contact" element={<Contact />} />
-                    
-                    {/* Catch-all 404 route */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </Suspense>
+                <NetworkStatusProvider>
+                  <Suspense fallback={<LoadingScreen message="Loading page..." />}>
+                    <Routes>
+                      {/* Critical routes - eagerly loaded */}
+                      <Route path="/" element={<Index />} />
+                      <Route path="/auth" element={<Auth />} />
+                      <Route path="/dashboard" element={<Dashboard />} />
+                      
+                      {/* Lazy loaded routes */}
+                      <Route path="/ladders" element={<Ladders />} />
+                      <Route path="/ladders/create" element={<LadderCreate />} />
+                      <Route path="/ladders/:id" element={<LadderDetail />} />
+                      <Route path="/ladders/:id/manage" element={<LadderManage />} />
+                      <Route path="/teams/create" element={<CreateTeam />} />
+                      <Route path="/challenges" element={<Challenges />} />
+                      <Route path="/find-opponents" element={<FindOpponents />} />
+                      <Route path="/americano" element={<Americano />} />
+                      <Route path="/americano/create" element={<AmericanoCreate />} />
+                      <Route path="/americano/:id" element={<AmericanoSession />} />
+                      <Route path="/tournaments" element={<Tournaments />} />
+                      <Route path="/tournaments/create" element={<TournamentCreate />} />
+                      <Route path="/tournaments/:id" element={<TournamentDetail />} />
+                      <Route path="/profile" element={<Profile />} />
+                      <Route path="/players" element={<Players />} />
+                      <Route path="/players/:id" element={<PlayerProfile />} />
+                      <Route path="/stats" element={<Stats />} />
+                      <Route path="/admin" element={<Admin />} />
+                      <Route path="/privacy" element={<Privacy />} />
+                      <Route path="/terms" element={<Terms />} />
+                      <Route path="/contact" element={<Contact />} />
+                      
+                      {/* Catch-all 404 route */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Suspense>
+                </NetworkStatusProvider>
               </BrowserRouter>
             </TooltipProvider>
           </NotificationProvider>
