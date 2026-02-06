@@ -7,13 +7,22 @@ export function Hero() {
   const navigate = useNavigate();
 
   const handleGetStarted = () => {
-    navigate("/auth");
+    try {
+      navigate("/auth");
+    } catch (error) {
+      console.error("Navigation error:", error);
+      window.location.href = "/auth";
+    }
   };
 
   const handleViewDemo = () => {
-    navigate("/ladders");
+    try {
+      navigate("/ladders");
+    } catch (error) {
+      console.error("Navigation error:", error);
+      window.location.href = "/ladders";
+    }
   };
-
   return (
     <section className="relative min-h-[90vh] flex items-center overflow-hidden">
       {/* Background gradient */}

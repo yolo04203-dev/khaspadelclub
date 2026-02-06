@@ -16,11 +16,21 @@ export function Header() {
 
   const handleNavigateToAuth = () => {
     setMobileMenuOpen(false);
-    navigate("/auth");
+    try {
+      navigate("/auth");
+    } catch (error) {
+      console.error("Navigation error:", error);
+      window.location.href = "/auth";
+    }
   };
 
   const handleNavigateHome = () => {
-    navigate("/");
+    try {
+      navigate("/");
+    } catch (error) {
+      console.error("Navigation error:", error);
+      window.location.href = "/";
+    }
   };
 
   return (
