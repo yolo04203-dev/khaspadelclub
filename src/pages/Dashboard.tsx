@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { StatsCardSkeleton, DashboardCardSkeleton, TeamCardSkeleton } from "@/components/ui/skeleton-card";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { FAB, FABContainer } from "@/components/ui/fab";
+import { logger } from "@/lib/logger";
+import { safeCount, safeString } from "@/lib/safeData";
 interface UserTeam {
   id: string;
   name: string;
@@ -36,6 +38,8 @@ export default function Dashboard() {
   });
   const [incomingChallenges, setIncomingChallenges] = useState(0);
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   useEffect(() => {
     const fetchUserTeamAndStats = async () => {
       if (!user) {
@@ -44,73 +48,83 @@ export default function Dashboard() {
       }
 
       try {
-        // Get team membership
-        const { data: memberData, error: memberError } = await supabase
+        setFetchError(null);
+        
+        // Get team membership with timeout
+        const memberPromise = supabase
           .from("team_members")
           .select("team_id")
           .eq("user_id", user.id)
           .maybeSingle();
 
-        if (memberError) throw memberError;
+        const { data: memberData, error: memberError } = await memberPromise;
+
+        if (memberError) {
+          logger.apiError("fetchTeamMember", memberError, { userId: user.id });
+          throw memberError;
+        }
 
         if (memberData?.team_id) {
-          // Get team details
-          const { data: teamData, error: teamError } = await supabase
-            .from("teams")
-            .select("id, name")
-            .eq("id", memberData.team_id)
-            .single();
+          // Parallel fetch for performance
+          const [teamResult, rankResult] = await Promise.all([
+            supabase
+              .from("teams")
+              .select("id, name")
+              .eq("id", memberData.team_id)
+              .maybeSingle(),
+            supabase
+              .from("ladder_rankings")
+              .select("rank, wins, losses")
+              .eq("team_id", memberData.team_id)
+              .maybeSingle(),
+          ]);
 
-          if (teamError) throw teamError;
+          if (teamResult.error) {
+            logger.apiError("fetchTeam", teamResult.error);
+            throw teamResult.error;
+          }
 
-          // Get team rank
-          const { data: rankData } = await supabase
-            .from("ladder_rankings")
-            .select("rank, wins, losses")
-            .eq("team_id", memberData.team_id)
-            .maybeSingle();
+          if (teamResult.data) {
+            setUserTeam({
+              id: teamResult.data.id,
+              name: safeString(teamResult.data.name, "Unknown Team"),
+              rank: rankResult.data?.rank ?? null,
+            });
+          }
 
-          setUserTeam({
-            id: teamData.id,
-            name: teamData.name,
-            rank: rankData?.rank || null,
-          });
-
-          // Fetch stats
+          // Fetch stats in parallel
           const teamId = memberData.team_id;
+          
+          const [matchesResult, pendingResult, incomingResult] = await Promise.all([
+            supabase
+              .from("matches")
+              .select("*", { count: "exact", head: true })
+              .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+              .eq("status", "completed"),
+            supabase
+              .from("challenges")
+              .select("*", { count: "exact", head: true })
+              .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+              .eq("status", "pending"),
+            supabase
+              .from("challenges")
+              .select("*", { count: "exact", head: true })
+              .eq("challenged_team_id", teamId)
+              .eq("status", "pending"),
+          ]);
 
-          // Matches played
-          const { count: matchesCount } = await supabase
-            .from("matches")
-            .select("*", { count: "exact", head: true })
-            .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
-            .eq("status", "completed");
-
-          // Pending challenges (incoming + outgoing)
-          const { count: pendingCount } = await supabase
-            .from("challenges")
-            .select("*", { count: "exact", head: true })
-            .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
-            .eq("status", "pending");
-
-          // Incoming challenges (challenges sent TO user's team - needs response)
-          const { count: incomingCount } = await supabase
-            .from("challenges")
-            .select("*", { count: "exact", head: true })
-            .eq("challenged_team_id", teamId)
-            .eq("status", "pending");
-
-          setIncomingChallenges(incomingCount || 0);
+          setIncomingChallenges(safeCount(incomingResult.count));
 
           setStats({
-            matchesPlayed: matchesCount || 0,
-            wins: rankData?.wins || 0,
-            losses: rankData?.losses || 0,
-            pendingChallenges: pendingCount || 0,
+            matchesPlayed: safeCount(matchesResult.count),
+            wins: rankResult.data?.wins ?? 0,
+            losses: rankResult.data?.losses ?? 0,
+            pendingChallenges: safeCount(pendingResult.count),
           });
         }
       } catch (error) {
-        console.error("Error fetching user team:", error);
+        logger.error("Error fetching dashboard data", error);
+        setFetchError("Failed to load dashboard data. Pull down to retry.");
       } finally {
         setTeamLoading(false);
       }
@@ -124,69 +138,72 @@ export default function Dashboard() {
     : 0;
 
   const handleRefresh = useCallback(async () => {
-    // Re-fetch data by re-running the effect
-    if (user) {
-      const fetchData = async () => {
-        try {
-          const { data: memberData } = await supabase
-            .from("team_members")
-            .select("team_id")
-            .eq("user_id", user.id)
-            .maybeSingle();
+    if (!user) return;
+    
+    try {
+      setFetchError(null);
+      
+      const { data: memberData } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-          if (memberData?.team_id) {
-            const { data: teamData } = await supabase
-              .from("teams")
-              .select("id, name")
-              .eq("id", memberData.team_id)
-              .single();
+      if (memberData?.team_id) {
+        const [teamResult, rankResult] = await Promise.all([
+          supabase
+            .from("teams")
+            .select("id, name")
+            .eq("id", memberData.team_id)
+            .maybeSingle(),
+          supabase
+            .from("ladder_rankings")
+            .select("rank, wins, losses")
+            .eq("team_id", memberData.team_id)
+            .maybeSingle(),
+        ]);
 
-            const { data: rankData } = await supabase
-              .from("ladder_rankings")
-              .select("rank, wins, losses")
-              .eq("team_id", memberData.team_id)
-              .maybeSingle();
-
-            if (teamData) {
-              setUserTeam({
-                id: teamData.id,
-                name: teamData.name,
-                rank: rankData?.rank || null,
-              });
-            }
-
-            const teamId = memberData.team_id;
-            const { count: matchesCount } = await supabase
-              .from("matches")
-              .select("*", { count: "exact", head: true })
-              .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
-              .eq("status", "completed");
-
-            const { count: pendingCount } = await supabase
-              .from("challenges")
-              .select("*", { count: "exact", head: true })
-              .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
-              .eq("status", "pending");
-
-            const { count: incomingCount } = await supabase
-              .from("challenges")
-              .select("*", { count: "exact", head: true })
-              .eq("challenged_team_id", teamId)
-              .eq("status", "pending");
-
-            setIncomingChallenges(incomingCount || 0);
-            setStats({
-              matchesPlayed: matchesCount || 0,
-              wins: rankData?.wins || 0,
-              losses: rankData?.losses || 0,
-              pendingChallenges: pendingCount || 0,
-            });
-          }
-        } catch (error) {
-          console.error("Error refreshing data:", error);
+        if (teamResult.data) {
+          setUserTeam({
+            id: teamResult.data.id,
+            name: safeString(teamResult.data.name, "Unknown Team"),
+            rank: rankResult.data?.rank ?? null,
+          });
         }
-      };
-      await fetchData();
+
+        const teamId = memberData.team_id;
+        
+        const [matchesResult, pendingResult, incomingResult] = await Promise.all([
+          supabase
+            .from("matches")
+            .select("*", { count: "exact", head: true })
+            .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+            .eq("status", "completed"),
+          supabase
+            .from("challenges")
+            .select("*", { count: "exact", head: true })
+            .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+            .eq("status", "pending"),
+          supabase
+            .from("challenges")
+            .select("*", { count: "exact", head: true })
+            .eq("challenged_team_id", teamId)
+            .eq("status", "pending"),
+        ]);
+
+        setIncomingChallenges(safeCount(incomingResult.count));
+        setStats({
+          matchesPlayed: safeCount(matchesResult.count),
+          wins: rankResult.data?.wins ?? 0,
+          losses: rankResult.data?.losses ?? 0,
+          pendingChallenges: safeCount(pendingResult.count),
+        });
+      }
+      
+      logger.debug("Dashboard data refreshed");
+    } catch (error) {
+      logger.error("Error refreshing dashboard data", error);
+      setFetchError("Failed to refresh. Try again.");
     }
   }, [user]);
 
