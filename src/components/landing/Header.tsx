@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/Logo";
@@ -12,15 +12,25 @@ const navLinks = [
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleNavigateToAuth = () => {
+    setMobileMenuOpen(false);
+    navigate("/auth");
+  };
+
+  const handleNavigateHome = () => {
+    navigate("/");
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border/50">
       <div className="container">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/">
+          <button onClick={handleNavigateHome} className="focus:outline-none">
             <Logo size="sm" />
-          </Link>
+          </button>
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-8">
@@ -37,11 +47,14 @@ export function Header() {
 
           {/* CTA buttons */}
           <div className="hidden md:flex items-center gap-4">
-            <Button variant="ghost" asChild>
-              <Link to="/auth">Sign In</Link>
+            <Button variant="ghost" onClick={handleNavigateToAuth}>
+              Sign In
             </Button>
-            <Button className="bg-accent text-accent-foreground hover:bg-accent/90" asChild>
-              <Link to="/auth">Get Started</Link>
+            <Button 
+              className="bg-accent text-accent-foreground hover:bg-accent/90" 
+              onClick={handleNavigateToAuth}
+            >
+              Get Started
             </Button>
           </div>
 
@@ -80,11 +93,14 @@ export function Header() {
                 </a>
               ))}
               <div className="pt-4 space-y-2 border-t border-border">
-                <Button variant="outline" className="w-full" asChild>
-                  <Link to="/auth">Sign In</Link>
+                <Button variant="outline" className="w-full" onClick={handleNavigateToAuth}>
+                  Sign In
                 </Button>
-                <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90" asChild>
-                  <Link to="/auth">Get Started</Link>
+                <Button 
+                  className="w-full bg-accent text-accent-foreground hover:bg-accent/90" 
+                  onClick={handleNavigateToAuth}
+                >
+                  Get Started
                 </Button>
               </div>
             </div>

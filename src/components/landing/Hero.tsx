@@ -1,9 +1,19 @@
 import { motion } from "framer-motion";
 import { ArrowRight, Trophy, Users, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 export function Hero() {
+  const navigate = useNavigate();
+
+  const handleGetStarted = () => {
+    navigate("/auth");
+  };
+
+  const handleViewDemo = () => {
+    navigate("/ladders");
+  };
+
   return (
     <section className="relative min-h-[90vh] flex items-center overflow-hidden">
       {/* Background gradient */}
@@ -54,19 +64,17 @@ export function Hero() {
               <Button 
                 size="lg" 
                 className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-glow"
-                asChild
+                onClick={handleGetStarted}
               >
-                <Link to="/auth">
-                  Get Started <ArrowRight className="w-4 h-4 ml-2" />
-                </Link>
+                Get Started <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
               <Button 
                 size="lg" 
                 variant="outline" 
                 className="border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10"
-                asChild
+                onClick={handleViewDemo}
               >
-                <Link to="/leaderboard">View Demo</Link>
+                View Demo
               </Button>
             </div>
 
