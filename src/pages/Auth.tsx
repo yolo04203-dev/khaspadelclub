@@ -120,19 +120,28 @@ export default function Auth() {
 
   const handleForgotPassword = async (data: ForgotPasswordFormData) => {
     setIsSubmitting(true);
-    // Always show success message to prevent email enumeration
-    await supabase.auth.resetPasswordForEmail(data.email, {
-      redirectTo: `${window.location.origin}/auth?reset=true`,
-    });
+    try {
+      await supabase.auth.resetPasswordForEmail(data.email, {
+        redirectTo: `${window.location.origin}/auth?reset=true`,
+      });
 
-    // Always show success message regardless of whether email exists
-    toast({
-      title: "Check your email",
-      description: "If an account exists with this email, you'll receive a password reset link.",
-    });
-    forgotPasswordForm.reset();
-    setShowForgotPassword(false);
-    setIsSubmitting(false);
+      // Always show success message to prevent email enumeration
+      toast({
+        title: "Check your email",
+        description: "If an account exists with this email, you'll receive a password reset link.",
+      });
+      forgotPasswordForm.reset();
+      setShowForgotPassword(false);
+    } catch (error) {
+      console.error("Password reset error:", error);
+      toast({
+        title: "Error",
+        description: "Unable to send reset email. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isLoading) {
