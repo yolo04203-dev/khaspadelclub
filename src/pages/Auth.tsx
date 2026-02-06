@@ -81,9 +81,10 @@ export default function Auth() {
     const { error } = await signIn(data.email, data.password);
 
     if (error) {
+      // Use generic error message to prevent user enumeration attacks
       toast({
         title: "Login failed",
-        description: error.message,
+        description: "Invalid email or password. Please try again.",
         variant: "destructive",
       });
     } else {
@@ -100,9 +101,10 @@ export default function Auth() {
     const { error } = await signUp(data.email, data.password, data.displayName);
 
     if (error) {
+      // Use generic error message to prevent user enumeration attacks
       toast({
         title: "Signup failed",
-        description: error.message,
+        description: "Unable to create account. Please check your details and try again.",
         variant: "destructive",
       });
     } else {
@@ -118,24 +120,18 @@ export default function Auth() {
 
   const handleForgotPassword = async (data: ForgotPasswordFormData) => {
     setIsSubmitting(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
+    // Always show success message to prevent email enumeration
+    await supabase.auth.resetPasswordForEmail(data.email, {
       redirectTo: `${window.location.origin}/auth?reset=true`,
     });
 
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Check your email",
-        description: "We've sent you a password reset link.",
-      });
-      forgotPasswordForm.reset();
-      setShowForgotPassword(false);
-    }
+    // Always show success message regardless of whether email exists
+    toast({
+      title: "Check your email",
+      description: "If an account exists with this email, you'll receive a password reset link.",
+    });
+    forgotPasswordForm.reset();
+    setShowForgotPassword(false);
     setIsSubmitting(false);
   };
 
