@@ -1,40 +1,80 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, AlertTriangle } from "lucide-react";
+import { RefreshCw, AlertTriangle, Home, Copy, Check } from "lucide-react";
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
+  fallback?: React.ReactNode;
 }
 
 interface ErrorBoundaryState {
   hasError: boolean;
   error?: Error;
+  errorInfo?: React.ErrorInfo;
+  copied: boolean;
 }
 
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, copied: false };
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("Error boundary caught:", error, errorInfo);
+    // Log error details for debugging
+    console.error("[ErrorBoundary] Caught error:", {
+      message: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+    });
+    this.setState({ errorInfo });
   }
 
   handleReload = () => {
+    // Clear any cached state that might cause the error
+    try {
+      sessionStorage.clear();
+    } catch (e) {
+      // Storage might not be available
+    }
     window.location.reload();
   };
 
   handleGoHome = () => {
+    // Navigate to home and reload to clear state
     window.location.href = "/";
+  };
+
+  handleCopyError = async () => {
+    const { error, errorInfo } = this.state;
+    const errorDetails = `
+Error: ${error?.message || "Unknown error"}
+Stack: ${error?.stack || "No stack trace"}
+Component Stack: ${errorInfo?.componentStack || "No component stack"}
+URL: ${window.location.href}
+User Agent: ${navigator.userAgent}
+Timestamp: ${new Date().toISOString()}
+    `.trim();
+
+    try {
+      await navigator.clipboard.writeText(errorDetails);
+      this.setState({ copied: true });
+      setTimeout(() => this.setState({ copied: false }), 2000);
+    } catch (e) {
+      console.error("Failed to copy error details:", e);
+    }
   };
 
   render() {
     if (this.state.hasError) {
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
+
       return (
         <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
           <div className="max-w-md w-full text-center space-y-6">
@@ -51,12 +91,45 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               </p>
             </div>
 
+            {/* Error details (collapsed by default) */}
+            {this.state.error && (
+              <details className="text-left bg-muted/50 rounded-lg p-4">
+                <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                  View error details
+                </summary>
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs font-mono text-destructive break-all">
+                    {this.state.error.message}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={this.handleCopyError}
+                    className="w-full text-xs"
+                  >
+                    {this.state.copied ? (
+                      <>
+                        <Check className="w-3 h-3 mr-2" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3 mr-2" />
+                        Copy error for support
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </details>
+            )}
+
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button onClick={this.handleReload} className="gap-2">
                 <RefreshCw className="w-4 h-4" />
                 Reload Page
               </Button>
-              <Button variant="outline" onClick={this.handleGoHome}>
+              <Button variant="outline" onClick={this.handleGoHome} className="gap-2">
+                <Home className="w-4 h-4" />
                 Go to Home
               </Button>
             </div>
