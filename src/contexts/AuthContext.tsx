@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -22,6 +22,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const isMountedRef = useRef(true);
+
   const fetchUserRole = async (userId: string) => {
     try {
       // Fetch all roles for the user (they may have multiple)
@@ -36,10 +38,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // If user has admin role, prioritize it
-      if (data?.some(r => r.role === "admin")) {
+      if (data?.some((r) => r.role === "admin")) {
         return "admin" as UserRole;
       }
-      
+
       // Otherwise return the first role or default to player
       return (data?.[0]?.role as UserRole) || "player";
     } catch (error) {
@@ -49,40 +51,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    isMountedRef.current = true;
 
-        if (session?.user) {
-          // Defer role fetching to avoid blocking
-          setTimeout(async () => {
-            const userRole = await fetchUserRole(session.user.id);
-            setRole(userRole);
-          }, 0);
-        } else {
-          setRole(null);
-        }
+    const safeSetRoleForSession = async (session: Session | null) => {
+      if (!isMountedRef.current) return;
 
-        setIsLoading(false);
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        const userRole = await fetchUserRole(session.user.id);
-        setRole(userRole);
+      if (!session?.user) {
+        setRole(null);
+        return;
       }
 
-      setIsLoading(false);
+      const userRole = await fetchUserRole(session.user.id);
+      if (!isMountedRef.current) return;
+      setRole(userRole);
+    };
+
+    // Listener for ongoing auth changes (does NOT control isLoading)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+      if (!isMountedRef.current) return;
+
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+
+      // Fetch role in the background; don't block navigation/render.
+      void safeSetRoleForSession(nextSession);
     });
 
-    return () => subscription.unsubscribe();
+    // Initial session restore (controls isLoading)
+    const initializeAuth = async () => {
+      try {
+        const {
+          data: { session: initialSession },
+        } = await supabase.auth.getSession();
+
+        if (!isMountedRef.current) return;
+
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
+
+        // Ensure role is resolved before marking app ready
+        await safeSetRoleForSession(initialSession);
+      } catch (error) {
+        console.error("Error initializing auth:", error);
+      } finally {
+        if (isMountedRef.current) setIsLoading(false);
+      }
+    };
+
+    void initializeAuth();
+
+    return () => {
+      isMountedRef.current = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, displayName?: string) => {
