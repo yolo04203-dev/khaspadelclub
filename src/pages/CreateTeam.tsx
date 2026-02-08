@@ -97,7 +97,7 @@ export default function CreateTeam() {
 
       toast({
         title: "Team created!",
-        description: `"${data.name}" has been registered and added to the ladder.`,
+        description: `"${data.name}" has been registered successfully.`,
       });
 
       navigate("/ladders");
