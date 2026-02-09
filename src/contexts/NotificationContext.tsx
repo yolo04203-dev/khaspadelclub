@@ -54,19 +54,28 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Fetch incoming challenges (pending challenges where team is challenged)
-      const { count: incomingCount } = await supabase
-        .from("challenges")
-        .select("*", { count: "exact", head: true })
-        .eq("challenged_team_id", teamId)
-        .eq("status", "pending");
-
-      // Fetch scheduled matches (accepted challenges with scheduled_at set)
-      const { data: acceptedChallenges } = await supabase
-        .from("challenges")
-        .select("match_id")
-        .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
-        .eq("status", "accepted");
+      // Fetch all notification data in parallel
+      const [
+        { count: incomingCount },
+        { data: acceptedChallenges },
+        { count: approvalCount },
+      ] = await Promise.all([
+        supabase
+          .from("challenges")
+          .select("*", { count: "exact", head: true })
+          .eq("challenged_team_id", teamId)
+          .eq("status", "pending"),
+        supabase
+          .from("challenges")
+          .select("match_id")
+          .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+          .eq("status", "accepted"),
+        supabase
+          .from("ladder_join_requests")
+          .select("*", { count: "exact", head: true })
+          .eq("team_id", teamId)
+          .eq("status", "approved"),
+      ]);
 
       let scheduledCount = 0;
       let pendingConfirmationsCount = 0;
@@ -74,40 +83,28 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       if (acceptedChallenges && acceptedChallenges.length > 0) {
         const matchIds = acceptedChallenges.map(c => c.match_id).filter(Boolean);
         if (matchIds.length > 0) {
-          // Count scheduled matches
-          const { count } = await supabase
-            .from("matches")
-            .select("*", { count: "exact", head: true })
-            .in("id", matchIds)
-            .not("scheduled_at", "is", null)
-            .eq("status", "pending");
+          // Fetch scheduled + pending confirmations in parallel
+          const [{ count }, { data: pendingConfirmations }] = await Promise.all([
+            supabase
+              .from("matches")
+              .select("*", { count: "exact", head: true })
+              .in("id", matchIds)
+              .not("scheduled_at", "is", null)
+              .eq("status", "pending"),
+            supabase
+              .from("matches")
+              .select("id, score_submitted_by")
+              .in("id", matchIds)
+              .not("score_submitted_by", "is", null)
+              .is("score_confirmed_by", null)
+              .eq("score_disputed", false),
+          ]);
           scheduledCount = count || 0;
-
-          // Count pending score confirmations - matches where:
-          // - score was submitted (score_submitted_by is set)
-          // - not yet confirmed (score_confirmed_by is null)
-          // - current user is NOT the one who submitted (they need to confirm)
-          const { data: pendingConfirmations } = await supabase
-            .from("matches")
-            .select("id, score_submitted_by, challenger_team_id, challenged_team_id")
-            .in("id", matchIds)
-            .not("score_submitted_by", "is", null)
-            .is("score_confirmed_by", null)
-            .eq("score_disputed", false);
-          
-          // Filter to only count matches where WE need to confirm (we didn't submit)
           pendingConfirmationsCount = (pendingConfirmations || []).filter(m => 
             m.score_submitted_by !== user.id
           ).length;
         }
       }
-
-      // Fetch ladder approvals (approved join requests for user's team)
-      const { count: approvalCount } = await supabase
-        .from("ladder_join_requests")
-        .select("*", { count: "exact", head: true })
-        .eq("team_id", teamId)
-        .eq("status", "approved");
 
       const newCounts = {
         incomingChallenges: incomingCount || 0,

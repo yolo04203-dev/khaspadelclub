@@ -112,19 +112,21 @@ export default function Challenges() {
 
     if (!memberData) return null;
 
-    const { data: teamData } = await supabase
-      .from("teams")
-      .select("id, name, is_frozen, frozen_until, frozen_reason")
-      .eq("id", memberData.team_id)
-      .single();
+    // Fetch team and rank in parallel
+    const [{ data: teamData }, { data: rankData }] = await Promise.all([
+      supabase
+        .from("teams")
+        .select("id, name, is_frozen, frozen_until, frozen_reason")
+        .eq("id", memberData.team_id)
+        .single(),
+      supabase
+        .from("ladder_rankings")
+        .select("rank")
+        .eq("team_id", memberData.team_id)
+        .maybeSingle(),
+    ]);
 
     if (!teamData) return null;
-
-    const { data: rankData } = await supabase
-      .from("ladder_rankings")
-      .select("rank")
-      .eq("team_id", memberData.team_id)
-      .maybeSingle();
 
     return {
       id: teamData.id,
@@ -140,94 +142,44 @@ export default function Challenges() {
   const isTeamFrozen = userTeam?.is_frozen && userTeam?.frozen_until && isFuture(new Date(userTeam.frozen_until));
 
   const fetchChallenges = async (teamId: string) => {
-    // Fetch incoming challenges
-    const { data: incoming, error: inError } = await supabase
-      .from("challenges")
-      .select(`
-        id,
-        status,
-        message,
-        decline_reason,
-        expires_at,
-        created_at,
-        match_id,
-        challenger_team_id,
-        challenged_team_id
-      `)
-      .eq("challenged_team_id", teamId)
-      .eq("status", "pending")
-      .order("created_at", { ascending: false });
+    // Fetch all challenge categories in parallel
+    const [
+      { data: incoming, error: inError },
+      { data: outgoing, error: outError },
+      { data: accepted, error: accError },
+      { data: history, error: histError },
+    ] = await Promise.all([
+      supabase
+        .from("challenges")
+        .select("id, status, message, decline_reason, expires_at, created_at, match_id, challenger_team_id, challenged_team_id")
+        .eq("challenged_team_id", teamId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("challenges")
+        .select("id, status, message, decline_reason, expires_at, created_at, match_id, challenger_team_id, challenged_team_id")
+        .eq("challenger_team_id", teamId)
+        .in("status", ["pending", "declined"])
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("challenges")
+        .select(`id, status, message, decline_reason, expires_at, created_at, match_id, challenger_team_id, challenged_team_id, ladder_category_id,
+          ladder_categories!ladder_category_id ( id, name, ladders!ladder_id ( id, name ) )`)
+        .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+        .eq("status", "accepted")
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("challenges")
+        .select("id, status, message, decline_reason, expires_at, created_at, match_id, challenger_team_id, challenged_team_id")
+        .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+        .in("status", ["declined", "cancelled", "expired"])
+        .order("created_at", { ascending: false })
+        .limit(20),
+    ]);
 
     if (inError) console.error("Error fetching incoming:", inError);
-
-    // Fetch outgoing challenges
-    const { data: outgoing, error: outError } = await supabase
-      .from("challenges")
-      .select(`
-        id,
-        status,
-        message,
-        decline_reason,
-        expires_at,
-        created_at,
-        match_id,
-        challenger_team_id,
-        challenged_team_id
-      `)
-      .eq("challenger_team_id", teamId)
-      .in("status", ["pending", "declined"])
-      .order("created_at", { ascending: false });
-
     if (outError) console.error("Error fetching outgoing:", outError);
-
-    // Fetch accepted challenges (both incoming and outgoing) with ladder category
-    const { data: accepted, error: accError } = await supabase
-      .from("challenges")
-      .select(`
-        id,
-        status,
-        message,
-        decline_reason,
-        expires_at,
-        created_at,
-        match_id,
-        challenger_team_id,
-        challenged_team_id,
-        ladder_category_id,
-        ladder_categories!ladder_category_id (
-          id,
-          name,
-          ladders!ladder_id (
-            id,
-            name
-          )
-        )
-      `)
-      .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
-      .eq("status", "accepted")
-      .order("created_at", { ascending: false });
-
     if (accError) console.error("Error fetching accepted:", accError);
-
-    // Fetch challenge history (declined, cancelled, expired, completed)
-    const { data: history, error: histError } = await supabase
-      .from("challenges")
-      .select(`
-        id,
-        status,
-        message,
-        decline_reason,
-        expires_at,
-        created_at,
-        match_id,
-        challenger_team_id,
-        challenged_team_id
-      `)
-      .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
-      .in("status", ["declined", "cancelled", "expired"])
-      .order("created_at", { ascending: false })
-      .limit(20);
-
     if (histError) console.error("Error fetching history:", histError);
 
     // Get all team IDs
@@ -242,35 +194,27 @@ export default function Challenges() {
       ...(history?.map(c => c.challenged_team_id) || []),
     ].filter(Boolean);
 
-    // Fetch team names
-    const { data: teams } = await supabase
-      .from("teams")
-      .select("id, name")
-      .in("id", allTeamIds);
-
-    // Fetch ranks
-    const { data: ranks } = await supabase
-      .from("ladder_rankings")
-      .select("team_id, rank")
-      .in("team_id", allTeamIds);
-
-    const teamsMap = new Map(teams?.map(t => [t.id, t]) || []);
-    const ranksMap = new Map(ranks?.map(r => [r.team_id, r.rank]) || []);
-
-    // Fetch match statuses and scheduling info for accepted challenges
+    const uniqueTeamIds = [...new Set(allTeamIds)];
     const allMatchIds = [
       ...(accepted || []).map(c => c.match_id).filter(Boolean),
       ...(history || []).map(c => c.match_id).filter(Boolean),
     ];
-    const { data: matches } = allMatchIds.length > 0 
-      ? await supabase
-          .from("matches")
-          .select("id, status, scheduled_at, venue, winner_team_id, challenger_score, challenged_score, challenger_sets, challenged_sets, score_submitted_by, score_confirmed_by, score_disputed, dispute_reason")
-          .in("id", allMatchIds)
-      : { data: [] as any[] };
-    
+
+    // Fetch teams, ranks, and matches all in parallel
+    const [{ data: teams }, { data: ranks }, { data: matches }] = await Promise.all([
+      supabase.from("teams").select("id, name").in("id", uniqueTeamIds),
+      supabase.from("ladder_rankings").select("team_id, rank").in("team_id", uniqueTeamIds),
+      allMatchIds.length > 0
+        ? supabase.from("matches")
+            .select("id, status, scheduled_at, venue, winner_team_id, challenger_score, challenged_score, challenger_sets, challenged_sets, score_submitted_by, score_confirmed_by, score_disputed, dispute_reason")
+            .in("id", allMatchIds)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+
+    const teamsMap = new Map(teams?.map(t => [t.id, t]) || []);
+    const ranksMap = new Map(ranks?.map(r => [r.team_id, r.rank]) || []);
     const matchMap = new Map<string, any>(
-      (matches || []).map(m => [m.id, m])
+      (matches || []).map((m: any) => [m.id, m])
     );
 
     const mapChallenge = (c: any): Challenge => {
