@@ -30,6 +30,7 @@ interface InvitePartnerDialogProps {
   teamId: string;
   teamName: string;
   onInviteSent: () => void;
+  initialSearchQuery?: string;
 }
 
 export function InvitePartnerDialog({
@@ -38,9 +39,10 @@ export function InvitePartnerDialog({
   teamId,
   teamName,
   onInviteSent,
+  initialSearchQuery = "",
 }: InvitePartnerDialogProps) {
   const { user } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [message, setMessage] = useState("");
   const [suggestions, setSuggestions] = useState<PlayerSuggestion[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerSuggestion | null>(null);

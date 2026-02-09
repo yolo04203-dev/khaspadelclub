@@ -21,6 +21,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { toast } from "@/hooks/use-toast";
+import { InvitePartnerDialog } from "@/components/team/InvitePartnerDialog";
 
 const teamSchema = z.object({
   name: z
@@ -46,6 +47,8 @@ export default function CreateTeam() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingTeam, setExistingTeam] = useState<{ id: string; name: string } | null>(null);
   const [checkingTeam, setCheckingTeam] = useState(true);
+  const [createdTeam, setCreatedTeam] = useState<{ id: string; name: string } | null>(null);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
 
   const form = useForm<TeamFormData>({
     resolver: zodResolver(teamSchema),
@@ -116,7 +119,9 @@ export default function CreateTeam() {
         description: `"${data.name}" has been registered with ${data.player1Name} and ${data.player2Name}.`,
       });
 
-      navigate("/ladders");
+      // Store created team info and open invite dialog
+      setCreatedTeam({ id: teamId, name: data.name.trim() });
+      setShowInviteDialog(true);
     } catch (error: any) {
       console.error("Error creating team:", error);
       toast({
@@ -308,6 +313,22 @@ export default function CreateTeam() {
             </Card>
           )}
         </motion.div>
+
+        {createdTeam && (
+          <InvitePartnerDialog
+            open={showInviteDialog}
+            onOpenChange={(open) => {
+              setShowInviteDialog(open);
+              if (!open) navigate("/ladders");
+            }}
+            teamId={createdTeam.id}
+            teamName={createdTeam.name}
+            onInviteSent={() => {
+              navigate("/ladders");
+            }}
+            initialSearchQuery={form.getValues("player2Name")}
+          />
+        )}
       </main>
     </div>
   );
