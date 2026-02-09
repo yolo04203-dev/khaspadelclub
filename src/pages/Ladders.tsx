@@ -30,41 +30,39 @@ interface Ladder {
 }
 
 async function fetchLaddersData(): Promise<Ladder[]> {
-  // Fetch all ladders
-  const { data: laddersData, error: laddersError } = await supabase
-    .from("ladders")
-    .select("*")
-    .order("created_at", { ascending: false });
+  // Fetch ladders with only needed columns
+  const [laddersResult, categoriesResult, rankingsResult] = await Promise.all([
+    supabase
+      .from("ladders")
+      .select("id, name, description, status, created_at")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("ladder_categories")
+      .select("id, name, ladder_id")
+      .order("display_order", { ascending: true }),
+    supabase
+      .from("ladder_rankings")
+      .select("ladder_category_id")
+      .not("ladder_category_id", "is", null),
+  ]);
 
-  if (laddersError) {
-    logger.error("Error fetching ladders", laddersError);
+  if (laddersResult.error) {
+    logger.error("Error fetching ladders", laddersResult.error);
     throw new Error("Failed to load ladders. Please try again.");
   }
 
-  // Fetch categories for each ladder
-  const { data: categoriesData, error: categoriesError } = await supabase
-    .from("ladder_categories")
-    .select("*")
-    .order("display_order", { ascending: true });
-
-  if (categoriesError) {
-    logger.error("Error fetching categories", categoriesError);
+  if (categoriesResult.error) {
+    logger.error("Error fetching categories", categoriesResult.error);
     throw new Error("Failed to load ladder categories.");
   }
 
-  // Fetch team counts per category
-  const { data: rankingsData } = await supabase
-    .from("ladder_rankings")
-    .select("ladder_category_id")
-    .not("ladder_category_id", "is", null);
-
   // Build ladder objects with categories and team counts
-  const laddersWithCategories: Ladder[] = safeArray(laddersData).map((ladder) => {
-    const categories = safeArray(categoriesData).filter(
+  const laddersWithCategories: Ladder[] = safeArray(laddersResult.data).map((ladder) => {
+    const categories = safeArray(categoriesResult.data).filter(
       (cat) => cat.ladder_id === ladder.id
     );
     const categoryIds = categories.map((c) => c.id);
-    const teamCount = safeArray(rankingsData).filter((r) =>
+    const teamCount = safeArray(rankingsResult.data).filter((r) =>
       categoryIds.includes(r.ladder_category_id)
     ).length;
 

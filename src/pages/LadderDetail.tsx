@@ -134,10 +134,10 @@ export default function LadderDetail() {
     if (!id) return;
 
     try {
-      // Fetch ladder
+      // Fetch ladder with only needed columns
       const { data: ladderData, error: ladderError } = await supabase
         .from("ladders")
-        .select("*")
+        .select("id, name, description, status")
         .eq("id", id)
         .single();
 
@@ -147,7 +147,7 @@ export default function LadderDetail() {
       // Fetch categories
       const { data: categoriesData, error: categoriesError } = await supabase
         .from("ladder_categories")
-        .select("*")
+        .select("id, name, description, challenge_range")
         .eq("ladder_id", id)
         .order("display_order", { ascending: true });
 
@@ -373,58 +373,9 @@ export default function LadderDetail() {
 
   useEffect(() => {
     fetchLadderData();
-
-    // Subscribe to realtime changes for rankings, challenges, and teams
-    const rankingsChannel = supabase
-      .channel(`ladder-${id}-rankings`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'ladder_rankings',
-        },
-        () => {
-          fetchLadderData();
-        }
-      )
-      .subscribe();
-
-    const challengesChannel = supabase
-      .channel(`ladder-${id}-challenges`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'challenges',
-        },
-        () => {
-          fetchLadderData();
-        }
-      )
-      .subscribe();
-
-    const teamsChannel = supabase
-      .channel(`ladder-${id}-teams`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'teams',
-        },
-        () => {
-          fetchLadderData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(rankingsChannel);
-      supabase.removeChannel(challengesChannel);
-      supabase.removeChannel(teamsChannel);
-    };
+    // Removed overly broad realtime subscriptions that triggered full refetches
+    // on ANY change to rankings/challenges/teams globally.
+    // Users can pull-to-refresh for updates instead.
   }, [id, user]);
 
   const handleRefresh = useCallback(async () => {

@@ -315,12 +315,9 @@ export default function Challenges() {
   };
 
   useEffect(() => {
-    let teamId: string | null = null;
-    
     const init = async () => {
       const team = await fetchUserTeam();
       setUserTeam(team);
-      teamId = team?.id || null;
 
       if (team) {
         await fetchChallenges(team.id);
@@ -330,29 +327,7 @@ export default function Challenges() {
     };
 
     init();
-
-    // Subscribe to realtime changes on challenges table
-    const channel = supabase
-      .channel('challenges-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'challenges',
-        },
-        async (payload) => {
-          // Refresh challenges when any change occurs
-          if (teamId) {
-            await fetchChallenges(teamId);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // Removed overly broad realtime subscription - data refreshes on user actions
   }, [user]);
 
   const handleRespond = async (challengeId: string, accept: boolean) => {

@@ -127,53 +127,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchCounts();
+
+    // Poll every 60s instead of realtime on 3 tables (which triggered on ANY row change globally)
+    const interval = setInterval(fetchCounts, 60000);
+    return () => clearInterval(interval);
   }, [fetchCounts]);
-
-  // Set up real-time subscriptions
-  useEffect(() => {
-    if (!user || !userTeamId) return;
-
-    const channel = supabase
-      .channel("notifications-realtime")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "challenges",
-        },
-        () => {
-          fetchCounts();
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "matches",
-        },
-        () => {
-          fetchCounts();
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "ladder_join_requests",
-        },
-        () => {
-          fetchCounts();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, userTeamId, fetchCounts]);
 
   return (
     <NotificationContext.Provider value={{ counts, isLoading, refresh: fetchCounts }}>

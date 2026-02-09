@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap } from "lucide-react";
@@ -74,27 +74,42 @@ export default function Admin() {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const fetchAdminData = useCallback(async () => {
     if (role !== "admin") return;
 
     try {
-      // Fetch profiles with team info
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id, display_name");
+      // Single parallel fetch for ALL admin data
+      const [
+        profilesRes, membersRes, teamsRes, rolesRes, rankingsRes,
+        matchesRes, laddersRes, categoriesRes, ladderRankingsRes,
+        tournamentsRes, participantsRes
+      ] = await Promise.all([
+        supabase.from("profiles").select("user_id, display_name"),
+        supabase.from("team_members").select("user_id, team_id"),
+        supabase.from("teams").select("id, name, is_frozen, frozen_until, frozen_reason"),
+        supabase.from("user_roles").select("user_id, role"),
+        supabase.from("ladder_rankings").select("team_id, rank, wins, losses").order("rank"),
+        supabase.from("matches").select("id, challenger_team_id, challenged_team_id, status, challenger_score, challenged_score, created_at").order("created_at", { ascending: false }).limit(50),
+        supabase.from("ladders").select("id, name, description, status, created_at").order("created_at", { ascending: false }),
+        supabase.from("ladder_categories").select("id, ladder_id"),
+        supabase.from("ladder_rankings").select("id, ladder_category_id"),
+        supabase.from("tournaments").select("id, name, format, status, max_teams, created_at").order("created_at", { ascending: false }),
+        supabase.from("tournament_participants").select("id, tournament_id"),
+      ]);
 
-      const { data: members } = await supabase
-        .from("team_members")
-        .select("user_id, team_id");
-
-      const { data: teamsData } = await supabase
-        .from("teams")
-        .select("id, name, is_frozen, frozen_until, frozen_reason");
-
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("user_id, role");
+      const profiles = profilesRes.data;
+      const members = membersRes.data;
+      const teamsData = teamsRes.data;
+      const roles = rolesRes.data;
+      const rankings = rankingsRes.data;
 
       const teamsMap = new Map(teamsData?.map(t => [t.id, t.name]) || []);
       const membersMap = new Map(members?.map(m => [m.user_id, m.team_id]) || []);
@@ -107,15 +122,9 @@ export default function Admin() {
         team_name: membersMap.has(p.user_id) ? teamsMap.get(membersMap.get(p.user_id)!) || null : null,
         role: rolesMap.get(p.user_id) || "player",
       }));
-
       setPlayers(playersData);
 
-      // Fetch teams with rankings
-      const { data: rankings } = await supabase
-        .from("ladder_rankings")
-        .select("team_id, rank, wins, losses")
-        .order("rank");
-
+      // Teams with rankings
       const teamMemberCounts = new Map<string, number>();
       members?.forEach(m => {
         teamMemberCounts.set(m.team_id, (teamMemberCounts.get(m.team_id) || 0) + 1);
@@ -135,18 +144,11 @@ export default function Admin() {
           frozen_reason: t.frozen_reason,
         };
       }).sort((a, b) => (a.rank || 999) - (b.rank || 999));
-
       setTeams(teamsWithRank);
 
-      // Fetch recent matches
-      const { data: matchesData } = await supabase
-        .from("matches")
-        .select("id, challenger_team_id, challenged_team_id, status, challenger_score, challenged_score, created_at")
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      if (matchesData) {
-        const matchesMapped: Match[] = matchesData.map(m => ({
+      // Matches
+      if (matchesRes.data) {
+        const matchesMapped: Match[] = matchesRes.data.map(m => ({
           id: m.id,
           challenger_name: teamsMap.get(m.challenger_team_id) || "Unknown",
           challenged_name: teamsMap.get(m.challenged_team_id) || "Unknown",
@@ -158,32 +160,18 @@ export default function Admin() {
         setMatches(matchesMapped);
       }
 
-      // Fetch ladders
-      const { data: laddersData } = await supabase
-        .from("ladders")
-        .select("id, name, description, status, created_at")
-        .order("created_at", { ascending: false });
-
-      const { data: categoriesData } = await supabase
-        .from("ladder_categories")
-        .select("id, ladder_id");
-
-      const { data: ladderRankings } = await supabase
-        .from("ladder_rankings")
-        .select("id, ladder_category_id");
-
-      if (laddersData) {
-        const laddersMapped: Ladder[] = laddersData.map(l => {
-          const categories = categoriesData?.filter(c => c.ladder_id === l.id) || [];
-          const categoryIds = categories.map(c => c.id);
-          const teamsInLadder = ladderRankings?.filter(r => categoryIds.includes(r.ladder_category_id || "")) || [];
-          
+      // Ladders
+      if (laddersRes.data) {
+        const laddersMapped: Ladder[] = laddersRes.data.map(l => {
+          const cats = categoriesRes.data?.filter(c => c.ladder_id === l.id) || [];
+          const catIds = cats.map(c => c.id);
+          const teamsInLadder = ladderRankingsRes.data?.filter(r => catIds.includes(r.ladder_category_id || "")) || [];
           return {
             id: l.id,
             name: l.name,
             description: l.description,
             status: l.status,
-            categories_count: categories.length,
+            categories_count: cats.length,
             teams_count: teamsInLadder.length,
             created_at: new Date(l.created_at).toLocaleDateString(),
           };
@@ -191,24 +179,15 @@ export default function Admin() {
         setLadders(laddersMapped);
       }
 
-      // Fetch tournaments
-      const { data: tournamentsData } = await supabase
-        .from("tournaments")
-        .select("id, name, format, status, max_teams, created_at")
-        .order("created_at", { ascending: false });
-
-      const { data: participantsData } = await supabase
-        .from("tournament_participants")
-        .select("id, tournament_id");
-
-      if (tournamentsData) {
-        const tournamentsMapped: Tournament[] = tournamentsData.map(t => ({
+      // Tournaments
+      if (tournamentsRes.data) {
+        const tournamentsMapped: Tournament[] = tournamentsRes.data.map(t => ({
           id: t.id,
           name: t.name,
           format: t.format,
           status: t.status,
           max_teams: t.max_teams,
-          participants_count: participantsData?.filter(p => p.tournament_id === t.id).length || 0,
+          participants_count: participantsRes.data?.filter(p => p.tournament_id === t.id).length || 0,
           created_at: new Date(t.created_at).toLocaleDateString(),
         }));
         setTournaments(tournamentsMapped);
@@ -225,6 +204,23 @@ export default function Admin() {
     else setIsLoading(false);
   }, [role, fetchAdminData]);
 
+  const filteredPlayers = useMemo(() => players.filter(p => 
+    p.display_name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+    p.team_name?.toLowerCase().includes(debouncedSearch.toLowerCase())
+  ), [players, debouncedSearch]);
+
+  const filteredTeams = useMemo(() => teams.filter(t =>
+    t.name.toLowerCase().includes(debouncedSearch.toLowerCase())
+  ), [teams, debouncedSearch]);
+
+  const filteredLadders = useMemo(() => ladders.filter(l =>
+    l.name.toLowerCase().includes(debouncedSearch.toLowerCase())
+  ), [ladders, debouncedSearch]);
+
+  const filteredTournaments = useMemo(() => tournaments.filter(t =>
+    t.name.toLowerCase().includes(debouncedSearch.toLowerCase())
+  ), [tournaments, debouncedSearch]);
+
   if (authLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -240,23 +236,6 @@ export default function Admin() {
   if (role !== "admin") {
     return <Navigate to="/dashboard" replace />;
   }
-
-  const filteredPlayers = players.filter(p => 
-    p.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.team_name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredTeams = teams.filter(t =>
-    t.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredLadders = ladders.filter(l =>
-    l.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredTournaments = tournaments.filter(t =>
-    t.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <div className="min-h-screen bg-background">
