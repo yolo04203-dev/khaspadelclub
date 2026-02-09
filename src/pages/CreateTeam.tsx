@@ -28,6 +28,14 @@ const teamSchema = z.object({
     .min(2, "Team name must be at least 2 characters")
     .max(50, "Team name is too long")
     .regex(/^[a-zA-Z0-9\s\-_]+$/, "Team name can only contain letters, numbers, spaces, hyphens, and underscores"),
+  player1Name: z
+    .string()
+    .min(2, "Player 1 name must be at least 2 characters")
+    .max(50, "Player 1 name is too long"),
+  player2Name: z
+    .string()
+    .min(2, "Player 2 name must be at least 2 characters")
+    .max(50, "Player 2 name is too long"),
 });
 
 type TeamFormData = z.infer<typeof teamSchema>;
@@ -43,6 +51,8 @@ export default function CreateTeam() {
     resolver: zodResolver(teamSchema),
     defaultValues: {
       name: "",
+      player1Name: "",
+      player2Name: "",
     },
   });
 
@@ -95,9 +105,15 @@ export default function CreateTeam() {
 
       if (error) throw error;
 
+      // Update the captain's profile with player 1 name
+      await supabase
+        .from("profiles")
+        .update({ display_name: data.player1Name.trim() })
+        .eq("user_id", user.id);
+
       toast({
         title: "Team created!",
-        description: `"${data.name}" has been registered successfully.`,
+        description: `"${data.name}" has been registered with ${data.player1Name} and ${data.player2Name}.`,
       });
 
       navigate("/ladders");
@@ -205,6 +221,45 @@ export default function CreateTeam() {
                           </FormControl>
                           <FormDescription>
                             Choose a unique name for your team (2-50 characters)
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="player1Name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Player 1 Name (You)</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Enter your name"
+                              autoComplete="off"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="player2Name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Player 2 Name (Partner)</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Enter your partner's name"
+                              autoComplete="off"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            You can invite your partner to join the app later
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
