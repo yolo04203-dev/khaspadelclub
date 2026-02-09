@@ -1,16 +1,13 @@
 {
-  "files": [],
-  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }],
+  "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "baseUrl": ".",
+    "jsx": "react-native",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./native/*"]
     },
-    "noImplicitAny": false,
-    "noUnusedParameters": false,
-    "skipLibCheck": true,
-    "allowJs": true,
-    "noUnusedLocals": false,
-    "strictNullChecks": false
-  }
+    "strict": true
+  },
+  "include": ["App.tsx", "native/**/*"],
+  "exclude": ["src", "public", "dist", "node_modules"]
 }
