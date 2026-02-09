@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "Khas Padel Club",
+    "slug": "khaspadelclub",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "platforms": ["ios", "android", "web"],
+    "jsEngine": "hermes",
+    "newArchEnabled": true
+  }
+}
