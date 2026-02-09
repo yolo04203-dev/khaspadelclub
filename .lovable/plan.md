@@ -1,106 +1,94 @@
-# Load Testing Plan for 2000 Concurrent Users
 
-## ✅ IMPLEMENTED
+# Cleanup Plan: Remove Seeded Test Data
 
-### Phase 1: Database Indexes
-**Status:** Complete
+## Problem Summary
+The application became slow because load testing seeded ~10,000 records into production tables:
+- 1,000 teams with "SEED" suffix in names
+- 1,000 ladder rankings linked to seeded teams
+- 5,000 challenges with "SEED_DATA" in message field
+- 3,000 matches with "SEED_DATA" in notes field
 
-Created performance indexes:
-- `idx_team_members_user_id` - Optimize team lookups
-- `idx_ladder_rankings_category_rank` - Optimize ranking queries  
-- `idx_challenges_status_teams` - Optimize challenge queries
-- `idx_matches_teams_status` - Optimize match history
+These records are now being loaded in normal application views like the Ladder Detail page.
 
-### Phase 2: Seed Data Edge Function
-**Status:** Complete
+---
 
-**File:** `supabase/functions/seed-test-data/index.ts`
+## Cleanup Strategy
 
-**Usage:**
-```bash
+Execute database deletions in the correct order to respect foreign key constraints:
+
+```text
+Step 1: Delete challenges linked to seeded teams
+Step 2: Delete matches linked to seeded teams  
+Step 3: Delete ladder rankings linked to seeded teams
+Step 4: Delete the seeded teams themselves
+```
+
+---
+
+## Technical Implementation
+
+### Phase 1: Database Cleanup Migration
+
+Create a new migration to remove all seeded data using reliable markers:
+
+```sql
+-- Step 1: Delete challenges linked to seeded teams
+DELETE FROM challenges 
+WHERE message LIKE 'SEED_DATA%';
+
+-- Step 2: Delete matches linked to seeded teams
+DELETE FROM matches 
+WHERE notes LIKE 'SEED_DATA%';
+
+-- Step 3: Delete ladder rankings linked to seeded teams
+DELETE FROM ladder_rankings 
+WHERE team_id IN (
+  SELECT id FROM teams WHERE name LIKE '%SEED%'
+);
+
+-- Step 4: Delete seeded teams
+DELETE FROM teams 
+WHERE name LIKE '%SEED%';
+```
+
+### Phase 2: Verify Cleanup
+
+After running the migration, verify counts return to normal:
+- teams: ~29 rows
+- ladder_rankings: ~25 rows
+- challenges: ~12 rows
+- matches: ~6 rows
+
+---
+
+## Expected Results
+
+| Table | Before Cleanup | After Cleanup |
+|-------|----------------|---------------|
+| teams | 1,029 | ~29 |
+| ladder_rankings | 1,025 | ~25 |
+| challenges | 5,012 | ~12 |
+| matches | 3,006 | ~6 |
+
+**Performance Impact:** Ladder Detail page will load 507 → ~5 rankings, dramatically improving response times.
+
+---
+
+## Files to Modify
+
+| File | Action |
+|------|--------|
+| `supabase/migrations/[new]_cleanup_seed_data.sql` | New migration to delete seeded records |
+
+---
+
+## Alternative: Call Existing Edge Function
+
+The `seed-test-data` edge function already has cleanup logic. You could also call it with:
+
+```json
 POST /seed-test-data
-Body: { "teamCount": 1000, "clearExisting": false }
+{ "teamCount": 0, "clearExisting": true }
 ```
 
-Generates:
-- Teams (with SEED suffix)
-- Ladder rankings (starting at rank 100+)
-- Challenges (5x team count)
-- Matches (3x team count)
-
-### Phase 3: Load Testing Utilities
-**Status:** Complete
-
-**File:** `src/test/load-test.ts`
-
-**Available functions:**
-- `smokeTest()` - 10 users, 10 seconds
-- `standardLoadTest()` - 100 users, 60 seconds
-- `stressTest()` - 2000 users, 120 seconds
-- `runLoadTest(config)` - Custom configuration
-- `testEndpoint(endpoint, iterations)` - Single endpoint testing
-
-### Phase 4: Performance Benchmarks
-**Status:** Complete
-
-**File:** `src/test/performance-benchmarks.test.ts`
-
-**Test results (all passing):**
-- Smoke test: 267 requests, 0% error rate, 76ms avg
-- 100 users: 7,416 requests, 0% error rate, 71ms avg
-- 500 users: 21,732 requests, 0% error rate, 243ms avg
-
----
-
-## Performance Results Summary
-
-| Metric | 10 Users | 100 Users | 500 Users | Target |
-|--------|----------|-----------|-----------|--------|
-| Avg Response | 76ms | 71ms | 243ms | < 1500ms |
-| P95 Response | 128ms | 95ms | 355ms | < 2000ms |
-| Error Rate | 0% | 0% | 0% | < 1% |
-| RPS | 26 | 244 | 713 | - |
-
-**All benchmarks PASSING** ✅
-
----
-
-## Usage Instructions
-
-### Seed Test Data
-```typescript
-// Call edge function to populate 1000 teams
-fetch(`${SUPABASE_URL}/functions/v1/seed-test-data`, {
-  method: 'POST',
-  body: JSON.stringify({ teamCount: 1000, clearExisting: true })
-});
-```
-
-### Run Load Tests
-```typescript
-import { stressTest, smokeTest } from "@/test/load-test";
-
-// Quick verification
-const smoke = await smokeTest();
-
-// Full stress test (2000 users)
-const stress = await stressTest();
-```
-
-### Run Benchmarks
-```bash
-bun run vitest run src/test/performance-benchmarks.test.ts
-```
-
----
-
-## Cleanup
-
-To remove seeded test data:
-```typescript
-fetch(`${SUPABASE_URL}/functions/v1/seed-test-data`, {
-  method: 'POST',
-  body: JSON.stringify({ teamCount: 0, clearExisting: true })
-});
-```
-
+However, a direct migration is more reliable and leaves a clear audit trail.
