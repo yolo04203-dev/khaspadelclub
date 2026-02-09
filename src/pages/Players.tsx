@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Search, Users, Filter, User, Loader2, Clock } from "lucide-react";
@@ -32,89 +32,102 @@ interface Player {
   team_recruitment_message: string | null;
 }
 
+const PAGE_SIZE = 30;
 const SKILL_LEVELS = ["Beginner", "Intermediate", "Advanced", "Pro"];
 
 export default function Players() {
   const { user } = useAuth();
   const [players, setPlayers] = useState<Player[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [skillFilter, setSkillFilter] = useState<string>("all");
   const [lookingForTeamFilter, setLookingForTeamFilter] = useState<string>("all");
   const [recruitingFilter, setRecruitingFilter] = useState<string>("all");
 
-  useEffect(() => {
-    const fetchPlayers = async () => {
-      try {
-        // Fetch all profiles
-        let query = supabase
-          .from("profiles")
-          .select("user_id, display_name, avatar_url, skill_level, bio, is_looking_for_team, preferred_play_times")
-          .neq("user_id", user?.id || "");
+  const fetchPlayers = useCallback(async (offset: number, append: boolean) => {
+    try {
+      let query = supabase
+        .from("profiles")
+        .select("user_id, display_name, avatar_url, skill_level, bio, is_looking_for_team, preferred_play_times")
+        .neq("user_id", user?.id || "");
 
-        if (searchQuery) {
-          query = query.ilike("display_name", `%${searchQuery}%`);
-        }
-
-        if (skillFilter !== "all") {
-          query = query.eq("skill_level", skillFilter);
-        }
-
-        if (lookingForTeamFilter === "yes") {
-          query = query.eq("is_looking_for_team", true);
-        } else if (lookingForTeamFilter === "no") {
-          query = query.eq("is_looking_for_team", false);
-        }
-
-        const { data: profiles, error } = await query.order("display_name").limit(50);
-
-        if (error) throw error;
-
-        // Get team membership info
-        const userIds = profiles?.map(p => p.user_id) || [];
-        const { data: teamMembers } = await supabase
-          .from("team_members")
-          .select("user_id, team_id")
-          .in("user_id", userIds);
-
-        const teamIds = [...new Set(teamMembers?.map(m => m.team_id) || [])];
-        const { data: teams } = await supabase
-          .from("teams")
-          .select("id, name, is_recruiting, recruitment_message")
-          .in("id", teamIds);
-
-        const teamMemberMap = new Map(teamMembers?.map(m => [m.user_id, m.team_id]) || []);
-        const teamsMap = new Map(teams?.map(t => [t.id, { name: t.name, is_recruiting: t.is_recruiting, recruitment_message: t.recruitment_message }]) || []);
-
-        let playersData = (profiles || []).map(p => {
-            const teamId = teamMemberMap.get(p.user_id) || null;
-            const teamInfo = teamId ? teamsMap.get(teamId) : null;
-            return {
-              ...p,
-              preferred_play_times: p.preferred_play_times || null,
-              team_id: teamId,
-              team_name: teamInfo?.name || null,
-              team_is_recruiting: teamInfo?.is_recruiting || false,
-              team_recruitment_message: teamInfo?.recruitment_message || null,
-            };
-          });
-
-        // Apply recruiting filter
-        if (recruitingFilter === "yes") {
-          playersData = playersData.filter(p => p.team_is_recruiting);
-        }
-
-        setPlayers(playersData);
-      } catch (error) {
-        console.error("Error fetching players:", error);
-      } finally {
-        setIsLoading(false);
+      if (searchQuery) {
+        query = query.ilike("display_name", `%${searchQuery}%`);
       }
-    };
+      if (skillFilter !== "all") {
+        query = query.eq("skill_level", skillFilter);
+      }
+      if (lookingForTeamFilter === "yes") {
+        query = query.eq("is_looking_for_team", true);
+      } else if (lookingForTeamFilter === "no") {
+        query = query.eq("is_looking_for_team", false);
+      }
 
-    const debounce = setTimeout(fetchPlayers, 300);
-    return () => clearTimeout(debounce);
+      const { data: profiles, error } = await query
+        .order("display_name")
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      if (error) throw error;
+
+      const userIds = profiles?.map(p => p.user_id) || [];
+      if (userIds.length === 0) {
+        if (!append) setPlayers([]);
+        setHasMore(false);
+        return;
+      }
+
+      const [{ data: teamMembers }, { data: teamsRaw }] = await Promise.all([
+        supabase.from("team_members").select("user_id, team_id").in("user_id", userIds),
+        supabase.from("teams").select("id, name, is_recruiting, recruitment_message"),
+      ]);
+
+      const teamMemberMap = new Map(teamMembers?.map(m => [m.user_id, m.team_id]) || []);
+      const teamIds = [...new Set(teamMembers?.map(m => m.team_id) || [])];
+      const relevantTeams = (teamsRaw || []).filter(t => teamIds.includes(t.id));
+      const teamsMap = new Map(relevantTeams.map(t => [t.id, { name: t.name, is_recruiting: t.is_recruiting, recruitment_message: t.recruitment_message }]));
+
+      let playersData = (profiles || []).map(p => {
+        const teamId = teamMemberMap.get(p.user_id) || null;
+        const teamInfo = teamId ? teamsMap.get(teamId) : null;
+        return {
+          ...p,
+          preferred_play_times: p.preferred_play_times || null,
+          team_id: teamId,
+          team_name: teamInfo?.name || null,
+          team_is_recruiting: teamInfo?.is_recruiting || false,
+          team_recruitment_message: teamInfo?.recruitment_message || null,
+        };
+      });
+
+      if (recruitingFilter === "yes") {
+        playersData = playersData.filter(p => p.team_is_recruiting);
+      }
+
+      setHasMore((profiles?.length || 0) >= PAGE_SIZE);
+      setPlayers(prev => append ? [...prev, ...playersData] : playersData);
+    } catch (error) {
+      console.error("Error fetching players:", error);
+    }
   }, [user?.id, searchQuery, skillFilter, lookingForTeamFilter, recruitingFilter]);
+
+  // Reset and fetch on filter change
+  useEffect(() => {
+    setIsLoading(true);
+    setHasMore(true);
+    const debounce = setTimeout(async () => {
+      await fetchPlayers(0, false);
+      setIsLoading(false);
+    }, 300);
+    return () => clearTimeout(debounce);
+  }, [fetchPlayers]);
+
+  const loadMore = async () => {
+    setIsLoadingMore(true);
+    await fetchPlayers(players.length, true);
+    setIsLoadingMore(false);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -285,6 +298,22 @@ export default function Players() {
                   </Card>
                 </motion.div>
               ))}
+
+              {hasMore && (
+                <div className="flex justify-center pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={loadMore}
+                    disabled={isLoadingMore}
+                  >
+                    {isLoadingMore ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...</>
+                    ) : (
+                      "Load More"
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </motion.div>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MoreHorizontal, UserCog, Trash2 } from "lucide-react";
+import { MoreHorizontal, UserCog } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -44,9 +43,15 @@ interface PlayersTabProps {
   onRefresh: () => void;
 }
 
+const PAGE_SIZE = 50;
+
 export function PlayersTab({ players, onRefresh }: PlayersTabProps) {
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [actionType, setActionType] = useState<"promote" | "demote" | null>(null);
+  const [page, setPage] = useState(0);
+
+  const displayedPlayers = players.slice(0, (page + 1) * PAGE_SIZE);
+  const hasMore = displayedPlayers.length < players.length;
 
   const handleRoleChange = async () => {
     if (!selectedPlayer || !actionType) return;
@@ -77,7 +82,9 @@ export function PlayersTab({ players, onRefresh }: PlayersTabProps) {
       <Card>
         <CardHeader>
           <CardTitle>All Players</CardTitle>
-          <CardDescription>View and manage all registered players</CardDescription>
+          <CardDescription>
+            Showing {displayedPlayers.length} of {players.length} players
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -90,14 +97,14 @@ export function PlayersTab({ players, onRefresh }: PlayersTabProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {players.length === 0 ? (
+              {displayedPlayers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                     No players found
                   </TableCell>
                 </TableRow>
               ) : (
-                players.map((player) => (
+                displayedPlayers.map((player) => (
                   <TableRow key={player.id}>
                     <TableCell className="font-medium">
                       {player.display_name || "Unknown"}
@@ -147,6 +154,14 @@ export function PlayersTab({ players, onRefresh }: PlayersTabProps) {
               )}
             </TableBody>
           </Table>
+
+          {hasMore && (
+            <div className="flex justify-center pt-4">
+              <Button variant="outline" onClick={() => setPage(p => p + 1)}>
+                Load More ({players.length - displayedPlayers.length} remaining)
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
