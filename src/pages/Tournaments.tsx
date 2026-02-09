@@ -32,22 +32,29 @@ export default function Tournaments() {
 
   const fetchTournaments = async () => {
     try {
-      const { data, error } = await supabase
-        .from("tournaments")
-        .select("*")
-        .order("created_at", { ascending: false });
+      // Parallel fetch: tournaments + all participant counts in 2 queries (not N+1)
+      const [tournamentsResult, participantsResult] = await Promise.all([
+        supabase
+          .from("tournaments")
+          .select("id, name, format, status, max_teams, registration_deadline, entry_fee, created_at")
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("tournament_participants")
+          .select("tournament_id"),
+      ]);
 
-      if (error) throw error;
+      if (tournamentsResult.error) throw tournamentsResult.error;
 
-      const tournamentsWithCounts = await Promise.all(
-        (data || []).map(async (tournament) => {
-          const { count } = await supabase
-            .from("tournament_participants")
-            .select("*", { count: "exact", head: true })
-            .eq("tournament_id", tournament.id);
-          return { ...tournament, participant_count: count || 0 };
-        })
-      );
+      // Count participants per tournament client-side
+      const countMap = new Map<string, number>();
+      (participantsResult.data || []).forEach(p => {
+        countMap.set(p.tournament_id, (countMap.get(p.tournament_id) || 0) + 1);
+      });
+
+      const tournamentsWithCounts = (tournamentsResult.data || []).map(t => ({
+        ...t,
+        participant_count: countMap.get(t.id) || 0,
+      }));
 
       setTournaments(tournamentsWithCounts);
     } catch (error) {

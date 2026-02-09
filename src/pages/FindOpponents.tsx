@@ -223,42 +223,7 @@ export default function FindOpponents() {
 
   useEffect(() => {
     fetchData();
-
-    // Subscribe to realtime changes on challenges and ladder_rankings
-    const challengesChannel = supabase
-      .channel('find-opponents-challenges')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'challenges',
-        },
-        () => {
-          fetchData();
-        }
-      )
-      .subscribe();
-
-    const rankingsChannel = supabase
-      .channel('find-opponents-rankings')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'ladder_rankings',
-        },
-        () => {
-          fetchData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(challengesChannel);
-      supabase.removeChannel(rankingsChannel);
-    };
+    // Removed overly broad realtime subscriptions - data refreshes on challenge send
   }, [user]);
 
   const isTeamFrozen = (team: ChallengeableTeam) => {
