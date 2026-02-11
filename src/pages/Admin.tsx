@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap } from "lucide-react";
+import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap, Shuffle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { MatchesTab } from "@/components/admin/MatchesTab";
 import { LaddersTab } from "@/components/admin/LaddersTab";
 import { TournamentsTab } from "@/components/admin/TournamentsTab";
 import { ChallengesTab } from "@/components/admin/ChallengesTab";
+import { AmericanoTab } from "@/components/admin/AmericanoTab";
 
 interface Player {
   id: string;
@@ -39,10 +40,16 @@ interface Match {
   id: string;
   challenger_name: string;
   challenged_name: string;
+  challenger_team_id: string;
+  challenged_team_id: string;
   status: string;
   challenger_score: number | null;
   challenged_score: number | null;
   created_at: string;
+  scheduled_at: string | null;
+  venue: string | null;
+  score_disputed: boolean;
+  dispute_reason: string | null;
 }
 
 interface Ladder {
@@ -97,7 +104,7 @@ export default function Admin() {
         supabase.from("teams").select("id, name, is_frozen, frozen_until, frozen_reason"),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("ladder_rankings").select("team_id, rank, wins, losses").order("rank"),
-        supabase.from("matches").select("id, challenger_team_id, challenged_team_id, status, challenger_score, challenged_score, created_at").order("created_at", { ascending: false }).limit(50),
+        supabase.from("matches").select("id, challenger_team_id, challenged_team_id, status, challenger_score, challenged_score, created_at, scheduled_at, venue, score_disputed, dispute_reason").order("created_at", { ascending: false }).limit(50),
         supabase.from("ladders").select("id, name, description, status, created_at").order("created_at", { ascending: false }),
         supabase.from("ladder_categories").select("id, ladder_id"),
         supabase.from("ladder_rankings").select("id, ladder_category_id"),
@@ -152,10 +159,16 @@ export default function Admin() {
           id: m.id,
           challenger_name: teamsMap.get(m.challenger_team_id) || "Unknown",
           challenged_name: teamsMap.get(m.challenged_team_id) || "Unknown",
+          challenger_team_id: m.challenger_team_id,
+          challenged_team_id: m.challenged_team_id,
           status: m.status,
           challenger_score: m.challenger_score,
           challenged_score: m.challenged_score,
           created_at: new Date(m.created_at).toLocaleDateString(),
+          scheduled_at: m.scheduled_at,
+          venue: m.venue,
+          score_disputed: m.score_disputed ?? false,
+          dispute_reason: m.dispute_reason,
         }));
         setMatches(matchesMapped);
       }
@@ -272,7 +285,7 @@ export default function Admin() {
 
           {/* Tabs */}
           <Tabs defaultValue="players" className="w-full">
-            <TabsList className="grid w-full grid-cols-6 mb-6">
+            <TabsList className="grid w-full grid-cols-7 mb-6">
               <TabsTrigger value="players">
                 <Users className="w-4 h-4 mr-2 hidden sm:inline" />
                 Players
@@ -296,6 +309,10 @@ export default function Admin() {
               <TabsTrigger value="tournaments">
                 <LayoutGrid className="w-4 h-4 mr-2 hidden sm:inline" />
                 Tournaments
+              </TabsTrigger>
+              <TabsTrigger value="americano">
+                <Shuffle className="w-4 h-4 mr-2 hidden sm:inline" />
+                Americano
               </TabsTrigger>
             </TabsList>
 
@@ -321,6 +338,10 @@ export default function Admin() {
 
             <TabsContent value="tournaments">
               <TournamentsTab tournaments={filteredTournaments} onRefresh={fetchAdminData} />
+            </TabsContent>
+
+            <TabsContent value="americano">
+              <AmericanoTab />
             </TabsContent>
           </Tabs>
         </motion.div>
