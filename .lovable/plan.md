@@ -1,119 +1,108 @@
 
 
-# Unified Player Stats Across All Game Modes
+# True Individual Stats Across All Game Modes
 
-## Problem
-The Stats page currently only counts ladder matches. Tournament results, Americano Individual rounds, and Americano Team matches are completely ignored, giving players an incomplete picture of their performance.
+## The Problem You Identified
 
-## Data Sources to Aggregate
+Currently the stats system finds your ONE team and counts that team's wins/losses. But:
+- If you play Americano individually, that has nothing to do with your team
+- If you change teams or play on multiple teams in tournaments, those stats get lost
+- Your personal record should follow YOU, not your current team
 
-| Game Mode | Table | How player is identified |
-|-----------|-------|------------------------|
-| Ladder | `matches` | Via team_id (team_members lookup) |
-| Tournament | `tournament_matches` | Via team_id (team_members or tournament_participants lookup) |
-| Americano Individual | `americano_rounds` | Via americano_players.user_id |
-| Americano Team | `americano_team_matches` | Via americano_teams (no direct user_id link -- name-based only) |
+## The Fix: Player-Centric Stats
 
-Note: Americano Team mode lacks a `user_id` link, so those matches cannot be reliably attributed to a logged-in player. The plan will cover the three modes that have reliable user linkage (Ladder, Tournament, Americano Individual).
+Instead of "find team, then find team's matches," we flip it to "find all matches this player participated in, across all modes."
 
-## Approach: Database RPC Function
+### How Each Mode Links to YOU (the player)
 
-Rather than making 5+ separate queries from the client, we will create a single database RPC function `get_player_unified_stats` that returns aggregated stats in one call. This is more efficient and keeps complex logic server-side.
+| Mode | How we find YOUR matches |
+|------|--------------------------|
+| Ladder | `matches` -> your team_id via `team_members` (all teams you've been on) |
+| Tournament | `tournament_matches` -> teams you were on via `team_members` (all teams) |
+| Americano | `americano_rounds` -> directly via `americano_players.user_id` |
+
+The key change: instead of `LIMIT 1` on team lookup, we get ALL teams the player has ever been a member of, and count matches across all of them.
 
 ## Changes
 
-### 1. New Database RPC: `get_player_unified_stats(p_user_id, p_days)`
+### 1. Update the Database RPC Function
 
-Returns a JSON object with:
-- **overall**: total wins, losses, points, matches played
-- **by_mode**: breakdown for ladder, tournament, americano
-- **recent_matches**: unified list of recent matches (last 15) across all modes, each tagged with a `source` field ("ladder", "tournament", "americano")
-- **win_rate_by_day**: daily win/loss counts for charting
+Modify `get_player_unified_stats` to:
+- Collect ALL team_ids the player belongs to (not just one)
+- Count ladder/tournament matches across ALL those teams
+- Keep Americano as-is (already user_id based)
+- Add a `teams` array in the response showing each team's name and individual record
+- The "overall" section becomes a true personal aggregate
 
-The function will:
-- Look up the user's team_id from `team_members`
-- Query `matches` (ladder) for completed matches involving that team
-- Query `tournament_matches` for completed matches involving that team (via `tournament_participants`)
-- Query `americano_rounds` for completed rounds where the user was a player (via `americano_players.user_id`)
-- Combine and return aggregated results
+### 2. Update Stats Page
 
-### 2. Update `src/pages/Stats.tsx`
+- Title becomes "My Stats" with the player's own name
+- Show a "Teams" section listing each team the player is on, with per-team records
+- Americano stats shown separately as "Individual" since they're not tied to any team
+- Overall summary adds up everything across all teams + individual play
+- Mode filter still works (All / Ladder / Tournament / Americano)
 
-- Replace the current ladder-only fetch with a single RPC call to `get_player_unified_stats`
-- Add a mode filter (All / Ladder / Tournament / Americano) alongside the existing time period filter
-- Update the summary cards to show combined totals
-- Keep the existing card layout (Rank stays ladder-only since only ladders have ranks)
-- Add a "Matches by Mode" breakdown showing pie/bar distribution
+### 3. Update Player Profile Page
 
-### 3. Update `src/components/stats/WinRateChart.tsx`
-
-- Accept unified match data (with source tags) instead of querying `matches` directly
-- Filter by selected mode if applicable
-- Chart remains the same visually (cumulative win rate over time)
-
-### 4. Update `src/components/stats/MatchTimeline.tsx`
-
-- Accept unified recent matches list from the RPC
-- Add a small badge on each match entry showing the source (Ladder, Tournament, Americano)
-- Each entry shows opponent name, result, score, date, and mode
-
-### 5. Update `src/components/stats/HeadToHead.tsx`
-
-- Include tournament matches in opponent records (same team-based lookup)
-- Americano individual rounds won't have meaningful "opponents" for head-to-head, so those are excluded from this component
-
-### 6. Database Index
-
-Add an index on `americano_players(user_id)` to speed up the americano stats lookup.
+- Add a unified stats summary when viewing any player's profile
+- Uses the same RPC, showing their cross-mode performance
 
 ## Technical Details
 
-### RPC Function SQL (simplified)
+### Updated RPC Logic
 
-```sql
-CREATE OR REPLACE FUNCTION get_player_unified_stats(
-  p_user_id UUID,
-  p_days INTEGER DEFAULT 0
-)
-RETURNS JSONB AS $$
-DECLARE
-  v_team_id UUID;
-  v_start_date TIMESTAMPTZ;
-  v_result JSONB;
-BEGIN
-  -- Get user's team
-  SELECT team_id INTO v_team_id
-  FROM team_members WHERE user_id = p_user_id LIMIT 1;
+```text
+get_player_unified_stats(p_user_id, p_days)
+  |
+  |-- Find ALL team_ids from team_members (not LIMIT 1)
+  |-- For EACH team_id:
+  |     |-- Count ladder match wins/losses
+  |     |-- Count tournament match wins/losses
+  |-- Americano: query by user_id directly (unchanged)
+  |-- Aggregate everything into personal totals
+  |-- Return per-team breakdown + personal americano + overall
+```
 
-  -- Calculate date filter
-  IF p_days > 0 THEN
-    v_start_date := NOW() - (p_days || ' days')::INTERVAL;
-  ELSE
-    v_start_date := '1970-01-01'::TIMESTAMPTZ;
-  END IF;
+### Updated Response Shape
 
-  -- Build unified result from ladder matches,
-  -- tournament matches, and americano rounds
-  -- ... (aggregation logic)
-
-  RETURN v_result;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+```text
+{
+  "player_name": "Ali",
+  "teams": [
+    { "team_id": "...", "team_name": "Team Alpha", "ladder_wins": 5, "ladder_losses": 2, "tournament_wins": 3, "tournament_losses": 1 },
+    { "team_id": "...", "team_name": "Team Beta", "ladder_wins": 1, "ladder_losses": 0, "tournament_wins": 0, "tournament_losses": 0 }
+  ],
+  "overall": { "wins": 12, "losses": 4 },
+  "by_mode": {
+    "ladder": { "wins": 6, "losses": 2 },
+    "tournament": { "wins": 3, "losses": 1 },
+    "americano": { "wins": 3, "losses": 1 }
+  },
+  "rank": 5,              // from primary/first team's ladder ranking
+  "points": 1200,
+  "streak": 3,
+  "recent_matches": [...], // unified across all teams + americano
+  "win_rate_by_day": [...],
+  "head_to_head": [...]
+}
 ```
 
 ### Files Changed
 
 | File | Change |
 |------|--------|
-| New migration SQL | RPC function + index |
-| `src/pages/Stats.tsx` | Replace fetch with RPC call, add mode filter |
-| `src/components/stats/WinRateChart.tsx` | Accept pre-fetched data prop instead of self-fetching |
-| `src/components/stats/MatchTimeline.tsx` | Accept unified data, show mode badges |
-| `src/components/stats/HeadToHead.tsx` | Include tournament matches in records |
+| New migration SQL | Replace RPC to use ALL team_ids, add per-team breakdown, fetch player name from profiles |
+| `src/pages/Stats.tsx` | Show player name as title, add per-team breakdown cards, label Americano as "Individual" |
+| `src/pages/PlayerProfile.tsx` | Add unified stats section using the same RPC for any viewed player |
+| `src/components/stats/MatchTimeline.tsx` | No change needed (already shows source badges) |
+| `src/components/stats/WinRateChart.tsx` | No change needed (already accepts data prop) |
+| `src/components/stats/HeadToHead.tsx` | No change needed (already includes tournament) |
 
-### No UI/UX Redesign
+### Stats Page Layout Updates
 
-The existing card layout, charts, and visual style remain identical. The only visible additions are:
-- A mode filter dropdown next to the existing time period dropdown
-- Small mode badges on match timeline entries (e.g., "Ladder", "Tournament", "Americano")
+- Header: "My Stats" with player display name from profiles
+- Per-team cards: each team the player is on, showing that team's ladder + tournament record
+- Americano card: labeled "Individual" showing personal americano record
+- Overall summary cards: aggregate of everything (unchanged layout, just correct numbers now)
+- All existing charts and filters remain the same
 
