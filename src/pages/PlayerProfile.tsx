@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { InvitePartnerDialog } from "@/components/team/InvitePartnerDialog";
+import { PlayerStatsSection } from "@/components/stats/PlayerStatsSection";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -252,6 +253,9 @@ export default function PlayerProfile() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Unified Stats */}
+          <PlayerStatsSection userId={player.user_id} />
 
           {/* Team Info */}
           {team ? (
