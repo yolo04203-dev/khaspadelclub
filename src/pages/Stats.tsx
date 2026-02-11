@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Trophy, TrendingUp, Calendar, Users, Loader2, Target } from "lucide-react";
+import { Trophy, TrendingUp, Calendar, Users, Loader2, Target, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppHeader } from "@/components/AppHeader";
@@ -18,9 +18,18 @@ import { WinRateChart } from "@/components/stats/WinRateChart";
 import { HeadToHead } from "@/components/stats/HeadToHead";
 import { MatchTimeline } from "@/components/stats/MatchTimeline";
 
+interface TeamBreakdown {
+  team_id: string;
+  team_name: string;
+  ladder_wins: number;
+  ladder_losses: number;
+  tournament_wins: number;
+  tournament_losses: number;
+}
+
 interface UnifiedStats {
-  team_id: string | null;
-  team_name: string | null;
+  player_name: string;
+  teams: TeamBreakdown[];
   rank: number | null;
   points: number;
   streak: number;
@@ -91,17 +100,17 @@ export default function Stats() {
     return <Navigate to="/auth" replace />;
   }
 
-  if (!stats?.team_id) {
+  if (!stats) {
     return (
       <div className="min-h-screen bg-background">
         <AppHeader showBack />
         <main className="container py-8 max-w-4xl">
-          <h1 className="text-3xl font-bold text-foreground mb-8">Performance Stats</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-8">My Stats</h1>
           <Card className="text-center py-12">
             <CardContent>
-              <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">No team yet</h3>
-              <p className="text-muted-foreground">Join or create a team to see your performance stats</p>
+              <User className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">No stats available</h3>
+              <p className="text-muted-foreground">Play some matches to see your performance stats</p>
             </CardContent>
           </Card>
         </main>
@@ -136,8 +145,12 @@ export default function Stats() {
         >
           <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Performance Stats</h1>
-              <p className="text-muted-foreground mt-1">Team: {stats.team_name}</p>
+              <h1 className="text-3xl font-bold text-foreground">
+                {stats.player_name}'s Stats
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Your personal performance across all game modes
+              </p>
             </div>
 
             <div className="flex gap-2">
@@ -230,8 +243,71 @@ export default function Stats() {
               </Card>
             </div>
 
-            {/* Mode breakdown (only when "All" is selected) */}
-            {mode === "all" && (
+            {/* Per-Team Breakdown */}
+            {mode === "all" && stats.teams.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Team Records
+                </h2>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {stats.teams.map((team) => {
+                    const teamTotal = team.ladder_wins + team.ladder_losses + team.tournament_wins + team.tournament_losses;
+                    const teamWins = team.ladder_wins + team.tournament_wins;
+                    return (
+                      <Card key={team.team_id}>
+                        <CardContent className="pt-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-semibold text-foreground">{team.team_name}</span>
+                            <Badge variant="outline" className="text-xs">Team</Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Ladder: </span>
+                              <span className="font-medium">{team.ladder_wins}W / {team.ladder_losses}L</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Tournament: </span>
+                              <span className="font-medium">{team.tournament_wins}W / {team.tournament_losses}L</span>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {teamTotal} matches · {teamWins}W total
+                            {teamTotal > 0 && ` · ${Math.round((teamWins / teamTotal) * 100)}%`}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+
+                  {/* Americano Individual Card */}
+                  {(stats.by_mode.americano.wins > 0 || stats.by_mode.americano.losses > 0) && (
+                    <Card>
+                      <CardContent className="pt-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-semibold text-foreground">Americano</span>
+                          <Badge variant="secondary" className="text-xs">Individual</Badge>
+                        </div>
+                        <div className="text-sm">
+                          <span className="font-medium">
+                            {stats.by_mode.americano.wins}W / {stats.by_mode.americano.losses}L
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {stats.by_mode.americano.wins + stats.by_mode.americano.losses} matches
+                          {(stats.by_mode.americano.wins + stats.by_mode.americano.losses) > 0 &&
+                            ` · ${Math.round((stats.by_mode.americano.wins / (stats.by_mode.americano.wins + stats.by_mode.americano.losses)) * 100)}%`
+                          }
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Mode breakdown (only when "All" is selected and no teams) */}
+            {mode === "all" && stats.teams.length === 0 && (
               <div className="grid gap-4 md:grid-cols-3">
                 {(["ladder", "tournament", "americano"] as const).map((m) => {
                   const ms = stats.by_mode[m];
@@ -241,8 +317,8 @@ export default function Stats() {
                       <CardContent className="pt-4">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium capitalize text-foreground">{m}</span>
-                          <Badge variant="secondary" className="text-xs">
-                            {t} matches
+                          <Badge variant={m === "americano" ? "secondary" : "outline"} className="text-xs">
+                            {m === "americano" ? "Individual" : "Team"} · {t} matches
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
