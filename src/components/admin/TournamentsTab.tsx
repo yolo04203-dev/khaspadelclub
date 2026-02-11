@@ -154,7 +154,7 @@ export function TournamentsTab({ tournaments, onRefresh }: TournamentsTabProps) 
                           <DropdownMenuItem asChild>
                             <Link to={`/tournaments/${tournament.id}`}>
                               <ExternalLink className="w-4 h-4 mr-2" />
-                              View Tournament
+                              Manage Tournament
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
