@@ -26,6 +26,12 @@ interface DashboardStats {
   pendingChallenges: number;
 }
 
+interface ModeBreakdown {
+  ladder: { wins: number; losses: number };
+  tournament: { wins: number; losses: number };
+  americano: { wins: number; losses: number };
+}
+
 export default function Dashboard() {
   const { user, role, isLoading, signOut } = useAuth();
   const [userTeam, setUserTeam] = useState<UserTeam | null>(null);
@@ -37,7 +43,7 @@ export default function Dashboard() {
     pendingChallenges: 0,
   });
   const [incomingChallenges, setIncomingChallenges] = useState(0);
-
+  const [modeBreakdown, setModeBreakdown] = useState<ModeBreakdown | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -95,7 +101,7 @@ export default function Dashboard() {
           // Fetch stats in parallel
           const teamId = memberData.team_id;
           
-          const [matchesResult, pendingResult, incomingResult] = await Promise.all([
+          const [matchesResult, pendingResult, incomingResult, unifiedResult] = await Promise.all([
             supabase
               .from("matches")
               .select("*", { count: "exact", head: true })
@@ -111,14 +117,26 @@ export default function Dashboard() {
               .select("*", { count: "exact", head: true })
               .eq("challenged_team_id", teamId)
               .eq("status", "pending"),
+            supabase.rpc("get_player_unified_stats", {
+              p_user_id: user.id,
+              p_days: 0,
+            }),
           ]);
 
           setIncomingChallenges(safeCount(incomingResult.count));
 
+          const unified = unifiedResult.data as any;
+          if (unified?.by_mode) {
+            setModeBreakdown(unified.by_mode);
+          }
+
+          const totalWins = unified?.overall?.wins ?? rankResult.data?.wins ?? 0;
+          const totalLosses = unified?.overall?.losses ?? rankResult.data?.losses ?? 0;
+
           setStats({
-            matchesPlayed: safeCount(matchesResult.count),
-            wins: rankResult.data?.wins ?? 0,
-            losses: rankResult.data?.losses ?? 0,
+            matchesPlayed: totalWins + totalLosses,
+            wins: totalWins,
+            losses: totalLosses,
             pendingChallenges: safeCount(pendingResult.count),
           });
         }
@@ -173,7 +191,7 @@ export default function Dashboard() {
 
         const teamId = memberData.team_id;
         
-        const [matchesResult, pendingResult, incomingResult] = await Promise.all([
+        const [matchesResult, pendingResult, incomingResult, unifiedResult] = await Promise.all([
           supabase
             .from("matches")
             .select("*", { count: "exact", head: true })
@@ -189,13 +207,26 @@ export default function Dashboard() {
             .select("*", { count: "exact", head: true })
             .eq("challenged_team_id", teamId)
             .eq("status", "pending"),
+          supabase.rpc("get_player_unified_stats", {
+            p_user_id: user!.id,
+            p_days: 0,
+          }),
         ]);
 
         setIncomingChallenges(safeCount(incomingResult.count));
+
+        const unified = unifiedResult.data as any;
+        if (unified?.by_mode) {
+          setModeBreakdown(unified.by_mode);
+        }
+
+        const totalWins = unified?.overall?.wins ?? rankResult.data?.wins ?? 0;
+        const totalLosses = unified?.overall?.losses ?? rankResult.data?.losses ?? 0;
+
         setStats({
-          matchesPlayed: safeCount(matchesResult.count),
-          wins: rankResult.data?.wins ?? 0,
-          losses: rankResult.data?.losses ?? 0,
+          matchesPlayed: totalWins + totalLosses,
+          wins: totalWins,
+          losses: totalLosses,
           pendingChallenges: safeCount(pendingResult.count),
         });
       }
@@ -375,6 +406,29 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Mode Breakdown */}
+          {modeBreakdown && (
+            <div className="flex flex-wrap gap-3 mb-8">
+              {(["ladder", "tournament", "americano"] as const).map((m) => {
+                const ms = modeBreakdown[m];
+                const total = ms.wins + ms.losses;
+                if (total === 0) return null;
+                const wr = Math.round((ms.wins / total) * 100);
+                const icons = { ladder: "🪜", tournament: "🏆", americano: "🔀" };
+                return (
+                  <Link to="/stats" key={m}>
+                    <Badge variant="secondary" className="px-3 py-1.5 text-sm gap-1.5 cursor-pointer hover:bg-muted transition-colors">
+                      <span>{icons[m]}</span>
+                      <span className="capitalize font-medium">{m}</span>
+                      <span className="text-muted-foreground">{total} matches</span>
+                      <span className="text-foreground font-semibold">{wr}%</span>
+                    </Badge>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
 
           {/* Quick Actions */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
