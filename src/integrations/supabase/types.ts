@@ -1209,6 +1209,10 @@ export type Database = {
         Args: { _avatar_url?: string; _name: string }
         Returns: string
       }
+      get_player_unified_stats: {
+        Args: { p_days?: number; p_user_id: string }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
