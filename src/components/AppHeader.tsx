@@ -25,67 +25,69 @@ export function AppHeader({ showBack = false, backTo = "/dashboard", actions }: 
   const location = useLocation();
 
   return (
-    <header className="border-b border-border bg-card sticky top-0 z-40">
-      <div className="container flex items-center justify-between h-16">
-        <div className="flex items-center gap-4">
-          {showBack && (
-            <Button variant="ghost" size="icon" asChild>
-              <Link to={backTo}>
-                <ArrowLeft className="w-4 h-4" />
-              </Link>
-            </Button>
-          )}
-          <Link to={user ? "/dashboard" : "/"}>
-            <Logo size="sm" />
-          </Link>
+    <>
+      <header className="border-b border-border bg-card sticky top-0 z-40 safe-top">
+        <div className="container flex items-center justify-between h-16">
+          <div className="flex items-center gap-4">
+            {showBack && (
+              <Button variant="ghost" size="icon" asChild>
+                <Link to={backTo}>
+                  <ArrowLeft className="w-4 h-4" />
+                </Link>
+              </Button>
+            )}
+            <Link to={user ? "/dashboard" : "/"}>
+              <Logo size="sm" />
+            </Link>
 
-          {/* Navigation Links - Desktop */}
-          {user && (
-            <nav className="hidden md:flex items-center gap-1 ml-4">
-              {navLinks.map(({ to, label, icon: Icon }) => {
-                const isActive = location.pathname === to || 
-                  (to !== "/dashboard" && location.pathname.startsWith(to));
-                return (
-                  <Link
-                    key={to}
-                    to={to}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-                      isActive
-                        ? "bg-accent/10 text-accent"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                    )}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {label}
-                  </Link>
-                );
-              })}
-            </nav>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {actions}
-          
-          {user && <NotificationBell />}
-
-          <div className="text-right hidden sm:block ml-2">
-            <p className="text-sm font-medium text-foreground">
-              {user?.user_metadata?.display_name || user?.email?.split("@")[0]}
-            </p>
-            <p className="text-xs text-muted-foreground capitalize">{role || "Player"}</p>
+            {/* Navigation Links - Desktop */}
+            {user && (
+              <nav className="hidden md:flex items-center gap-1 ml-4">
+                {navLinks.map(({ to, label, icon: Icon }) => {
+                  const isActive = location.pathname === to || 
+                    (to !== "/dashboard" && location.pathname.startsWith(to));
+                  return (
+                    <Link
+                      key={to}
+                      to={to}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+                        isActive
+                          ? "bg-accent/10 text-accent"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      )}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {label}
+                    </Link>
+                  );
+                })}
+              </nav>
+            )}
           </div>
 
-          <Button variant="ghost" size="icon" onClick={signOut}>
-            <LogOut className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
+          <div className="flex items-center gap-2">
+            {actions}
+            
+            {user && <NotificationBell />}
 
-      {/* Mobile Navigation */}
+            <div className="text-right hidden sm:block ml-2">
+              <p className="text-sm font-medium text-foreground">
+                {user?.user_metadata?.display_name || user?.email?.split("@")[0]}
+              </p>
+              <p className="text-xs text-muted-foreground capitalize">{role || "Player"}</p>
+            </div>
+
+            <Button variant="ghost" size="icon" onClick={signOut}>
+              <LogOut className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Mobile Navigation - Fixed bottom bar */}
       {user && (
-        <nav className="md:hidden flex items-center justify-around border-t border-border bg-card py-2 px-2">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border bg-card py-2 px-2 safe-bottom">
           {navLinks.map(({ to, label, icon: Icon }) => {
             const isActive = location.pathname === to || 
               (to !== "/dashboard" && location.pathname.startsWith(to));
@@ -107,6 +109,6 @@ export function AppHeader({ showBack = false, backTo = "/dashboard", actions }: 
           })}
         </nav>
       )}
-    </header>
+    </>
   );
 }
