@@ -1,119 +1,116 @@
 
 
-# Cross-Platform iOS/Android Audit Report and Optimization Plan
+# 1000 Concurrent User Testing and Optimization Plan
 
-## Current State: What's Already Done (Well)
+## Audit Summary
 
-The codebase is already hardened for cross-platform mobile use. Here is a summary of what's in place:
+The codebase is already well-hardened across most areas. Here is the current status and the remaining gaps to address.
 
-| Area | Status | Implementation |
-|------|--------|----------------|
-| Safe area insets | Done | CSS classes (safe-top, safe-bottom, pb-safe-nav), FAB positioning with env() |
-| Input font size >= 16px | Done | Global CSS rule prevents iOS auto-zoom |
-| Touch targets >= 44px | Done | CSS rule on pointer:coarse media query |
-| No tap delay | Done | touch-manipulation on all interactive elements |
-| No rubber-band bounce | Done | overscroll-behavior: none globally |
-| Tap highlight removed | Done | -webkit-tap-highlight-color: transparent |
-| Button press feedback | Done | active:scale-[0.97] + haptic-tap utility |
-| Haptic feedback | Done | useHaptics hook with Capacitor Haptics |
-| Error boundaries | Done | Global ErrorBoundary + RouteErrorBoundary |
-| Crash reporting | Done | Sentry with tracing, replay, user identity |
-| Unhandled rejection handling | Done | Global event listeners in App.tsx |
-| Dark mode | Done | next-themes with CSS variables |
-| Keyboard handling | Done | useKeyboardHeight hook (visualViewport API) |
-| Pull-to-refresh | Done | Custom PullToRefresh component with WebKit guards |
-| Skeleton loaders | Done | Dashboard, Players, Stats pages |
-| Code splitting | Done | 21 lazy-loaded routes |
-| Chunk splitting | Done | 3 manual vendor chunks |
-| PWA manifest | Done | Standalone, portrait, PNG icons with purpose:any |
-| Service worker | Done | Network-first, skips /~oauth and API routes |
-| Capacitor config | Done | iOS contentInset, Android mixedContent, StatusBar, SplashScreen |
-| Web Vitals tracking | Done | FCP, LCP, CLS, INP via PerformanceObserver |
-| Performance budgets | Done | TTI < 2.5s, tap < 100ms, 60fps scroll |
-| Safe navigation | Done | useSafeNavigation with WebKit fallback |
-| Network monitoring | Done | useNetworkStatus with offline/slow banners |
-| Query caching | Done | 2-min staleTime, 10-min gcTime, retry with backoff |
-| Font loading | Done | Preloaded in index.html, non-blocking |
-| Preconnect hints | Done | Supabase + Google Fonts domains |
-| FAB component | Done | Safe-area-aware positioning |
-| Image resilience | Done | ImageWithFallback with lazy loading + retry |
+### Already in Place (No Changes Needed)
 
-## Gaps Found and Fixes
-
-### 1. Profile Page: Missing Skeleton Loader
-The Profile page shows a plain centered spinner during loading, unlike Dashboard and Players which use proper skeleton loaders. This creates an inconsistent perceived-performance experience.
-
-**Fix:** Replace the Loader2 spinner with a skeleton layout matching the profile card structure.
-
-**File:** `src/pages/Profile.tsx`
+| Area | Implementation |
+|------|---------------|
+| FCP optimization | Fonts preloaded via `<link>` in index.html, preconnect to backend and Google Fonts |
+| TTI budget | Performance budget set at 2.5s, code splitting across 21 routes, 3 manual vendor chunks |
+| Tap responsiveness | `touch-manipulation` globally removes 300ms delay; `active:scale-[0.97]` gives press feedback |
+| Safe areas (iOS) | CSS env() insets for notch, home indicator; `pb-safe-nav` utility class |
+| Input zoom prevention | Global CSS enforces 16px minimum on inputs |
+| Touch targets | 44px minimum on `pointer:coarse` devices |
+| Keyboard handling | `useKeyboardHeight` hook auto-scrolls focused inputs into view |
+| Error boundaries | Global `ErrorBoundary` + per-route `RouteErrorBoundary` with copy-to-clipboard diagnostics |
+| Crash reporting | Sentry with browser tracing, session replay, user identity |
+| Unhandled rejections | Global listeners in App.tsx, forwarded to Sentry |
+| API resilience | `apiClient.ts` with 15s timeouts, retry for idempotent methods, AbortController |
+| Query caching | 2-min staleTime, 10-min gcTime, exponential backoff retries |
+| Dark mode | next-themes with full CSS variable coverage |
+| Haptic feedback | `useHaptics` hook with Capacitor Haptics |
+| Web Vitals tracking | FCP, LCP, CLS, INP via PerformanceObserver |
+| Real-time health | `useRealtimeHealth` hook with connection status tracking and cleanup |
+| Deep linking | Capacitor `appUrlOpen` listener routing through React Router |
+| Foreground refresh | `appStateChange` listener triggers React Query refetch |
+| Splash screen | Manual dismissal after auth resolves |
+| Status bar theming | Dynamic StatusBar style synced with light/dark theme |
+| Pagination | 30-50 items per page with Load More pattern |
+| Search debouncing | 300ms debounce on all search inputs |
+| Skeleton loaders | Dashboard, Challenges, Ladder Detail pages |
+| Credential security | Only anon key exposed (public by design); service role key is server-side only |
+| Load testing infra | Supports up to 2000 concurrent users with ramp-up, per-endpoint stats, percentile tracking |
 
 ---
 
-### 2. Dashboard: Duplicated Fetch Logic
-The Dashboard has identical data-fetching logic in both the initial `useEffect` and the `handleRefresh` callback (~80 lines duplicated). This is a maintainability risk -- bugs fixed in one path may not be fixed in the other.
+## Gaps Found and Fixes
 
-**Fix:** Extract the shared fetch logic into a single `fetchDashboardData` function and call it from both the initial effect and the pull-to-refresh handler.
+### 1. Players Page: Missing Skeleton Loader
+
+The Players page uses a basic `Loader2` spinner during initial load (line 199-201). A `PlayerCardSkeleton` component already exists in `skeleton-card.tsx` but is not being used.
+
+**Fix:** Replace the spinner with 6 `PlayerCardSkeleton` instances to match the pattern used by Dashboard and Challenges.
+
+**File:** `src/pages/Players.tsx`
+
+---
+
+### 2. Load Test: Missing 1000-User Tier
+
+The current benchmark tests cover 100 and 500 concurrent users, but the requirement specifies 1000. No 1000-user test scenario exists.
+
+**Fix:** Add a "1000 Concurrent Users" test suite to `performance-benchmarks.test.ts` with:
+- Error rate under 5%
+- P95 response time under 3x the acceptable threshold (9 seconds)
+- Minimum 50 requests/second throughput
+- Full endpoint breakdown logging
+
+**File:** `src/test/performance-benchmarks.test.ts`
+
+---
+
+### 3. Load Test: Missing RPC Endpoint Coverage
+
+The load test only covers simple table queries and mutations. The app's heaviest query -- `get_player_unified_stats` RPC -- is not tested. Under 1000 concurrent users, this function (which runs multiple JOINs and subqueries) is the most likely bottleneck.
+
+**Fix:** Add the `get_player_unified_stats` RPC call as a new test endpoint in `load-test.ts` with a realistic weight.
+
+**File:** `src/test/load-test.ts`
+
+---
+
+### 4. Performance Budget: Missing 1000-User Constant
+
+The `perfBudget.ts` file defines budgets for TTI, tap latency, and scroll FPS, but has no constant for concurrent user capacity or API response time targets. This makes it harder to enforce the 1000-user requirement in automated tests.
+
+**Fix:** Add `CONCURRENT_USERS_TARGET`, `API_RESPONSE_MAX_MS`, and `LOAD_ERROR_RATE_MAX_PCT` constants.
+
+**File:** `src/lib/perfBudget.ts`
+
+---
+
+### 5. Dashboard: framer-motion Wrapper on Full Page Content
+
+The Dashboard wraps its entire main content in a `<motion.div>` with an opacity+translate animation (line 211-215). For a page with 4 stat cards, mode breakdown badges, and 7 action cards, this creates a single large animation that blocks TTI until the animation completes.
+
+**Fix:** Remove the `<motion.div>` wrapper. The skeleton-to-content transition already provides a smooth perceived loading experience.
 
 **File:** `src/pages/Dashboard.tsx`
 
 ---
 
-### 3. Deep Linking for Capacitor (iOS/Android)
-No deep linking configuration exists. Users cannot open specific app content (e.g., a tournament or player profile) from external links or notifications.
-
-**Fix:** Add a Capacitor App Listener in `App.tsx` that intercepts deep link URLs and routes them through React Router. Add associated link domain entries to the Capacitor config.
-
-**Files:** `src/App.tsx`, `capacitor.config.ts`
-
----
-
-### 4. Status Bar and Navigation Bar Styling
-The Capacitor config sets a static dark status bar, but doesn't adapt to the current theme (light/dark mode). On iOS, this can cause white text on a white background in light mode.
-
-**Fix:** Add a `useStatusBar` hook that listens to theme changes and dynamically updates the Capacitor StatusBar style to match.
-
-**File:** New `src/hooks/useStatusBar.ts`, integrate in `App.tsx`
-
----
-
-### 5. App State Lifecycle Handling (Background/Foreground)
-When the app returns from background on mobile, stale data may be shown. There is no foreground-resume handler to refresh critical data.
-
-**Fix:** Add a Capacitor App state change listener that triggers a React Query refetch of active queries when the app returns to the foreground.
-
-**File:** `src/App.tsx`
-
----
-
-### 6. Splash Screen Dismissal
-The Capacitor config has `launchAutoHide: true` for the splash screen, but for a smoother experience, the splash should be dismissed only after the auth state is resolved (preventing a flash of the login screen for authenticated users).
-
-**Fix:** Set `launchAutoHide: false` in `capacitor.config.ts` and programmatically hide the splash screen in `AuthContext.tsx` after `isLoading` becomes `false`.
-
-**Files:** `capacitor.config.ts`, `src/contexts/AuthContext.tsx`
-
----
-
 ## Technical Details
 
-### File Changes Summary
+### File Changes
 
-| File | Action |
+| File | Change |
 |------|--------|
-| `src/pages/Profile.tsx` | Replace spinner with skeleton loader |
-| `src/pages/Dashboard.tsx` | Extract shared fetch logic to eliminate duplication |
-| `src/App.tsx` | Add deep link listener + foreground resume handler |
-| `capacitor.config.ts` | Disable splash auto-hide, add deep link config |
-| `src/contexts/AuthContext.tsx` | Dismiss splash screen after auth resolves |
-| `src/hooks/useStatusBar.ts` | New -- dynamic status bar style based on theme |
+| `src/pages/Players.tsx` | Replace Loader2 spinner with PlayerCardSkeleton grid |
+| `src/pages/Dashboard.tsx` | Remove motion.div wrapper around main content |
+| `src/test/performance-benchmarks.test.ts` | Add 1000-user test suite |
+| `src/test/load-test.ts` | Add `get_player_unified_stats` RPC endpoint |
+| `src/lib/perfBudget.ts` | Add concurrent user and API response constants |
 
-### Items Outside Lovable Scope (Require Local Setup)
+### What Cannot Be Tested in Lovable (Requires Local Setup)
 
-These items cannot be implemented within Lovable but are documented for completeness:
-
-- **Push Notifications (FCM):** Requires Firebase project setup, native permission handling, and server-side token management. Must be configured locally with `@capacitor/push-notifications`.
-- **E2E Testing (Detox/Appium):** Requires native build toolchain and physical/emulator device access.
-- **CI/CD Pipeline:** Requires GitHub Actions or similar configuration in the repository.
-- **Feature Flags:** Requires an external service (LaunchDarkly, Unleash) or a custom database-backed implementation.
-- **Staged Rollouts:** Handled at the App Store / Play Store level during submission.
+- Real-device iOS/Android battery and memory profiling
+- Lighthouse audits on physical devices
+- Network throttling tests (3G/4G simulation)
+- Native permission dialogs (camera, location)
+- App Store / Play Store submission
 
