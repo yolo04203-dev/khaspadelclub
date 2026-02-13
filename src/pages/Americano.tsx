@@ -119,10 +119,10 @@ export default function Americano() {
         showBack 
         actions={
           user && (
-            <Button asChild>
+            <Button asChild size="icon" className="sm:w-auto sm:px-4 sm:h-10">
               <Link to="/americano/create">
-                <Plus className="w-4 h-4 mr-2" />
-                New Session
+                <Plus className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">New Session</span>
               </Link>
             </Button>
           )
