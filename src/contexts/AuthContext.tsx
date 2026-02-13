@@ -1,8 +1,21 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode, useCallback } from "react";
 import { User, Session } from "@supabase/supabase-js";
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
 import { setErrorReportingUser, clearErrorReportingUser } from "@/lib/errorReporting";
+
+/** Hide the native splash screen once auth is resolved */
+async function hideSplashScreen() {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    const { SplashScreen } = await import("@capacitor/splash-screen");
+    await SplashScreen.hide();
+    logger.debug("Splash screen dismissed");
+  } catch {
+    // Plugin not installed — safe to ignore
+  }
+}
 
 type UserRole = "admin" | "player";
 
@@ -169,6 +182,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } finally {
         if (isMountedRef.current) setIsLoading(false);
+        // Dismiss splash screen now that auth state is resolved
+        void hideSplashScreen();
       }
     };
 
