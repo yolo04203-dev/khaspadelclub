@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { logger } from "@/lib/logger";
 
 interface JoinRequest {
   id: string;
@@ -76,7 +77,7 @@ export function JoinRequestsManagement({
         }))
       );
     } catch (error) {
-      console.error("Error fetching join requests:", error);
+      logger.apiError("fetchJoinRequests", error);
     } finally {
       setIsLoading(false);
     }

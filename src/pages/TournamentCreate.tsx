@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 
 type TournamentFormat = "single_elimination" | "double_elimination" | "round_robin";
 
@@ -115,14 +116,14 @@ export default function TournamentCreate() {
           .insert(categoriesToInsert);
 
         if (catError) {
-          console.error("Error creating categories:", catError);
+          logger.apiError("createTournamentCategories", catError);
         }
       }
 
       toast({ title: "Tournament created!", description: "Teams can now register" });
       navigate(`/tournaments/${data.id}`);
     } catch (error) {
-      console.error("Error creating tournament:", error);
+      logger.apiError("createTournament", error);
       toast({ title: "Error", description: "Failed to create tournament", variant: "destructive" });
     } finally {
       setIsSubmitting(false);

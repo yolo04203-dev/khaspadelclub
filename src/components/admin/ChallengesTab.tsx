@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { logger } from "@/lib/logger";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -108,7 +109,7 @@ export function ChallengesTab() {
 
       setChallenges(mapped);
     } catch (error) {
-      console.error("Error fetching challenges:", error);
+      logger.apiError("fetchChallenges", error);
       toast.error("Failed to load challenges");
     } finally {
       setIsLoading(false);
@@ -134,7 +135,7 @@ export function ChallengesTab() {
       toast.success("Challenge cancelled");
       fetchChallenges();
     } catch (error) {
-      console.error("Error cancelling challenge:", error);
+      logger.apiError("cancelChallenge", error);
       toast.error("Failed to cancel challenge");
     } finally {
       setIsCancelling(false);

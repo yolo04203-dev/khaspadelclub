@@ -18,6 +18,7 @@ import { KnockoutBracket } from "@/components/tournament/KnockoutBracket";
 import { RegistrationDialog } from "@/components/tournament/RegistrationDialog";
 import { PaymentManagement } from "@/components/tournament/PaymentManagement";
 import { CategoryManagement, TournamentCategory } from "@/components/tournament/CategoryManagement";
+import { logger } from "@/lib/logger";
 import { toast as sonnerToast } from "sonner";
 
 interface Tournament {
@@ -146,7 +147,7 @@ export default function TournamentDetail() {
       );
       setParticipants(participantsWithNames);
     } catch (error) {
-      console.error("Error fetching tournament:", error);
+      logger.apiError("fetchTournament", error);
     } finally {
       setLoading(false);
     }

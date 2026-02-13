@@ -13,6 +13,7 @@ import { InvitePartnerDialog } from "@/components/team/InvitePartnerDialog";
 import { PlayerStatsSection } from "@/components/stats/PlayerStatsSection";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { logger } from "@/lib/logger";
 
 interface PlayerData {
   user_id: string;
@@ -151,7 +152,7 @@ export default function PlayerProfile() {
           }
         }
       } catch (error) {
-        console.error("Error fetching player:", error);
+        logger.apiError("fetchPlayer", error);
       } finally {
         setIsLoading(false);
       }

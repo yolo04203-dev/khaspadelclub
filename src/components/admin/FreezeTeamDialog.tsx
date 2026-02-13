@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { logger } from "@/lib/logger";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -107,7 +108,7 @@ export function FreezeTeamDialog({
           },
         });
       } catch (emailError) {
-        console.error("Failed to send freeze notification email:", emailError);
+        logger.apiError("sendFreezeNotification", emailError);
         // Don't fail the freeze operation if email fails
       }
 
@@ -118,7 +119,7 @@ export function FreezeTeamDialog({
       setReason("");
       setCustomDate(undefined);
     } catch (error) {
-      console.error("Error freezing team:", error);
+      logger.apiError("freezeTeam", error);
       toast.error("Failed to freeze team");
     } finally {
       setIsFreezing(false);

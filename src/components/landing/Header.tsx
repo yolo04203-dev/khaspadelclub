@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
+import { logger } from "@/lib/logger";
 
 const navLinks = [
   { label: "Features", href: "#features" },
@@ -19,7 +20,7 @@ export function Header() {
     try {
       navigate("/auth");
     } catch (error) {
-      console.error("Navigation error:", error);
+      logger.navigationError("/auth", error);
       window.location.href = "/auth";
     }
   };
@@ -28,7 +29,7 @@ export function Header() {
     try {
       navigate("/");
     } catch (error) {
-      console.error("Navigation error:", error);
+      logger.navigationError("/", error);
       window.location.href = "/";
     }
   };

@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Trophy, Users, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { logger } from "@/lib/logger";
 
 export function Hero() {
   const navigate = useNavigate();
@@ -10,7 +11,7 @@ export function Hero() {
     try {
       navigate("/auth");
     } catch (error) {
-      console.error("Navigation error:", error);
+      logger.navigationError("/auth", error);
       window.location.href = "/auth";
     }
   };

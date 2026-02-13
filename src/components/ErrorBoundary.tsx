@@ -2,6 +2,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, AlertTriangle, Home, Copy, Check } from "lucide-react";
 import { reportError } from "@/lib/errorReporting";
+import { logger } from "@/lib/logger";
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -27,10 +28,8 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     // Log error details for debugging
-    console.error("[ErrorBoundary] Caught error:", {
-      message: error.message,
-      stack: error.stack,
-      componentStack: errorInfo.componentStack,
+    logger.error("ErrorBoundary caught error", error, {
+      componentStack: errorInfo.componentStack || undefined,
     });
     reportError(error, { componentStack: errorInfo.componentStack });
     this.setState({ errorInfo });
@@ -67,7 +66,7 @@ Timestamp: ${new Date().toISOString()}
       this.setState({ copied: true });
       setTimeout(() => this.setState({ copied: false }), 2000);
     } catch (e) {
-      console.error("Failed to copy error details:", e);
+      logger.error("Failed to copy error details", e);
     }
   };
 

@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { logger } from "@/lib/logger";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -108,14 +109,14 @@ export function TeamsTab({ teams, onRefresh }: TeamsTabProps) {
           },
         });
       } catch (emailError) {
-        console.error("Failed to send unfreeze notification email:", emailError);
+        logger.apiError("sendUnfreezeNotification", emailError);
         // Don't fail the unfreeze operation if email fails
       }
 
       toast.success(`${team.name} has been unfrozen`);
       onRefresh();
     } catch (error) {
-      console.error("Error unfreezing team:", error);
+      logger.apiError("unfreezeTeam", error);
       toast.error("Failed to unfreeze team");
     } finally {
       setIsUnfreezing(null);
@@ -140,7 +141,7 @@ export function TeamsTab({ teams, onRefresh }: TeamsTabProps) {
       toast.success("Team deleted successfully");
       onRefresh();
     } catch (error) {
-      console.error("Error deleting team:", error);
+      logger.apiError("deleteTeam", error);
       toast.error("Failed to delete team");
     } finally {
       setIsDeleting(false);
@@ -163,7 +164,7 @@ export function TeamsTab({ teams, onRefresh }: TeamsTabProps) {
       toast.success("Team updated successfully");
       onRefresh();
     } catch (error) {
-      console.error("Error updating team:", error);
+      logger.apiError("updateTeam", error);
       toast.error("Failed to update team");
     } finally {
       setIsSaving(false);

@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 
 interface AvatarUploadProps {
   currentAvatarUrl?: string | null;
@@ -82,7 +83,7 @@ export function AvatarUpload({
         description: "Your profile picture has been updated.",
       });
     } catch (error: any) {
-      console.error("Upload error:", error);
+      logger.apiError("uploadAvatar", error);
       toast({
         title: "Upload failed",
         description: error.message || "Failed to upload avatar.",

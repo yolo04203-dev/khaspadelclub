@@ -15,6 +15,7 @@ import { LaddersTab } from "@/components/admin/LaddersTab";
 import { TournamentsTab } from "@/components/admin/TournamentsTab";
 import { ChallengesTab } from "@/components/admin/ChallengesTab";
 import { AmericanoTab } from "@/components/admin/AmericanoTab";
+import { logger } from "@/lib/logger";
 
 interface Player {
   id: string;
@@ -206,7 +207,7 @@ export default function Admin() {
         setTournaments(tournamentsMapped);
       }
     } catch (error) {
-      console.error("Error fetching admin data:", error);
+      logger.apiError("fetchAdminData", error);
     } finally {
       setIsLoading(false);
     }

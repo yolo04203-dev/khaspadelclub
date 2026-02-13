@@ -256,7 +256,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Send email using Resend REST API
-    console.log(`Sending ${type} notification to:`, emails);
+    console.log(`Sending ${type} notification to ${emails.length} recipients`);
     
     const emailResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",

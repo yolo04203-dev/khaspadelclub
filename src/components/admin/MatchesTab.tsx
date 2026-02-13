@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import { AdminEditScoreDialog } from "./AdminEditScoreDialog";
 import { AdminScheduleDialog } from "./AdminScheduleDialog";
+import { logger } from "@/lib/logger";
 
 interface Match {
   id: string;
@@ -59,7 +60,7 @@ export function MatchesTab({ matches, onRefresh }: MatchesTabProps) {
       toast.success("Match cancelled");
       onRefresh();
     } catch (error) {
-      console.error("Error cancelling match:", error);
+      logger.apiError("cancelMatch", error);
       toast.error("Failed to cancel match");
     } finally {
       setIsProcessing(false);
@@ -78,7 +79,7 @@ export function MatchesTab({ matches, onRefresh }: MatchesTabProps) {
       toast.success(`Status changed to ${newStatus}`);
       onRefresh();
     } catch (error) {
-      console.error("Error changing status:", error);
+      logger.apiError("changeMatchStatus", error);
       toast.error("Failed to change status");
     }
   };

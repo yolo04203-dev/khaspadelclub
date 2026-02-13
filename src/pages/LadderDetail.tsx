@@ -18,6 +18,7 @@ import { isFuture, format } from "date-fns";
 import { JoinLadderDialog } from "@/components/ladder/JoinLadderDialog";
 import { LadderRowSkeleton } from "@/components/ui/skeleton-card";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
+import { logger } from "@/lib/logger";
 
 interface TeamMember {
   user_id: string;
@@ -312,7 +313,7 @@ export default function LadderDetail() {
         }
       }
     } catch (error) {
-      console.error("Error fetching ladder:", error);
+      logger.apiError("fetchLadder", error);
     } finally {
       setIsLoading(false);
     }

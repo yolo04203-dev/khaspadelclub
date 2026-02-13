@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { logger } from "@/lib/logger";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,7 +70,7 @@ export function PlayersTab({ players, onRefresh }: PlayersTabProps) {
       toast.success(`User ${actionType === "promote" ? "promoted to admin" : "demoted to player"}`);
       onRefresh();
     } catch (error) {
-      console.error("Error changing role:", error);
+      logger.apiError("changeRole", error);
       toast.error("Failed to change user role");
     } finally {
       setSelectedPlayer(null);
