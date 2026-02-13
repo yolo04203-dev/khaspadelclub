@@ -19,11 +19,12 @@ import { PerfOverlay } from "@/components/dev/PerfOverlay";
 // Eager load critical pages
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
+
 import NotFound from "./pages/NotFound";
 
 // Lazy load non-critical pages for better performance
 const lazyImports = {
+  Dashboard: () => import("./pages/Dashboard"),
   Ladders: () => import("./pages/Ladders"),
   LadderDetail: () => import("./pages/LadderDetail"),
   LadderCreate: () => import("./pages/LadderCreate"),
@@ -50,6 +51,7 @@ const lazyImports = {
 // Export for prefetching in AppHeader
 export { lazyImports };
 
+const Dashboard = lazy(lazyImports.Dashboard);
 const Ladders = lazy(lazyImports.Ladders);
 const LadderDetail = lazy(lazyImports.LadderDetail);
 const LadderCreate = lazy(lazyImports.LadderCreate);
