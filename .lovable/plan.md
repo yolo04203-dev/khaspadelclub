@@ -1,98 +1,90 @@
 
 
-# Seed 500 Dummy Users Across All Game Modes
+# Performance Testing and Optimization for 500 Users
 
-## Overview
-Rewrite the `seed-test-data` edge function to create 500 fake users (profiles + teams) and distribute them across ladders, tournaments, and americano sessions with realistic data -- giving you a production-like dataset to stress-test on mobile.
+## Current Performance Risks Found
 
-## Current State
-- 9 real profiles, 29 teams
-- 2 ladders with 4 categories
-- 5 tournaments with 9 categories
-- 5 americano sessions (4 individual, 1 team)
+After analyzing the codebase, several bottlenecks will degrade mobile performance with 500 users:
 
-## Data Distribution Plan
+### Critical Issues
 
-| Entity | Count | Details |
-|--------|-------|---------|
-| Profiles | 500 | Fake `user_id`, display name, skill level, bio |
-| Teams | 250 | 2 players per team, linked via `team_members` |
-| Ladder rankings | 250 | All 250 teams distributed across 4 existing ladder categories |
-| Challenges | 500 | Mix of pending/accepted/declined/expired between ladder teams |
-| Matches | 400 | ~60% completed with scores, rest pending/scheduled |
-| Tournament participants | 120 | ~30 teams per tournament category (using existing tournaments) |
-| Tournament matches | 80 | Group stage + knockout matches for registered teams |
-| Americano sessions | 5 new | 3 individual (8 players each) + 2 team (6 teams each) with completed rounds |
+1. **Ladder rankings render ALL items without virtualization** -- LadderDetail.tsx renders every team in a category (now 100+) as individual animated cards with staggered delays (`delay: index * 0.05`), meaning the last item waits 5 seconds before appearing.
 
-## Technical Approach
+2. **Per-item Framer Motion animations on long lists** -- Each ranking row gets its own `motion.div` with `layout`, `initial`, `animate`, and staggered `exit` animations. With 100+ items, this overwhelms the main thread on mobile.
 
-### Rewrite `supabase/functions/seed-test-data/index.ts`
+3. **No list virtualization implemented** -- Despite project memories referencing react-window, no page actually uses it. All lists render every DOM node.
 
-The function will execute in phases using the service role key (bypasses RLS):
+4. **LadderDetail fetches all members + profiles in separate queries** -- For 100 teams with 2 members each, this means processing 200 member rows and 200 profile lookups client-side.
 
-**Phase 1 -- Profiles (500)**
-- Generate 500 UUIDs as fake `user_id` values
-- Insert into `profiles` with randomized display names, skill levels (Beginner/Intermediate/Advanced/Pro), bios
-- These are NOT real auth users -- just profile rows for data volume
+## Implementation Plan
 
-**Phase 2 -- Teams (250) + Team Members (500)**
-- Pair up profiles into 250 teams
-- Insert into `teams` with generated names (marked with "SEED" suffix)
-- Insert 2 `team_members` rows per team (one captain, one regular)
+### 1. Remove per-item animations on long lists
 
-**Phase 3 -- Ladder Rankings (250)**
-- Distribute all 250 teams across the 4 existing ladder categories
-- Assign sequential ranks starting from 100 (avoids conflicting with real data)
-- Randomize wins/losses/points/streak
+**Files:** `src/pages/LadderDetail.tsx`
+- Remove `AnimatePresence` and per-row `motion.div` with staggered delays from the rankings list
+- Keep the page-level fade-in animation (already 0.4s, will reduce to 0.15s to match other pages)
+- Replace with plain `div` elements -- eliminates layout thrashing on scroll
 
-**Phase 4 -- Challenges (500)**
-- Create challenges between random teams within the same ladder category
-- Mix of statuses: 40% pending, 20% accepted, 15% declined, 15% expired, 10% cancelled
+### 2. Add list virtualization for ladder rankings
 
-**Phase 5 -- Matches (400)**
-- Create matches between random teams
-- ~60% completed with random scores and winner
-- ~25% scheduled with future dates
-- ~15% pending
+**Files:** `src/pages/LadderDetail.tsx`
+- Install `react-window` (lightweight virtual list renderer, ~6KB gzipped)
+- Wrap the rankings list in a `FixedSizeList` that only renders visible rows
+- Each row height: ~88px (card with padding)
+- Container height: `calc(100vh - 300px)` to fill available space
+- This reduces DOM nodes from 100+ cards to ~10-12 visible at a time
 
-**Phase 6 -- Tournament Participants (120)**
-- Register ~30 seed teams into existing tournament categories
-- Set payment status, seed numbers, group assignments
+### 3. Add list virtualization for Players page
 
-**Phase 7 -- Americano Sessions (5 new)**
-- Create 3 individual sessions with 8 random players each, completed rounds with scores
-- Create 2 team sessions with 6 teams each, completed round-robin matches
+**Files:** `src/pages/Players.tsx`
+- Wrap the player cards list in a `FixedSizeList`
+- Row height: ~120px (player card with avatar, badges, bio)
+- Keep the existing "Load More" pagination -- virtualization handles what's already loaded
 
-**Phase 8 -- Cleanup marker**
-- All seed data uses "SEED" or "SEED_DATA" markers so `clearExisting` can remove it cleanly
+### 4. Enhance the load test suite for 500-user scenario
 
-### Request Parameters
-```json
-{
-  "userCount": 500,        // default 500
-  "clearExisting": false   // set true to wipe previous seed data
-}
-```
+**Files:** `src/test/performance-benchmarks.test.ts`
+- Update the existing 500-user stress test to check:
+  - Ladder ranking fetch time under 2s (was 3s threshold)
+  - Player list fetch time under 1.5s
+  - Tournament participant fetch time under 1s
+- Add a new "Mobile Simulation" test that measures with throttled network conditions
 
-### Cleanup Logic (when `clearExisting: true`)
-Delete in reverse dependency order:
-1. `americano_team_matches` / `americano_rounds` (where session name contains SEED)
-2. `americano_teams` / `americano_players` (where session name contains SEED)
-3. `americano_sessions` (where name contains SEED)
-4. `tournament_matches` (where linked participants are SEED)
-5. `tournament_participants` (where team name contains SEED)
-6. `challenges` (where message contains SEED_DATA)
-7. `matches` (where notes contains SEED_DATA)
-8. `ladder_rankings` (where rank >= 100)
-9. `team_members` (where team name contains SEED)
-10. `teams` (where name contains SEED)
-11. `profiles` (where bio contains SEED_DATA)
+### 5. Add a performance test page (admin-only)
 
-### Files Changed
+**Files:** `src/pages/Admin.tsx` (add a "Perf Test" tab or section)
+- Add a button to run the existing `smokeTest()` from `load-test.ts` directly in the browser
+- Display results (avg response time, P95, error rate, per-endpoint breakdown) in a results card
+- This lets you test from a real mobile device without needing DevTools
+
+### 6. Reduce LadderDetail animation duration
+
+**Files:** `src/pages/LadderDetail.tsx`
+- Change page-level `motion.div` transition from `0.4s` to `0.15s` (consistent with Ladders, Tournaments pages)
+
+## Files Changed
+
 | File | Change |
 |------|--------|
-| `supabase/functions/seed-test-data/index.ts` | Full rewrite to cover all game modes |
+| `package.json` | Add `react-window` and `@types/react-window` dependencies |
+| `src/pages/LadderDetail.tsx` | Remove per-item animations, add react-window virtualization, reduce page transition to 0.15s |
+| `src/pages/Players.tsx` | Add react-window virtualization for player cards |
+| `src/pages/Admin.tsx` | Add "Run Perf Test" button with results display |
+| `src/test/performance-benchmarks.test.ts` | Tighten thresholds for 500-user scenario |
 
-### How to Run
-After deployment, call the function from the Admin panel or via the existing trigger. The function requires admin authentication and uses the service role key for inserts.
+## Expected Outcomes
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Ladder page DOM nodes (100 teams) | ~800+ | ~80-100 (virtualized) |
+| Ladder page initial render | ~2-3s (staggered animations) | < 300ms |
+| Scroll FPS on ladder list | ~30-40 FPS | 55-60 FPS |
+| Players page DOM nodes (30 loaded) | ~300 | ~80-100 (virtualized) |
+| LadderDetail animation duration | 400ms + 5s stagger | 150ms flat |
+
+## What This Does NOT Change
+- Backend queries remain the same (already optimized with parallel fetches and column selection)
+- Service worker and caching strategy untouched
+- Existing load test infrastructure reused, not replaced
+- No changes to the seed data function
 
