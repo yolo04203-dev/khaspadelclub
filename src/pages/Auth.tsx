@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Navigate, Link } from "react-router-dom";
-import { motion } from "framer-motion";
+
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -167,11 +167,7 @@ export default function Auth() {
             <Logo size="md" />
           </Link>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-          >
+          <div className="animate-fade-in">
             {showForgotPassword ? (
               <div className="space-y-6">
                 <div className="text-center">
@@ -489,18 +485,13 @@ export default function Auth() {
                 </TabsContent>
               </Tabs>
             )}
-          </motion.div>
+          </div>
         </div>
       </div>
 
       {/* Right side - Decorative */}
       <div className="hidden lg:flex flex-1 bg-gradient-to-br from-primary/10 via-accent/10 to-secondary items-center justify-center p-12">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="text-center max-w-md"
-        >
+        <div className="text-center max-w-md animate-fade-in">
           <div className="mb-8">
             <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-accent to-primary flex items-center justify-center">
               <span className="text-4xl">🏸</span>
@@ -512,7 +503,7 @@ export default function Auth() {
           <p className="text-muted-foreground text-lg">
             Join the ladder, challenge opponents, and climb to the top of the leaderboard.
           </p>
-        </motion.div>
+        </div>
       </div>
     </div>
   );
