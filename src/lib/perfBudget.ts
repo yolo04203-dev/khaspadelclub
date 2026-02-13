@@ -13,4 +13,10 @@ export const PERF_BUDGET = {
   LONG_TASK_MS: 50,
   /** Maximum initial bundle size (KB, gzipped) */
   BUNDLE_SIZE_KB: 200,
+  /** Target concurrent users the app must support */
+  CONCURRENT_USERS_TARGET: 1000,
+  /** Maximum acceptable API response time (ms) */
+  API_RESPONSE_MAX_MS: 1000,
+  /** Maximum acceptable error rate under load (%) */
+  LOAD_ERROR_RATE_MAX_PCT: 5,
 } as const;

@@ -141,14 +141,13 @@ describe("Performance Benchmarks", () => {
         testDuration: 30,
         rampUpTime: 10,
       });
-    }, 180000); // 3 minute timeout
+    }, 180000);
 
     it("should maintain error rate under 5% at high load", () => {
       expect(result.errorRate).toBeLessThan(5);
     });
 
     it("should maintain P95 response time under degraded threshold", () => {
-      // Allow 2x threshold under stress
       expect(result.p95ResponseTime).toBeLessThan(THRESHOLDS.dashboardLoad.acceptable * 2);
     });
 
@@ -177,11 +176,60 @@ describe("Performance Benchmarks", () => {
       expect(result).toBeDefined();
     });
   });
+
+  describe("High Load Test - 1000 Concurrent Users", () => {
+    let result: LoadTestResult;
+
+    beforeAll(async () => {
+      result = await runLoadTest({
+        concurrentUsers: 1000,
+        testDuration: 45,
+        rampUpTime: 15,
+      });
+    }, 240000); // 4 minute timeout
+
+    it("should maintain error rate under 5%", () => {
+      expect(result.errorRate).toBeLessThan(5);
+    });
+
+    it("should maintain P95 response time under 3x threshold", () => {
+      expect(result.p95ResponseTime).toBeLessThan(THRESHOLDS.dashboardLoad.acceptable * 3);
+    });
+
+    it("should achieve minimum 50 requests per second", () => {
+      expect(result.requestsPerSecond).toBeGreaterThan(50);
+    });
+
+    it("should log 1000-user metrics for analysis", () => {
+      console.log("\n📊 High Load Test (1000 users) Summary:");
+      console.log(`   Total Requests: ${result.totalRequests}`);
+      console.log(`   Success Rate: ${(100 - result.errorRate).toFixed(2)}%`);
+      console.log(`   Avg Response: ${result.averageResponseTime.toFixed(2)}ms`);
+      console.log(`   P50 Response: ${result.p50ResponseTime.toFixed(2)}ms`);
+      console.log(`   P95 Response: ${result.p95ResponseTime.toFixed(2)}ms`);
+      console.log(`   P99 Response: ${result.p99ResponseTime.toFixed(2)}ms`);
+      console.log(`   RPS: ${result.requestsPerSecond.toFixed(2)}`);
+      
+      if (result.errors.length > 0) {
+        console.log("\n   Top Errors:");
+        result.errors.slice(0, 5).forEach(e => {
+          console.log(`   - ${e.endpoint}: ${e.message} (${e.count}x)`);
+        });
+      }
+      
+      console.log("\n   Endpoint Breakdown:");
+      result.endpointStats.forEach(stat => {
+        console.log(`   - ${stat.name}: ${stat.totalRequests} reqs, ${stat.averageResponseTime.toFixed(2)}ms avg, p95=${stat.p95ResponseTime.toFixed(2)}ms`);
+      });
+      
+      expect(result).toBeDefined();
+    });
+  });
 });
 
 describe("Benchmark Verification", () => {
   it("should have all expected endpoints defined", () => {
-    expect(defaultEndpoints.length).toBeGreaterThanOrEqual(7);
+    expect(defaultEndpoints.length).toBeGreaterThanOrEqual(8);
     
     const endpointNames = defaultEndpoints.map(e => e.name);
     expect(endpointNames.some(n => n.includes("Challenges"))).toBe(true);

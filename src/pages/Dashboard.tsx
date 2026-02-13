@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Navigate, Link } from "react-router-dom";
-import { motion } from "framer-motion";
+
 import { User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -208,11 +208,7 @@ export default function Dashboard() {
       {/* Main Content */}
       <PullToRefresh onRefresh={handleRefresh} className="min-h-[calc(100vh-4rem)]">
         <main className="container py-6 sm:py-8 pb-safe-nav sm:pb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15 }}
-          >
+          <div>
             <div className="mb-6 sm:mb-8">
               <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
                 Welcome, {user.user_metadata?.display_name || user.email?.split("@")[0]}!
@@ -453,7 +449,7 @@ export default function Dashboard() {
               </Link>
             )}
           </div>
-        </motion.div>
+        </div>
       </main>
     </PullToRefresh>
     </div>
