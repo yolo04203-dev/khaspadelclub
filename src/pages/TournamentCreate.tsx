@@ -3,6 +3,7 @@ import { Link, useNavigate, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Trophy, Banknote, Plus, Trash2, Tag, MapPin } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/usePermission";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ interface CategoryInput {
 
 export default function TournamentCreate() {
   const { user, role, isLoading: authLoading } = useAuth();
+  const { hasPermission, isLoading: permLoading } = usePermission("create_tournament");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -130,7 +132,7 @@ export default function TournamentCreate() {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || permLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -142,7 +144,7 @@ export default function TournamentCreate() {
     return <Navigate to="/auth" replace />;
   }
 
-  if (role !== "admin" && role !== "super_admin") {
+  if (!hasPermission) {
     return (
       <div className="min-h-screen bg-background">
         <header className="border-b border-border bg-card">
@@ -159,7 +161,7 @@ export default function TournamentCreate() {
           <Card className="text-center py-12">
             <CardContent>
               <h2 className="text-xl font-semibold">Access Denied</h2>
-              <p className="text-muted-foreground mt-2">Only administrators can create tournaments.</p>
+              <p className="text-muted-foreground mt-2">You don't have permission to create tournaments.</p>
             </CardContent>
           </Card>
         </main>
