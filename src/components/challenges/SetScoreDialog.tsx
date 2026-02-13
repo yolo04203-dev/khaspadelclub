@@ -207,21 +207,21 @@ export function SetScoreDialog({
         </DialogHeader>
 
         {/* Match Score Display */}
-        <div className="flex items-center justify-center gap-4 py-2">
+        <div className="flex items-center justify-center gap-6 py-4">
           <div className={cn(
-            "text-center px-4 py-2 rounded-lg transition-colors",
+            "text-center px-6 py-3 rounded-lg transition-colors flex-1 max-w-[120px]",
             matchWinner === "me" ? "bg-accent/20 text-accent" : "bg-muted"
           )}>
-            <div className="text-2xl font-bold">{standings.me}</div>
-            <div className="text-xs text-muted-foreground truncate max-w-[80px]">{myTeamName}</div>
+            <div className="text-3xl font-bold">{standings.me}</div>
+            <div className="text-xs text-muted-foreground truncate">{myTeamName}</div>
           </div>
-          <span className="text-muted-foreground font-medium">-</span>
+          <span className="text-muted-foreground font-medium text-lg">-</span>
           <div className={cn(
-            "text-center px-4 py-2 rounded-lg transition-colors",
+            "text-center px-6 py-3 rounded-lg transition-colors flex-1 max-w-[120px]",
             matchWinner === "opponent" ? "bg-accent/20 text-accent" : "bg-muted"
           )}>
-            <div className="text-2xl font-bold">{standings.opp}</div>
-            <div className="text-xs text-muted-foreground truncate max-w-[80px]">{opponentTeamName}</div>
+            <div className="text-3xl font-bold">{standings.opp}</div>
+            <div className="text-xs text-muted-foreground truncate">{opponentTeamName}</div>
           </div>
         </div>
 
@@ -247,11 +247,11 @@ export function SetScoreDialog({
                     placeholder="0"
                     disabled={isDisabled}
                     className={cn(
-                      "w-14 text-center text-lg font-mono",
+                      "w-16 h-12 text-center text-xl font-mono",
                       setWinner === "me" && "border-accent bg-accent/10"
                     )}
                   />
-                  <span className="text-muted-foreground">-</span>
+                  <span className="text-muted-foreground text-lg">-</span>
                   <Input
                     type="text"
                     inputMode="numeric"
@@ -261,7 +261,7 @@ export function SetScoreDialog({
                     placeholder="0"
                     disabled={isDisabled}
                     className={cn(
-                      "w-14 text-center text-lg font-mono",
+                      "w-16 h-12 text-center text-xl font-mono",
                       setWinner === "opponent" && "border-accent bg-accent/10"
                     )}
                   />
@@ -286,17 +286,17 @@ export function SetScoreDialog({
           </Alert>
         )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => handleOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting || !matchWinner}>
+        <DialogFooter className="flex-col gap-2 sm:flex-row">
+          <Button onClick={handleSubmit} disabled={isSubmitting || !matchWinner} className="w-full sm:w-auto">
             {isSubmitting ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
               <Check className="w-4 h-4 mr-2" />
             )}
             Submit Score
+          </Button>
+          <Button variant="outline" onClick={() => handleOpenChange(false)} className="w-full sm:w-auto">
+            Cancel
           </Button>
         </DialogFooter>
       </DialogContent>
