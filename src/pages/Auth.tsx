@@ -7,6 +7,7 @@ import { z } from "zod";
 import { Eye, EyeOff, Loader2, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -133,7 +134,7 @@ export default function Auth() {
       forgotPasswordForm.reset();
       setShowForgotPassword(false);
     } catch (error) {
-      console.error("Password reset error:", error);
+      logger.authError("passwordReset", error);
       toast({
         title: "Error",
         description: "Unable to send reset email. Please try again.",

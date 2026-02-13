@@ -55,10 +55,10 @@ export default function PlayerProfile() {
       try {
         // Fetch player profile
         const { data: profile, error: profileError } = await supabase
-          .from("profiles")
+          .from("public_profiles" as any)
           .select("user_id, display_name, avatar_url, skill_level, bio, is_looking_for_team, created_at")
           .eq("user_id", id)
-          .single();
+          .single() as { data: PlayerData | null; error: any };
 
         if (profileError) throw profileError;
         setPlayer(profile);

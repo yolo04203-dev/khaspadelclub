@@ -49,7 +49,7 @@ export default function Players() {
   const fetchPlayers = useCallback(async (offset: number, append: boolean) => {
     try {
       let query = supabase
-        .from("profiles")
+        .from("public_profiles" as any)
         .select("user_id, display_name, avatar_url, skill_level, bio, is_looking_for_team, preferred_play_times")
         .neq("user_id", user?.id || "");
 
@@ -67,7 +67,7 @@ export default function Players() {
 
       const { data: profiles, error } = await query
         .order("display_name")
-        .range(offset, offset + PAGE_SIZE - 1);
+        .range(offset, offset + PAGE_SIZE - 1) as { data: any[] | null; error: any };
 
       if (error) throw error;
 
