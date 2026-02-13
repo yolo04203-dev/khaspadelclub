@@ -1235,6 +1235,101 @@ export type Database = {
         }
         Relationships: []
       }
+      tournament_participants_public: {
+        Row: {
+          category_id: string | null
+          custom_team_name: string | null
+          eliminated_at: string | null
+          final_placement: number | null
+          group_id: string | null
+          group_losses: number | null
+          group_points_against: number | null
+          group_points_for: number | null
+          group_wins: number | null
+          id: string | null
+          is_eliminated: boolean | null
+          payment_status: string | null
+          player1_name: string | null
+          player2_name: string | null
+          registered_at: string | null
+          seed: number | null
+          team_id: string | null
+          tournament_id: string | null
+          waitlist_position: number | null
+        }
+        Insert: {
+          category_id?: string | null
+          custom_team_name?: string | null
+          eliminated_at?: string | null
+          final_placement?: number | null
+          group_id?: string | null
+          group_losses?: number | null
+          group_points_against?: number | null
+          group_points_for?: number | null
+          group_wins?: number | null
+          id?: string | null
+          is_eliminated?: boolean | null
+          payment_status?: string | null
+          player1_name?: string | null
+          player2_name?: string | null
+          registered_at?: string | null
+          seed?: number | null
+          team_id?: string | null
+          tournament_id?: string | null
+          waitlist_position?: number | null
+        }
+        Update: {
+          category_id?: string | null
+          custom_team_name?: string | null
+          eliminated_at?: string | null
+          final_placement?: number | null
+          group_id?: string | null
+          group_losses?: number | null
+          group_points_against?: number | null
+          group_points_for?: number | null
+          group_wins?: number | null
+          id?: string | null
+          is_eliminated?: boolean | null
+          payment_status?: string | null
+          player1_name?: string | null
+          player2_name?: string | null
+          registered_at?: string | null
+          seed?: number | null
+          team_id?: string | null
+          tournament_id?: string | null
+          waitlist_position?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_participants_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "tournament_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_participants_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "tournament_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_participants_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_participants_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       create_team_with_captain: {

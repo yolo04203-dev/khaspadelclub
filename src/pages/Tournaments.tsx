@@ -41,7 +41,7 @@ export default function Tournaments() {
           .select("id, name, format, status, max_teams, registration_deadline, entry_fee, created_at")
           .order("created_at", { ascending: false }),
         supabase
-          .from("tournament_participants")
+          .from("tournament_participants_public")
           .select("tournament_id"),
       ]);
 

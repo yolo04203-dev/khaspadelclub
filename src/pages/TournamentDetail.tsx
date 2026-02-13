@@ -103,6 +103,26 @@ export default function TournamentDetail() {
   const [userTeam, setUserTeam] = useState<UserTeam | null>(null);
   const [loading, setLoading] = useState(true);
   const [registrationDialogOpen, setRegistrationDialogOpen] = useState(false);
+  const [paymentParticipants, setPaymentParticipants] = useState<Array<{
+    id: string; team_id: string; team_name: string; registered_at: string;
+    payment_status: string; payment_notes: string | null; custom_team_name: string | null;
+    waitlist_position: number | null;
+  }>>([]);
+
+  const fetchPaymentData = useCallback(async () => {
+    if (!id) return;
+    const { data } = await supabase
+      .from("tournament_participants")
+      .select("id, team_id, registered_at, payment_status, payment_notes, custom_team_name, waitlist_position")
+      .eq("tournament_id", id);
+    if (data) {
+      const withNames = await Promise.all(data.map(async (p) => {
+        const { data: team } = await supabase.from("teams").select("name").eq("id", p.team_id).single();
+        return { ...p, team_name: team?.name || "Unknown", payment_status: p.payment_status || "pending" };
+      }));
+      setPaymentParticipants(withNames);
+    }
+  }, [id]);
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -110,7 +130,7 @@ export default function TournamentDetail() {
       const [tournamentRes, groupsRes, participantsRes, matchesRes, categoriesRes] = await Promise.all([
         supabase.from("tournaments").select("*").eq("id", id).single(),
         supabase.from("tournament_groups").select("*").eq("tournament_id", id).order("display_order"),
-        supabase.from("tournament_participants").select("*").eq("tournament_id", id),
+        supabase.from("tournament_participants_public").select("*").eq("tournament_id", id),
         supabase.from("tournament_matches").select("*").eq("tournament_id", id).order("round_number").order("match_number"),
         supabase.from("tournament_categories").select("*").eq("tournament_id", id).order("display_order"),
       ]);
@@ -136,7 +156,7 @@ export default function TournamentDetail() {
             ...p, 
             team_name: team?.name || "Unknown",
             payment_status: (p as any).payment_status || "pending",
-            payment_notes: (p as any).payment_notes || null,
+            payment_notes: null,
             custom_team_name: (p as any).custom_team_name || null,
             category_id: (p as any).category_id || null,
             player1_name: (p as any).player1_name || null,
@@ -171,7 +191,10 @@ export default function TournamentDetail() {
   useEffect(() => {
     if (id) {
       fetchData();
-      if (user) fetchUserTeam();
+      if (user) {
+        fetchUserTeam();
+        fetchPaymentData();
+      }
     }
 
     // Subscribe to realtime changes for tournament data
@@ -242,7 +265,7 @@ export default function TournamentDetail() {
       supabase.removeChannel(groupsChannel);
       supabase.removeChannel(tournamentChannel);
     };
-  }, [id, user, fetchData, fetchUserTeam]);
+  }, [id, user, fetchData, fetchUserTeam, fetchPaymentData]);
 
   const registerTeam = async (teamId: string | null, customTeamName: string | null, player1Name?: string, player2Name?: string, categoryId?: string) => {
     if (!tournament) return;
@@ -1184,17 +1207,8 @@ export default function TournamentDetail() {
                   tournamentId={tournament.id}
                   entryFee={tournament.entry_fee}
                   entryFeeCurrency={tournament.entry_fee_currency || "PKR"}
-                  participants={participants.map(p => ({
-                    id: p.id,
-                    team_id: p.team_id,
-                    team_name: p.team_name || "Unknown",
-                    registered_at: p.registered_at,
-                    payment_status: p.payment_status || "pending",
-                    payment_notes: p.payment_notes,
-                    custom_team_name: p.custom_team_name,
-                    waitlist_position: p.waitlist_position,
-                  }))}
-                  onRefresh={fetchData}
+                participants={paymentParticipants}
+                  onRefresh={fetchPaymentData}
                 />
               </TabsContent>
             )}
