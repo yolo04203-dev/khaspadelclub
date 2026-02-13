@@ -123,7 +123,7 @@ export function ScheduleMatchDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-3 py-2 sm:space-y-4 sm:py-4">
           {/* Date Picker */}
           <div className="space-y-2">
             <Label>Date</Label>
@@ -211,11 +211,8 @@ export function ScheduleMatchDialog({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
+        <DialogFooter className="flex-col gap-2 sm:flex-row">
+          <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
             {isSaving ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -224,6 +221,9 @@ export function ScheduleMatchDialog({
             ) : (
               "Save Schedule"
             )}
+          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
+            Cancel
           </Button>
         </DialogFooter>
       </DialogContent>
