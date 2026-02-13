@@ -778,7 +778,7 @@ export default function TournamentDetail() {
   };
 
   const isOwner = user?.id === tournament?.created_by;
-  const isAdmin = role === "admin" || isOwner;
+  const isAdmin = role === "admin" || role === "super_admin" || isOwner;
   
   // Filter participants by selected category
   const filteredParticipants = selectedCategoryId === "all" 
