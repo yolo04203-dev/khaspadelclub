@@ -1,116 +1,114 @@
 
 
-# 1000 Concurrent User Testing and Optimization Plan
+# Security Audit Report and Remediation Plan
 
-## Audit Summary
+## Audit Results Summary
 
-The codebase is already well-hardened across most areas. Here is the current status and the remaining gaps to address.
+### PASSED (No Action Needed)
 
-### Already in Place (No Changes Needed)
-
-| Area | Implementation |
-|------|---------------|
-| FCP optimization | Fonts preloaded via `<link>` in index.html, preconnect to backend and Google Fonts |
-| TTI budget | Performance budget set at 2.5s, code splitting across 21 routes, 3 manual vendor chunks |
-| Tap responsiveness | `touch-manipulation` globally removes 300ms delay; `active:scale-[0.97]` gives press feedback |
-| Safe areas (iOS) | CSS env() insets for notch, home indicator; `pb-safe-nav` utility class |
-| Input zoom prevention | Global CSS enforces 16px minimum on inputs |
-| Touch targets | 44px minimum on `pointer:coarse` devices |
-| Keyboard handling | `useKeyboardHeight` hook auto-scrolls focused inputs into view |
-| Error boundaries | Global `ErrorBoundary` + per-route `RouteErrorBoundary` with copy-to-clipboard diagnostics |
-| Crash reporting | Sentry with browser tracing, session replay, user identity |
-| Unhandled rejections | Global listeners in App.tsx, forwarded to Sentry |
-| API resilience | `apiClient.ts` with 15s timeouts, retry for idempotent methods, AbortController |
-| Query caching | 2-min staleTime, 10-min gcTime, exponential backoff retries |
-| Dark mode | next-themes with full CSS variable coverage |
-| Haptic feedback | `useHaptics` hook with Capacitor Haptics |
-| Web Vitals tracking | FCP, LCP, CLS, INP via PerformanceObserver |
-| Real-time health | `useRealtimeHealth` hook with connection status tracking and cleanup |
-| Deep linking | Capacitor `appUrlOpen` listener routing through React Router |
-| Foreground refresh | `appStateChange` listener triggers React Query refetch |
-| Splash screen | Manual dismissal after auth resolves |
-| Status bar theming | Dynamic StatusBar style synced with light/dark theme |
-| Pagination | 30-50 items per page with Load More pattern |
-| Search debouncing | 300ms debounce on all search inputs |
-| Skeleton loaders | Dashboard, Challenges, Ladder Detail pages |
-| Credential security | Only anon key exposed (public by design); service role key is server-side only |
-| Load testing infra | Supports up to 2000 concurrent users with ramp-up, per-endpoint stats, percentile tracking |
+| Check | Status | Details |
+|-------|--------|---------|
+| Auth uses POST, not GET | PASS | `signInWithPassword` and `signUp` use POST via Supabase SDK |
+| No passwords in URLs | PASS | Credentials sent in request body only |
+| No hardcoded credentials | PASS | Only the public anon key is in the codebase (this is by design) |
+| Service role key server-side only | PASS | Used only in edge functions via `Deno.env.get()`, never in frontend |
+| Password hashing | PASS | Handled by Supabase Auth (bcrypt), never stored in plaintext |
+| HTTPS everywhere | PASS | All Supabase endpoints use HTTPS; no HTTP URLs in codebase |
+| No sensitive data in localStorage | PASS | Only Supabase session (managed by SDK with `autoRefreshToken`) |
+| Input validation | PASS | Zod schemas on login/signup/forgot-password forms |
+| Error boundaries | PASS | Global `ErrorBoundary` + per-route `RouteErrorBoundary` |
+| Crash reporting | PASS | Sentry with tracing and replay |
+| User enumeration prevention | PASS | Generic error messages on login, signup, and forgot password |
+| Token refresh | PASS | `autoRefreshToken: true` + manual 55-min interval fallback |
+| XSS via dangerouslySetInnerHTML | PASS | Only used in `chart.tsx` with static theme data, no user input |
+| RLS on all tables | PASS | Every table has RLS enabled with appropriate policies |
+| Role storage | PASS | Roles stored in separate `user_roles` table with `is_admin()` security definer function |
+| Edge function auth | PASS | Manual JWT validation + role checks before service role key usage |
+| File upload validation | PASS | Type check (`image/*`) and size limit (5MB) on avatar upload |
 
 ---
 
-## Gaps Found and Fixes
-
-### 1. Players Page: Missing Skeleton Loader
-
-The Players page uses a basic `Loader2` spinner during initial load (line 199-201). A `PlayerCardSkeleton` component already exists in `skeleton-card.tsx` but is not being used.
-
-**Fix:** Replace the spinner with 6 `PlayerCardSkeleton` instances to match the pattern used by Dashboard and Challenges.
-
-**File:** `src/pages/Players.tsx`
+### ISSUES FOUND (Require Fixes)
 
 ---
 
-### 2. Load Test: Missing 1000-User Tier
+### Issue 1: Sentry Session Replay Records All Text and Media (HIGH)
 
-The current benchmark tests cover 100 and 500 concurrent users, but the requirement specifies 1000. No 1000-user test scenario exists.
+**File:** `src/lib/errorReporting.ts` (line 16)
 
-**Fix:** Add a "1000 Concurrent Users" test suite to `performance-benchmarks.test.ts` with:
-- Error rate under 5%
-- P95 response time under 3x the acceptable threshold (9 seconds)
-- Minimum 50 requests/second throughput
-- Full endpoint breakdown logging
+Sentry Replay is configured with `maskAllText: false` and `blockAllMedia: false`. This means every session replay captures raw text content from the screen -- including email addresses, display names, phone numbers, bios, and any other PII visible in the UI. Sentry stores this data on their servers, creating a data exposure risk and potential GDPR violation.
 
-**File:** `src/test/performance-benchmarks.test.ts`
+**Fix:** Set `maskAllText: true` and `blockAllMedia: true` so replays mask sensitive content by default. If specific non-sensitive elements need to be visible in replays, use Sentry's `data-sentry-unmask` attribute selectively.
 
 ---
 
-### 3. Load Test: Missing RPC Endpoint Coverage
+### Issue 2: Profiles Table Exposes Phone Numbers to Other Users (HIGH)
 
-The load test only covers simple table queries and mutations. The app's heaviest query -- `get_player_unified_stats` RPC -- is not tested. Under 1000 concurrent users, this function (which runs multiple JOINs and subqueries) is the most likely bottleneck.
+**Current RLS:** The `profiles` table has SELECT policies for "Users can view their own profile" and "Admins can view all profiles." However, the `PlayerProfile.tsx` page queries another user's profile by `user_id` (line 57-61). This query will fail for non-admin users due to RLS, meaning the Players page currently cannot display other users' profiles correctly.
 
-**Fix:** Add the `get_player_unified_stats` RPC call as a new test endpoint in `load-test.ts` with a realistic weight.
+There are two sub-issues:
+1. If a broader SELECT policy is added later to make player profiles work, it would expose `phone_number` to all authenticated users.
+2. The `PlayerProfile.tsx` page likely returns empty data for non-admin users right now, which is a functional bug.
 
-**File:** `src/test/load-test.ts`
-
----
-
-### 4. Performance Budget: Missing 1000-User Constant
-
-The `perfBudget.ts` file defines budgets for TTI, tap latency, and scroll FPS, but has no constant for concurrent user capacity or API response time targets. This makes it harder to enforce the 1000-user requirement in automated tests.
-
-**Fix:** Add `CONCURRENT_USERS_TARGET`, `API_RESPONSE_MAX_MS`, and `LOAD_ERROR_RATE_MAX_PCT` constants.
-
-**File:** `src/lib/perfBudget.ts`
+**Fix:** Create a database VIEW called `public_profiles` that exposes only safe fields (`user_id`, `display_name`, `avatar_url`, `skill_level`, `bio`, `is_looking_for_team`, `created_at`) and excludes `phone_number`. Add a permissive SELECT policy on the view for all authenticated users. Update `PlayerProfile.tsx` and `Players.tsx` to query from this view instead.
 
 ---
 
-### 5. Dashboard: framer-motion Wrapper on Full Page Content
+### Issue 3: Team Invitations Expose Email Addresses (MEDIUM)
 
-The Dashboard wraps its entire main content in a `<motion.div>` with an opacity+translate animation (line 211-215). For a page with 4 stat cards, mode breakdown badges, and 7 action cards, this creates a single large animation that blocks TTI until the animation completes.
+**Current RLS:** The `team_invitations` table has a SELECT policy that allows users to view invitations where `invited_email` matches their own email. However, the policy reads the user's email from `auth.users` via a subquery, which could allow enumeration if an attacker crafts queries to probe different `invited_email` values.
 
-**Fix:** Remove the `<motion.div>` wrapper. The skeleton-to-content transition already provides a smooth perceived loading experience.
+The `invited_email` field is stored in plaintext and is visible to team captains who can view sent invitations.
 
-**File:** `src/pages/Dashboard.tsx`
+**Fix:** This is partially mitigated because captains can only see invitations they created. However, the email should be sanitized in the response -- consider hashing or partially masking the email in the SELECT query (e.g., showing `j***@example.com`). Alternatively, store only `invited_user_id` when the user exists, and use `invited_email` only for users not yet registered.
 
 ---
 
-## Technical Details
+### Issue 4: Leaked Password Protection Disabled (MEDIUM)
 
-### File Changes
+**Source:** Supabase security linter
+
+The "Leaked Password Protection" feature in Supabase Auth is disabled. This feature checks passwords against known breached databases (HaveIBeenPwned) and prevents users from setting compromised passwords.
+
+**Fix:** This must be enabled manually in the Lovable Cloud backend settings (Authentication > Settings > Security). It cannot be done through code.
+
+---
+
+### Issue 5: Console Logging of Error Objects May Leak Sensitive Context (LOW)
+
+**File:** `src/pages/Auth.tsx` (line 136)
+
+The `console.error("Password reset error:", error)` call logs the full error object, which could contain request details or user input in some edge cases. While this is only visible in the user's own browser console, it's a best practice to sanitize error logging.
+
+**Fix:** Replace with `logger.authError("passwordReset", error)` which uses the structured logger and strips stack traces in production.
+
+---
+
+## Remediation Plan
+
+### Step 1: Fix Sentry Replay PII Exposure
+Update `src/lib/errorReporting.ts` line 16:
+- Change `maskAllText: false` to `maskAllText: true`
+- Change `blockAllMedia: false` to `blockAllMedia: true`
+
+### Step 2: Create Public Profiles View
+Create a database migration with a `public_profiles` view exposing only non-sensitive fields. Add RLS-equivalent security via the view definition. Update `PlayerProfile.tsx` and `Players.tsx` to query from the view.
+
+### Step 3: Sanitize Auth Console Logging
+Replace `console.error("Password reset error:", error)` in `Auth.tsx` with `logger.authError("passwordReset", error)` for structured, non-leaking error logging.
+
+### Step 4: Document Manual Steps
+The following require manual action outside of code:
+- Enable Leaked Password Protection in Lovable Cloud backend settings
+- Review Sentry replay recordings for any already-captured PII
+
+### Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/pages/Players.tsx` | Replace Loader2 spinner with PlayerCardSkeleton grid |
-| `src/pages/Dashboard.tsx` | Remove motion.div wrapper around main content |
-| `src/test/performance-benchmarks.test.ts` | Add 1000-user test suite |
-| `src/test/load-test.ts` | Add `get_player_unified_stats` RPC endpoint |
-| `src/lib/perfBudget.ts` | Add concurrent user and API response constants |
-
-### What Cannot Be Tested in Lovable (Requires Local Setup)
-
-- Real-device iOS/Android battery and memory profiling
-- Lighthouse audits on physical devices
-- Network throttling tests (3G/4G simulation)
-- Native permission dialogs (camera, location)
-- App Store / Play Store submission
+| `src/lib/errorReporting.ts` | Set `maskAllText: true`, `blockAllMedia: true` |
+| `src/pages/Auth.tsx` | Replace `console.error` with `logger.authError` |
+| Database migration | Create `public_profiles` view excluding `phone_number` |
+| `src/pages/PlayerProfile.tsx` | Query from `public_profiles` view |
+| `src/pages/Players.tsx` | Query from `public_profiles` view (if applicable) |
 
