@@ -137,7 +137,7 @@ export default function Stats() {
     <div className="min-h-screen bg-background">
       <AppHeader showBack />
 
-      <main className="container py-8 max-w-4xl">
+      <main className="container py-8 max-w-4xl pb-safe-nav sm:pb-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

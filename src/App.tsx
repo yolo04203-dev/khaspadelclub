@@ -11,6 +11,7 @@ import { LoadingScreen } from "@/components/ui/loading-screen";
 import { OfflineBanner, SlowConnectionBanner } from "@/components/ui/error-state";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { logger } from "@/lib/logger";
+import { reportError } from "@/lib/errorReporting";
 
 // Eager load critical pages
 import Index from "./pages/Index";
@@ -86,7 +87,7 @@ const App = () => {
       logger.error("Unhandled promise rejection", event.reason, {
         type: "unhandledrejection",
       });
-      // Prevent white screen by not crashing the app
+      reportError(event.reason, { type: "unhandledrejection" });
       event.preventDefault();
     };
 
@@ -97,7 +98,7 @@ const App = () => {
         lineno: event.lineno,
         colno: event.colno,
       });
-      // Prevent default error handling that might cause white screen
+      reportError(event.error, { filename: event.filename, lineno: event.lineno });
       event.preventDefault();
     };
 

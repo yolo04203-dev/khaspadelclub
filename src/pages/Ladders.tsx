@@ -113,7 +113,7 @@ function LaddersContent() {
         }
       />
 
-      <main className="container py-8">
+      <main className="container py-8 pb-safe-nav sm:pb-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

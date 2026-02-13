@@ -271,6 +271,40 @@ button, a, [role="button"], nav {
   }
 }
 
+/* Scroll-optimized utility */
+.scroll-optimized {
+  will-change: scroll-position;
+  contain: strict;
+}
+
+/* === Accessibility Hardening === */
+
+/* Visible focus outlines for keyboard navigation */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Enforce 44px minimum touch targets on all interactive elements */
+@media (pointer: coarse) {
+  button, a, [role="button"], input[type="checkbox"], input[type="radio"],
+  select, [tabindex]:not([tabindex="-1"]) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* High-contrast mode support */
+@media (forced-colors: active) {
+  .border-border {
+    border-color: ButtonText;
+  }
+  .bg-primary {
+    background-color: Highlight;
+    color: HighlightText;
+  }
+}
+
 /* Reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
   *,

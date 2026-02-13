@@ -636,7 +636,7 @@ export default function Challenges() {
 
       {/* Main Content */}
       <PullToRefresh onRefresh={handleRefresh} className="min-h-[calc(100vh-4rem)]">
-        <main className="container py-6 sm:py-8 max-w-2xl pb-24 sm:pb-8">
+        <main className="container py-6 sm:py-8 max-w-2xl pb-safe-nav sm:pb-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, ReactNode, useC
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
+import { setErrorReportingUser, clearErrorReportingUser } from "@/lib/errorReporting";
 
 type UserRole = "admin" | "player";
 
@@ -107,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Handle specific auth events
       if (event === "SIGNED_OUT") {
         setRole(null);
+        clearErrorReportingUser();
         // Clear refresh interval on sign out
         if (refreshIntervalRef.current) {
           clearInterval(refreshIntervalRef.current);
@@ -147,6 +149,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setSession(initialSession);
         setUser(initialSession?.user ?? null);
+        if (initialSession?.user) {
+          setErrorReportingUser({ id: initialSession.user.id, email: initialSession.user.email });
+        }
 
         // Ensure role is resolved before marking app ready
         await safeSetRoleForSession(initialSession);
