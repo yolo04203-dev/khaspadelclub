@@ -15,14 +15,6 @@ export function Hero() {
     }
   };
 
-  const handleViewDemo = () => {
-    try {
-      navigate("/ladders");
-    } catch (error) {
-      console.error("Navigation error:", error);
-      window.location.href = "/ladders";
-    }
-  };
   return (
     <section className="relative min-h-[90vh] flex items-center overflow-hidden">
       {/* Background gradient */}
@@ -76,14 +68,6 @@ export function Hero() {
                 onClick={handleGetStarted}
               >
                 Get Started <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10"
-                onClick={handleViewDemo}
-              >
-                View Demo
               </Button>
             </div>
 
