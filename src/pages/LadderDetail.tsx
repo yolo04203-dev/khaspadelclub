@@ -211,7 +211,7 @@ export default function LadderDetail() {
       let profilesData: { user_id: string; display_name: string | null; avatar_url: string | null }[] = [];
       if (userIds.length > 0) {
         const { data, error } = await supabase
-          .from("profiles")
+          .from("public_profiles")
           .select("user_id, display_name, avatar_url")
           .in("user_id", userIds);
 

@@ -58,7 +58,7 @@ export function PendingInvitations({ onAccepted }: PendingInvitationsProps) {
       // Get inviter profiles
       const inviterIds = invites.map(i => i.invited_by);
       const { data: profiles } = await supabase
-        .from("profiles")
+        .from("public_profiles")
         .select("user_id, display_name")
         .in("user_id", inviterIds);
 

@@ -61,7 +61,7 @@ export function InvitePartnerDialog({
       try {
         // Search profiles by display name
         const { data: profiles, error } = await supabase
-          .from("profiles")
+          .from("public_profiles")
           .select("user_id, display_name, avatar_url, skill_level")
           .ilike("display_name", `%${searchQuery}%`)
           .neq("user_id", user?.id || "")
