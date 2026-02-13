@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap, Shuffle } from "lucide-react";
+import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap, Shuffle, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { LaddersTab } from "@/components/admin/LaddersTab";
 import { TournamentsTab } from "@/components/admin/TournamentsTab";
 import { ChallengesTab } from "@/components/admin/ChallengesTab";
 import { AmericanoTab } from "@/components/admin/AmericanoTab";
+import { PermissionsTab } from "@/components/admin/PermissionsTab";
 import { logger } from "@/lib/logger";
 
 interface Player {
@@ -91,7 +92,7 @@ export default function Admin() {
   }, [searchQuery]);
 
   const fetchAdminData = useCallback(async () => {
-    if (role !== "admin") return;
+    if (role !== "admin" && role !== "super_admin") return;
 
     try {
       // Single parallel fetch for ALL admin data
@@ -214,7 +215,7 @@ export default function Admin() {
   }, [role]);
 
   useEffect(() => {
-    if (role === "admin") fetchAdminData();
+    if (role === "admin" || role === "super_admin") fetchAdminData();
     else setIsLoading(false);
   }, [role, fetchAdminData]);
 
@@ -247,7 +248,7 @@ export default function Admin() {
     return <Navigate to="/auth" replace />;
   }
 
-  if (role !== "admin") {
+  if (role !== "admin" && role !== "super_admin") {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -315,10 +316,16 @@ export default function Admin() {
                 <Shuffle className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline" />
                 Americano
               </TabsTrigger>
+              {role === "super_admin" && (
+                <TabsTrigger value="permissions" className="text-xs sm:text-sm shrink-0">
+                  <Shield className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline" />
+                  Permissions
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="players">
-              <PlayersTab players={filteredPlayers} onRefresh={fetchAdminData} />
+              <PlayersTab players={filteredPlayers} onRefresh={fetchAdminData} currentUserRole={role} />
             </TabsContent>
 
             <TabsContent value="teams">
@@ -344,6 +351,12 @@ export default function Admin() {
             <TabsContent value="americano">
               <AmericanoTab />
             </TabsContent>
+
+            {role === "super_admin" && (
+              <TabsContent value="permissions">
+                <PermissionsTab players={players} />
+              </TabsContent>
+            )}
           </Tabs>
         </motion.div>
       </main>

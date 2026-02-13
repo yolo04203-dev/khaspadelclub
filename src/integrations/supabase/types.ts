@@ -1179,6 +1179,30 @@ export type Database = {
           },
         ]
       }
+      user_permissions: {
+        Row: {
+          created_at: string
+          granted_by: string | null
+          id: string
+          permission: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          permission: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          permission?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1340,6 +1364,10 @@ export type Database = {
         Args: { p_days?: number; p_user_id: string }
         Returns: Json
       }
+      has_permission: {
+        Args: { _permission: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1348,6 +1376,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_team_captain: {
         Args: { _team_id: string; _user_id: string }
         Returns: boolean
@@ -1359,7 +1388,7 @@ export type Database = {
     }
     Enums: {
       americano_status: "draft" | "in_progress" | "completed" | "cancelled"
-      app_role: "admin" | "player"
+      app_role: "admin" | "player" | "super_admin"
       challenge_status:
         | "pending"
         | "accepted"
@@ -1512,7 +1541,7 @@ export const Constants = {
   public: {
     Enums: {
       americano_status: ["draft", "in_progress", "completed", "cancelled"],
-      app_role: ["admin", "player"],
+      app_role: ["admin", "player", "super_admin"],
       challenge_status: [
         "pending",
         "accepted",

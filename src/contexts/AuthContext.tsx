@@ -17,7 +17,7 @@ async function hideSplashScreen() {
   }
 }
 
-type UserRole = "admin" | "player";
+type UserRole = "super_admin" | "admin" | "player";
 
 interface AuthContextType {
   user: User | null;
@@ -58,7 +58,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null;
       }
 
-      // If user has admin role, prioritize it
+      // Prioritize: super_admin > admin > player
+      if (data?.some((r) => r.role === "super_admin")) {
+        return "super_admin";
+      }
       if (data?.some((r) => r.role === "admin")) {
         return "admin";
       }
