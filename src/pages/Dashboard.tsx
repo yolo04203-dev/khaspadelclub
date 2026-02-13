@@ -214,7 +214,7 @@ export default function Dashboard() {
                 Welcome, {user.user_metadata?.display_name || user.email?.split("@")[0]}!
               </h1>
               <p className="text-sm sm:text-base text-muted-foreground mt-2">
-                {role === "admin"
+                {(role === "admin" || role === "super_admin")
                   ? "Manage your academy from the admin dashboard"
                   : "View your rankings and challenge other players"}
               </p>
@@ -435,7 +435,7 @@ export default function Dashboard() {
               </Card>
             </Link>
 
-            {role === "admin" && (
+            {(role === "admin" || role === "super_admin") && (
               <Link to="/admin">
                 <Card className="hover:border-primary/50 transition-colors cursor-pointer border-accent/30 h-full">
                   <CardHeader>

@@ -42,11 +42,12 @@ interface Player {
 interface PlayersTabProps {
   players: Player[];
   onRefresh: () => void;
+  currentUserRole?: string | null;
 }
 
 const PAGE_SIZE = 50;
 
-export function PlayersTab({ players, onRefresh }: PlayersTabProps) {
+export function PlayersTab({ players, onRefresh, currentUserRole }: PlayersTabProps) {
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [actionType, setActionType] = useState<"promote" | "demote" | null>(null);
   const [page, setPage] = useState(0);
@@ -119,36 +120,38 @@ export function PlayersTab({ players, onRefresh }: PlayersTabProps) {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {player.role === "player" ? (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedPlayer(player);
-                                setActionType("promote");
-                              }}
-                            >
-                              <UserCog className="w-4 h-4 mr-2" />
-                              Promote to Admin
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedPlayer(player);
-                                setActionType("demote");
-                              }}
-                            >
-                              <UserCog className="w-4 h-4 mr-2" />
-                              Demote to Player
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {currentUserRole === "super_admin" && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {player.role === "player" ? (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedPlayer(player);
+                                  setActionType("promote");
+                                }}
+                              >
+                                <UserCog className="w-4 h-4 mr-2" />
+                                Promote to Admin
+                              </DropdownMenuItem>
+                            ) : player.role === "admin" ? (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedPlayer(player);
+                                  setActionType("demote");
+                                }}
+                              >
+                                <UserCog className="w-4 h-4 mr-2" />
+                                Demote to Player
+                              </DropdownMenuItem>
+                            ) : null}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
