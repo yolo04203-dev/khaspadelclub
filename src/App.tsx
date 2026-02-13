@@ -3,13 +3,15 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { OfflineBanner, SlowConnectionBanner } from "@/components/ui/error-state";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { useStatusBar } from "@/hooks/useStatusBar";
 import { logger } from "@/lib/logger";
 import { reportError } from "@/lib/errorReporting";
 
@@ -82,6 +84,58 @@ function NetworkStatusProvider({ children }: { children: React.ReactNode }) {
       </div>
     </>
   );
+}
+
+/** Handles Capacitor deep links and foreground resume inside Router context */
+function NativeLifecycleManager() {
+  const navigate = useNavigate();
+  useStatusBar();
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let appListener: { remove: () => void } | undefined;
+    let resumeListener: { remove: () => void } | undefined;
+
+    const setup = async () => {
+      try {
+        const { App: CapApp } = await import("@capacitor/app");
+
+        // Deep link handler
+        appListener = await CapApp.addListener("appUrlOpen", (event) => {
+          try {
+            const url = new URL(event.url);
+            const path = url.pathname + url.search + url.hash;
+            if (path && path !== "/") {
+              logger.debug("Deep link received", { path });
+              navigate(path, { replace: true });
+            }
+          } catch (e) {
+            logger.warn("Failed to parse deep link", { url: event.url });
+          }
+        });
+
+        // Foreground resume — refetch active queries
+        resumeListener = await CapApp.addListener("appStateChange", (state) => {
+          if (state.isActive) {
+            logger.debug("App resumed — refetching active queries");
+            queryClient.refetchQueries({ type: "active", stale: true });
+          }
+        });
+      } catch {
+        // @capacitor/app not installed — safe to ignore on web
+      }
+    };
+
+    void setup();
+
+    return () => {
+      appListener?.remove();
+      resumeListener?.remove();
+    };
+  }, [navigate]);
+
+  return null;
 }
 
 // Configure QueryClient with production-ready settings
@@ -163,6 +217,7 @@ const App = () => {
               <Toaster />
               <Sonner />
               <BrowserRouter>
+                <NativeLifecycleManager />
                 <NetworkStatusProvider>
                   <Suspense fallback={<LoadingScreen message="Loading page..." />}>
                     <Routes>
