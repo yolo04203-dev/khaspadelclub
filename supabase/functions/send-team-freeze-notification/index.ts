@@ -15,6 +15,15 @@ interface FreezeNotificationRequest {
   reason?: string;
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -72,11 +81,17 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("RESEND_API_KEY is not configured");
     }
 
-    const { teamId, teamName, action, frozenUntil, reason }: FreezeNotificationRequest = await req.json();
+    const rawPayload: FreezeNotificationRequest = await req.json();
 
-    if (!teamId || !teamName || !action) {
+    if (!rawPayload.teamId || !rawPayload.teamName || !rawPayload.action) {
       throw new Error("Missing required fields: teamId, teamName, action");
     }
+
+    const teamId = rawPayload.teamId;
+    const teamName = escapeHtml(rawPayload.teamName);
+    const action = rawPayload.action;
+    const frozenUntil = rawPayload.frozenUntil;
+    const reason = rawPayload.reason ? escapeHtml(rawPayload.reason) : undefined;
 
     // Get team members with their user IDs
     const { data: teamMembers, error: membersError } = await supabase
