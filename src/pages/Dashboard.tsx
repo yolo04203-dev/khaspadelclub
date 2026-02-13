@@ -289,7 +289,7 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <PullToRefresh onRefresh={handleRefresh} className="min-h-[calc(100vh-4rem)]">
-        <main className="container py-6 sm:py-8 pb-24 sm:pb-8">
+        <main className="container py-6 sm:py-8 pb-safe-nav sm:pb-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

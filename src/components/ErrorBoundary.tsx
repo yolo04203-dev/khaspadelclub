@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, AlertTriangle, Home, Copy, Check } from "lucide-react";
+import { reportError } from "@/lib/errorReporting";
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -31,6 +32,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       stack: error.stack,
       componentStack: errorInfo.componentStack,
     });
+    reportError(error, { componentStack: errorInfo.componentStack });
     this.setState({ errorInfo });
   }
 
