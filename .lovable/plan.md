@@ -1,80 +1,98 @@
 
 
-# Enhanced Service Worker and Offline Experience
+# Seed 500 Dummy Users Across All Game Modes
 
-## What Already Exists
-Your app already has a fully functional service worker (`public/sw.js`) with:
-- Network-first caching strategy
-- OAuth and API route exclusion
-- Old cache cleanup on activation
-- Registration in `main.tsx`
-- Web app manifest with icons
-- Offline/slow connection banners in the UI
+## Overview
+Rewrite the `seed-test-data` edge function to create 500 fake users (profiles + teams) and distribute them across ladders, tournaments, and americano sessions with realistic data -- giving you a production-like dataset to stress-test on mobile.
 
-## Proposed Enhancements
+## Current State
+- 9 real profiles, 29 teams
+- 2 ladders with 4 categories
+- 5 tournaments with 9 categories
+- 5 americano sessions (4 individual, 1 team)
 
-### 1. Versioned Cache with Build Hash
-Replace the static `khas-padel-v1` cache name with a version that changes on each deploy, ensuring users always get fresh assets after an update.
+## Data Distribution Plan
 
-**File:** `public/sw.js`
-- Change `CACHE_NAME` to `khas-padel-v2` (increment on each meaningful SW change)
-- Add a version comment at the top for tracking
+| Entity | Count | Details |
+|--------|-------|---------|
+| Profiles | 500 | Fake `user_id`, display name, skill level, bio |
+| Teams | 250 | 2 players per team, linked via `team_members` |
+| Ladder rankings | 250 | All 250 teams distributed across 4 existing ladder categories |
+| Challenges | 500 | Mix of pending/accepted/declined/expired between ladder teams |
+| Matches | 400 | ~60% completed with scores, rest pending/scheduled |
+| Tournament participants | 120 | ~30 teams per tournament category (using existing tournaments) |
+| Tournament matches | 80 | Group stage + knockout matches for registered teams |
+| Americano sessions | 5 new | 3 individual (8 players each) + 2 team (6 teams each) with completed rounds |
 
-### 2. Precache Key Static Assets
-Cache the critical app shell files during the `install` event so they're available offline immediately, not just after first visit.
+## Technical Approach
 
-**File:** `public/sw.js`
-- Expand the `install` handler to cache: `/`, `/index.html`, `/manifest.json`, `/icon-192.png`, `/icon-512.png`, `/offline.html`
+### Rewrite `supabase/functions/seed-test-data/index.ts`
 
-### 3. Offline Fallback Page
-Create a simple offline fallback page shown when the user navigates to a page that isn't cached and has no network.
+The function will execute in phases using the service role key (bypasses RLS):
 
-**New file:** `public/offline.html`
-- A styled HTML page matching the app's dark theme
-- Shows a friendly "You're offline" message with a retry button
-- Self-contained (no external CSS/JS dependencies)
+**Phase 1 -- Profiles (500)**
+- Generate 500 UUIDs as fake `user_id` values
+- Insert into `profiles` with randomized display names, skill levels (Beginner/Intermediate/Advanced/Pro), bios
+- These are NOT real auth users -- just profile rows for data volume
 
-**File:** `public/sw.js`
-- Update the `fetch` handler to serve `/offline.html` for navigation requests that fail and aren't in cache
+**Phase 2 -- Teams (250) + Team Members (500)**
+- Pair up profiles into 250 teams
+- Insert into `teams` with generated names (marked with "SEED" suffix)
+- Insert 2 `team_members` rows per team (one captain, one regular)
 
-### 4. Background Sync for Queued Actions (Optional Foundation)
-Add a `sync` event listener skeleton so future features (like submitting scores while offline) can queue actions and replay them when connectivity returns.
+**Phase 3 -- Ladder Rankings (250)**
+- Distribute all 250 teams across the 4 existing ladder categories
+- Assign sequential ranks starting from 100 (avoids conflicting with real data)
+- Randomize wins/losses/points/streak
 
-**File:** `public/sw.js`
-- Add a `sync` event listener with a `sync-data` tag
-- For now, just log that sync was triggered (actual queue logic can be added per-feature later)
+**Phase 4 -- Challenges (500)**
+- Create challenges between random teams within the same ladder category
+- Mix of statuses: 40% pending, 20% accepted, 15% declined, 15% expired, 10% cancelled
 
-### 5. SW Update Notification
-Notify users when a new version of the app is available so they can refresh.
+**Phase 5 -- Matches (400)**
+- Create matches between random teams
+- ~60% completed with random scores and winner
+- ~25% scheduled with future dates
+- ~15% pending
 
-**File:** `src/main.tsx`
-- After registration, listen for the `updatefound` event on the registration
-- When a new SW is installed and waiting, show a toast prompting the user to refresh
+**Phase 6 -- Tournament Participants (120)**
+- Register ~30 seed teams into existing tournament categories
+- Set payment status, seed numbers, group assignments
 
-## Technical Details
+**Phase 7 -- Americano Sessions (5 new)**
+- Create 3 individual sessions with 8 random players each, completed rounds with scores
+- Create 2 team sessions with 6 teams each, completed round-robin matches
 
-### Updated `public/sw.js` structure:
-```text
-CACHE_NAME = 'khas-padel-v2'
+**Phase 8 -- Cleanup marker**
+- All seed data uses "SEED" or "SEED_DATA" markers so `clearExisting` can remove it cleanly
 
-install -> precache [/, /index.html, /manifest.json, /offline.html, icons]
-activate -> delete old caches, claim clients
-fetch -> skip OAuth/Supabase/non-GET
-       -> network-first for all other requests
-       -> on navigation failure, serve /offline.html
-sync -> log + placeholder for future queue replay
+### Request Parameters
+```json
+{
+  "userCount": 500,        // default 500
+  "clearExisting": false   // set true to wipe previous seed data
+}
 ```
+
+### Cleanup Logic (when `clearExisting: true`)
+Delete in reverse dependency order:
+1. `americano_team_matches` / `americano_rounds` (where session name contains SEED)
+2. `americano_teams` / `americano_players` (where session name contains SEED)
+3. `americano_sessions` (where name contains SEED)
+4. `tournament_matches` (where linked participants are SEED)
+5. `tournament_participants` (where team name contains SEED)
+6. `challenges` (where message contains SEED_DATA)
+7. `matches` (where notes contains SEED_DATA)
+8. `ladder_rankings` (where rank >= 100)
+9. `team_members` (where team name contains SEED)
+10. `teams` (where name contains SEED)
+11. `profiles` (where bio contains SEED_DATA)
 
 ### Files Changed
 | File | Change |
 |------|--------|
-| `public/sw.js` | Versioned cache, expanded precache list, offline fallback for navigations, sync listener |
-| `public/offline.html` | New -- styled offline fallback page |
-| `src/main.tsx` | Add SW update detection with toast notification |
+| `supabase/functions/seed-test-data/index.ts` | Full rewrite to cover all game modes |
 
-### What This Does NOT Change
-- No new dependencies needed
-- No changes to the manifest, icons, or meta tags (already correct)
-- No changes to the existing `OfflineBanner` component (it handles in-app network status)
-- The network-first strategy remains unchanged (proven to work well)
+### How to Run
+After deployment, call the function from the Admin panel or via the existing trigger. The function requires admin authentication and uses the service role key for inserts.
 
