@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { logger } from "@/lib/logger";
 
 interface Player {
   user_id: string;
@@ -108,7 +109,7 @@ export default function Players() {
       setHasMore((profiles?.length || 0) >= PAGE_SIZE);
       setPlayers(prev => append ? [...prev, ...playersData] : playersData);
     } catch (error) {
-      console.error("Error fetching players:", error);
+      logger.apiError("fetchPlayers", error);
     }
   }, [user?.id, searchQuery, skillFilter, lookingForTeamFilter, recruitingFilter]);
 

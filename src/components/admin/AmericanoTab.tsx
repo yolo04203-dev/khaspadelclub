@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { logger } from "@/lib/logger";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,7 +75,7 @@ export function AmericanoTab() {
       }));
       setSessions(mapped);
     } catch (err) {
-      console.error("Error fetching americano sessions:", err);
+      logger.apiError("fetchAmericanoSessions", err);
     } finally {
       setLoading(false);
     }
@@ -100,7 +101,7 @@ export function AmericanoTab() {
       toast.success("Session deleted");
       fetchSessions();
     } catch (err) {
-      console.error("Error deleting session:", err);
+      logger.apiError("deleteAmericanoSession", err);
       toast.error("Failed to delete session");
     } finally {
       setIsDeleting(false);

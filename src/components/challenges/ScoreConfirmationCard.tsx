@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 import {
   Dialog,
   DialogContent,
@@ -112,7 +113,7 @@ export function ScoreConfirmationCard({
 
   const updateLadderRankings = async (winnerId: string | null, loserId: string | null, categoryId?: string | null) => {
     if (!winnerId || !loserId) {
-      console.error("Missing winner or loser ID for ranking update");
+      logger.warn("Missing winner or loser ID for ranking update");
       return;
     }
 
@@ -129,12 +130,12 @@ export function ScoreConfirmationCard({
     const { data: rankings, error: rankError } = await query;
 
     if (rankError) {
-      console.error("Error fetching rankings:", rankError);
+      logger.apiError("fetchRankings", rankError);
       return;
     }
 
     if (!rankings || rankings.length === 0) {
-      console.error("No rankings found for teams:", winnerId, loserId, "in category:", categoryId);
+      logger.warn("No rankings found for teams", { winnerId, loserId, categoryId });
       return;
     }
 
@@ -142,7 +143,7 @@ export function ScoreConfirmationCard({
     const loserRanking = rankings.find(r => r.team_id === loserId);
 
     if (!winnerRanking || !loserRanking) {
-      console.error("Could not find both rankings. Winner:", !!winnerRanking, "Loser:", !!loserRanking);
+      logger.warn("Could not find both rankings", { winner: !!winnerRanking, loser: !!loserRanking });
       return;
     }
 
@@ -158,7 +159,7 @@ export function ScoreConfirmationCard({
       .eq("id", winnerRanking.id);
 
     if (winnerError) {
-      console.error("Error updating winner ranking:", winnerError);
+      logger.apiError("updateWinnerRanking", winnerError);
     }
 
     // Update loser's stats
@@ -173,7 +174,7 @@ export function ScoreConfirmationCard({
       .eq("id", loserRanking.id);
 
     if (loserError) {
-      console.error("Error updating loser ranking:", loserError);
+      logger.apiError("updateLoserRanking", loserError);
     }
 
     // If lower-ranked team won: winner takes loser's rank, everyone between shifts down by 1

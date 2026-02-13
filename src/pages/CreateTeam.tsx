@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/form";
 import { toast } from "@/hooks/use-toast";
 import { InvitePartnerDialog } from "@/components/team/InvitePartnerDialog";
+import { logger } from "@/lib/logger";
 
 const teamSchema = z.object({
   name: z
@@ -86,7 +87,7 @@ export default function CreateTeam() {
           setExistingTeam(data.team as { id: string; name: string });
         }
       } catch (error) {
-        console.error("Error checking existing team:", error);
+        logger.apiError("checkExistingTeam", error);
       } finally {
         setCheckingTeam(false);
       }
@@ -123,7 +124,7 @@ export default function CreateTeam() {
       setCreatedTeam({ id: teamId, name: data.name.trim() });
       setShowInviteDialog(true);
     } catch (error: any) {
-      console.error("Error creating team:", error);
+      logger.apiError("createTeam", error);
       toast({
         title: "Failed to create team",
         description: error.message || "An unexpected error occurred",

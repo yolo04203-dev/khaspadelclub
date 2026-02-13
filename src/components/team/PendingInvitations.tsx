@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+import { logger } from "@/lib/logger";
 
 interface Invitation {
   id: string;
@@ -77,7 +78,7 @@ export function PendingInvitations({ onAccepted }: PendingInvitationsProps) {
         }))
       );
     } catch (error) {
-      console.error("Error fetching invitations:", error);
+      logger.apiError("fetchInvitations", error);
     } finally {
       setIsLoading(false);
     }

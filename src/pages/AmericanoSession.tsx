@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface Player {
@@ -131,7 +132,7 @@ export default function AmericanoSession() {
         setRounds(roundsRes.data || []);
       }
     } catch (error) {
-      console.error("Error fetching session:", error);
+      logger.apiError("fetchSession", error);
       toast({ title: "Error", description: "Failed to load session", variant: "destructive" });
     } finally {
       setLoading(false);
@@ -227,7 +228,7 @@ export default function AmericanoSession() {
 
       fetchSessionData();
     } catch (error) {
-      console.error("Error starting session:", error);
+      logger.apiError("startSession", error);
       toast({ title: "Error", description: "Failed to start session", variant: "destructive" });
     }
   };
@@ -293,7 +294,7 @@ export default function AmericanoSession() {
       toast({ title: "Score saved!", description: "Team stats updated" });
       fetchSessionData();
     } catch (error) {
-      console.error("Error submitting score:", error);
+      logger.apiError("submitTeamScore", error);
       toast({ title: "Error", description: "Failed to save score", variant: "destructive" });
     }
   };
@@ -341,7 +342,7 @@ export default function AmericanoSession() {
       toast({ title: "Score saved!", description: "Player points updated" });
       fetchSessionData();
     } catch (error) {
-      console.error("Error submitting score:", error);
+      logger.apiError("submitScore", error);
       toast({ title: "Error", description: "Failed to save score", variant: "destructive" });
     }
   };

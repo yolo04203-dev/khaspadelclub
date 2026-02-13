@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { logger } from "@/lib/logger";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,7 +68,7 @@ export function LaddersTab({ ladders, onRefresh }: LaddersTabProps) {
       toast.success("Ladder deleted successfully");
       onRefresh();
     } catch (error) {
-      console.error("Error deleting ladder:", error);
+      logger.apiError("deleteLadder", error);
       toast.error("Failed to delete ladder");
     } finally {
       setIsDeleting(false);

@@ -18,6 +18,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { logger } from "@/lib/logger";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
@@ -210,7 +211,7 @@ export default function FindOpponents() {
       setChallengeableTeams(teamsData);
       return memberData.team_id;
     } catch (error) {
-      console.error("Error fetching data:", error);
+      logger.apiError("fetchOpponents", error);
       toast({
         title: "Error",
         description: "Failed to load ladder data",

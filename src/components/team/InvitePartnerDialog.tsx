@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger";
 
 interface PlayerSuggestion {
   user_id: string;
@@ -80,7 +81,7 @@ export function InvitePartnerDialog({
 
         setSuggestions(availablePlayers);
       } catch (error) {
-        console.error("Error searching players:", error);
+        logger.apiError("searchPlayers", error);
       } finally {
         setIsLoading(false);
       }

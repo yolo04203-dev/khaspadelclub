@@ -17,6 +17,7 @@ import {
 import { WinRateChart } from "@/components/stats/WinRateChart";
 import { HeadToHead } from "@/components/stats/HeadToHead";
 import { MatchTimeline } from "@/components/stats/MatchTimeline";
+import { logger } from "@/lib/logger";
 
 interface TeamBreakdown {
   team_id: string;
@@ -79,7 +80,7 @@ export default function Stats() {
         if (error) throw error;
         setStats(data as unknown as UnifiedStats);
       } catch (error) {
-        console.error("Error fetching stats:", error);
+        logger.apiError("fetchStats", error);
       } finally {
         setIsLoading(false);
       }

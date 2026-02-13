@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Plus, Shuffle, Users, Trophy, Play, CheckCircle } from "lucide-react";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { useAuth } from "@/contexts/AuthContext";
+import { logger } from "@/lib/logger";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
@@ -70,7 +71,7 @@ export default function Americano() {
 
       setSessions(sessionsWithCounts);
     } catch (error) {
-      console.error("Error fetching sessions:", error);
+      logger.apiError("fetchAmericanoSessions", error);
     } finally {
       setLoading(false);
     }

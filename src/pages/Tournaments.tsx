@@ -9,6 +9,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { logger } from "@/lib/logger";
 
 interface Tournament {
   id: string;
@@ -59,7 +60,7 @@ export default function Tournaments() {
 
       setTournaments(tournamentsWithCounts);
     } catch (error) {
-      console.error("Error fetching tournaments:", error);
+      logger.apiError("fetchTournaments", error);
     } finally {
       setLoading(false);
     }

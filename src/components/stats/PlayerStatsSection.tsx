@@ -3,6 +3,7 @@ import { TrendingUp, Trophy, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { logger } from "@/lib/logger";
 
 interface PlayerStatsSectionProps {
   userId: string;
@@ -34,7 +35,7 @@ export function PlayerStatsSection({ userId }: PlayerStatsSectionProps) {
         if (error) throw error;
         setStats(data as unknown as StatsData);
       } catch (error) {
-        console.error("Error fetching player stats:", error);
+        logger.apiError("fetchPlayerStats", error);
       } finally {
         setIsLoading(false);
       }

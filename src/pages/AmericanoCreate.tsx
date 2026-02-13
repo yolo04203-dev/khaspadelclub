@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Navigate } from "react-router-dom";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { logger } from "@/lib/logger";
 
 interface Team {
   teamName: string;
@@ -140,7 +141,7 @@ export default function AmericanoCreate() {
 
         navigate(`/americano/${session.id}`);
       } catch (error) {
-        console.error("Error creating session:", error);
+        logger.apiError("createAmericanoSession", error);
         toast({
           title: "Error",
           description: "Failed to create session. Please try again.",
@@ -205,7 +206,7 @@ export default function AmericanoCreate() {
 
         navigate(`/americano/${session.id}`);
       } catch (error) {
-        console.error("Error creating session:", error);
+        logger.apiError("createTeamAmericanoSession", error);
         toast({
           title: "Error",
           description: "Failed to create session. Please try again.",

@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { JoinRequestsManagement } from "@/components/ladder/JoinRequestsManagement";
+import { logger } from "@/lib/logger";
 
 interface LadderCategory {
   id: string;
@@ -119,7 +120,7 @@ export default function LadderManage() {
         const available = (allTeams || []).filter((t) => !assignedTeamIds.has(t.id));
         setAvailableTeams(available);
       } catch (error) {
-        console.error("Error fetching ladder:", error);
+        logger.apiError("fetchLadder", error);
       } finally {
         setIsLoading(false);
       }

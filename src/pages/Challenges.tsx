@@ -37,6 +37,7 @@ import { ChallengeCardSkeleton } from "@/components/ui/skeleton-card";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { FAB, FABContainer } from "@/components/ui/fab";
 import { isFuture, format } from "date-fns";
+import { logger } from "@/lib/logger";
 
 interface Challenge {
   id: string;
@@ -177,10 +178,10 @@ export default function Challenges() {
         .limit(20),
     ]);
 
-    if (inError) console.error("Error fetching incoming:", inError);
-    if (outError) console.error("Error fetching outgoing:", outError);
-    if (accError) console.error("Error fetching accepted:", accError);
-    if (histError) console.error("Error fetching history:", histError);
+    if (inError) logger.apiError("fetchIncomingChallenges", inError);
+    if (outError) logger.apiError("fetchOutgoingChallenges", outError);
+    if (accError) logger.apiError("fetchAcceptedChallenges", accError);
+    if (histError) logger.apiError("fetchHistoryChallenges", histError);
 
     // Get all team IDs
     const allTeamIds = [
@@ -328,7 +329,7 @@ export default function Challenges() {
             });
           }
         } catch (notifError) {
-          console.error("Failed to send notification:", notifError);
+          logger.apiError("sendChallengeAcceptedNotification", notifError);
         }
         
         toast({
@@ -387,7 +388,7 @@ export default function Challenges() {
           });
         }
       } catch (notifError) {
-        console.error("Failed to send notification:", notifError);
+        logger.apiError("sendChallengeDeclinedNotification", notifError);
       }
 
       toast({
@@ -520,7 +521,7 @@ export default function Challenges() {
           },
         });
       } catch (notifError) {
-        console.error("Failed to send notification:", notifError);
+        logger.apiError("sendScoreSubmittedNotification", notifError);
       }
 
       // Format set scores for display

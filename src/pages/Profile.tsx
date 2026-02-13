@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { User, Users, Trophy, Loader2, Save } from "lucide-react";
+import { User, Users, Trophy, Loader2, Save, Trash2, MessageSquare } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { AvatarUpload } from "@/components/profile/AvatarUpload";
+import { logger } from "@/lib/logger";
 import { InvitePartnerDialog } from "@/components/team/InvitePartnerDialog";
 import { PendingInvitations } from "@/components/team/PendingInvitations";
 import { TeamRecruitmentToggle } from "@/components/team/TeamRecruitmentToggle";
@@ -24,6 +25,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Profile {
   display_name: string | null;
@@ -57,6 +68,7 @@ const PLAY_TIMES = ["Weekday Mornings", "Weekday Evenings", "Weekend Mornings", 
 
 export default function ProfilePage() {
   const { user, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userTeam, setUserTeam] = useState<UserTeam | null>(null);
   const [matchHistory, setMatchHistory] = useState<MatchHistory[]>([]);
@@ -64,6 +76,8 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLeavingTeam, setIsLeavingTeam] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Form state
   const [displayName, setDisplayName] = useState("");
@@ -94,7 +108,7 @@ export default function ProfilePage() {
 
       const { data: profileData, error: profileError } = profileResult;
       if (profileError && profileError.code !== "PGRST116") {
-        console.error("Error fetching profile:", profileError);
+        logger.apiError("fetchProfile", profileError);
       }
 
       if (profileData) {
@@ -177,7 +191,7 @@ export default function ProfilePage() {
         setUserTeam(null);
       }
     } catch (error) {
-      console.error("Error fetching data:", error);
+      logger.apiError("fetchProfileData", error);
     } finally {
       setIsLoading(false);
     }
@@ -259,6 +273,23 @@ export default function ProfilePage() {
       });
     } finally {
       setIsLeavingTeam(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase.functions.invoke("delete-account");
+      if (error) throw error;
+      await supabase.auth.signOut();
+      navigate("/");
+    } catch (error: any) {
+      logger.apiError("deleteAccount", error);
+      toast({ title: "Error", description: "Failed to delete account. Please try again.", variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -589,6 +620,22 @@ export default function ProfilePage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Support & Account Actions */}
+            <Card>
+              <CardContent className="pt-6 space-y-4">
+                <Button variant="outline" className="w-full justify-start" asChild>
+                  <Link to="/contact">
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    Report Issue / Send Feedback
+                  </Link>
+                </Button>
+                <Button variant="destructive" className="w-full justify-start" onClick={() => setDeleteDialogOpen(true)}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Account
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </motion.div>
       </main>
@@ -603,6 +650,25 @@ export default function ProfilePage() {
           onInviteSent={fetchData}
         />
       )}
+
+      {/* Delete Account Confirmation */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete your profile, team memberships, and all associated data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAccount} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {isDeleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Delete Forever
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
