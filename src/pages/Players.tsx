@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Search, Users, Filter, User, Loader2, Clock } from "lucide-react";
+import { PlayerCardSkeleton } from "@/components/ui/skeleton-card";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppHeader } from "@/components/AppHeader";
@@ -196,8 +197,10 @@ export default function Players() {
 
           {/* Players List */}
           {isLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div className="space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <PlayerCardSkeleton key={i} />
+              ))}
             </div>
           ) : players.length === 0 ? (
             <Card className="text-center py-12">

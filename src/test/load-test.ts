@@ -163,13 +163,24 @@ export const defaultEndpoints: TestEndpoint[] = [
   {
     name: "Tournaments - Fetch List",
     type: "query",
-    weight: 0.05,
+    weight: 0.04,
     execute: async () => {
       return supabase
         .from("tournaments")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(20);
+    },
+  },
+  {
+    name: "RPC - Player Unified Stats",
+    type: "query",
+    weight: 0.06,
+    execute: async () => {
+      return supabase.rpc("get_player_unified_stats", {
+        p_user_id: "00000000-0000-0000-0000-000000000000",
+        p_days: 0,
+      });
     },
   },
 ];
