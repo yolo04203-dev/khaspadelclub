@@ -14,6 +14,7 @@ import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useStatusBar } from "@/hooks/useStatusBar";
 import { logger } from "@/lib/logger";
 import { reportError } from "@/lib/errorReporting";
+import { PerfOverlay } from "@/components/dev/PerfOverlay";
 
 // Eager load critical pages
 import Index from "./pages/Index";
@@ -259,6 +260,7 @@ const App = () => {
           </NotificationProvider>
         </AuthProvider>
       </QueryClientProvider>
+      {import.meta.env.DEV && <PerfOverlay />}
     </ErrorBoundary>
   );
 };

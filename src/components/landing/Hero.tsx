@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { ArrowRight, Trophy, Users, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -35,21 +34,11 @@ export function Hero() {
       <div className="container relative z-10 py-20">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Content */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-primary-foreground"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2 }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/20 text-accent mb-6"
-            >
+          <div className="text-primary-foreground hero-animate">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/20 text-accent mb-6 hero-animate hero-animate-delay-1">
               <Zap className="w-4 h-4" />
               <span className="text-sm font-medium">Real-time Competition Tracking</span>
-            </motion.div>
+            </div>
 
             <h1 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
               Elevate Your{" "}
@@ -79,28 +68,20 @@ export function Hero() {
                 { icon: Trophy, value: "50+", label: "Tournaments" },
                 { icon: Zap, value: "1000+", label: "Matches" },
               ].map((stat, i) => (
-                <motion.div
+                <div
                   key={stat.label}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 + i * 0.1 }}
-                  className="text-center sm:text-left"
+                  className={`text-center sm:text-left hero-animate hero-animate-delay-${i + 2}`}
                 >
                   <stat.icon className="w-5 h-5 text-accent mb-2 mx-auto sm:mx-0" />
                   <div className="font-display text-2xl font-bold">{stat.value}</div>
                   <div className="text-sm text-primary-foreground/60">{stat.label}</div>
-                </motion.div>
+                </div>
               ))}
             </div>
-          </motion.div>
+          </div>
 
           {/* Illustration - Mock leaderboard card */}
-          <motion.div
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="hidden lg:block"
-          >
+          <div className="hidden lg:block hero-animate hero-animate-delay-2">
             <div className="relative">
               {/* Main card */}
               <div className="bg-card rounded-2xl shadow-2xl p-6 border border-border/50">
@@ -118,12 +99,9 @@ export function Hero() {
                   { rank: 3, name: "Paddle Kings", points: 2290, change: "-1" },
                   { rank: 4, name: "Net Blazers", points: 2180, change: "+3" },
                 ].map((team, i) => (
-                  <motion.div
+                  <div
                     key={team.name}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.5 + i * 0.1 }}
-                    className={`flex items-center gap-4 p-3 rounded-lg mb-2 ${
+                    className={`flex items-center gap-4 p-3 rounded-lg mb-2 hero-animate hero-animate-delay-${Math.min(i + 3, 5)} ${
                       i === 0 ? "bg-accent/10 border border-accent/20" : "bg-muted/50"
                     }`}
                   >
@@ -146,21 +124,16 @@ export function Hero() {
                     }`}>
                       {team.change}
                     </span>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
 
               {/* Floating badge */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.8 }}
-                className="absolute -top-4 -right-4 bg-accent text-accent-foreground px-4 py-2 rounded-full shadow-lg font-display font-semibold text-sm"
-              >
+              <div className="absolute -top-4 -right-4 bg-accent text-accent-foreground px-4 py-2 rounded-full shadow-lg font-display font-semibold text-sm hero-animate hero-animate-delay-5">
                 🏆 Challenge Now
-              </motion.div>
+              </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>
