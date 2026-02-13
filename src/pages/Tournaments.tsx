@@ -113,7 +113,7 @@ export default function Tournaments() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.15 }}
         >
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2">
@@ -153,8 +153,21 @@ export default function Tournaments() {
             <h2 className="text-xl font-semibold text-foreground">All Tournaments</h2>
 
             {loading ? (
-              <div className="flex justify-center py-12">
-                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3].map(i => (
+                  <Card key={i} className="animate-pulse h-full">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="h-5 bg-muted rounded w-2/3" />
+                        <div className="h-5 bg-muted rounded w-20" />
+                      </div>
+                      <div className="h-4 bg-muted rounded w-1/3 mt-2" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-4 bg-muted rounded w-full" />
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             ) : tournaments.length === 0 ? (
               <Card className="border-dashed">

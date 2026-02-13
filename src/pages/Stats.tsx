@@ -90,8 +90,28 @@ export default function Stats() {
 
   if (authLoading || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background">
+        <AppHeader showBack />
+        <main className="container py-8 max-w-4xl pb-safe-nav sm:pb-8">
+          <div className="h-8 bg-muted rounded w-48 mb-2 animate-pulse" />
+          <div className="h-4 bg-muted rounded w-64 mb-8 animate-pulse" />
+          <div className="grid gap-4 md:grid-cols-4 mb-6">
+            {[1, 2, 3, 4].map(i => (
+              <Card key={i} className="animate-pulse">
+                <CardHeader className="pb-2"><div className="h-4 bg-muted rounded w-1/2" /></CardHeader>
+                <CardContent><div className="h-8 bg-muted rounded w-16" /></CardContent>
+              </Card>
+            ))}
+          </div>
+          <Card className="animate-pulse mb-6">
+            <CardHeader><div className="h-5 bg-muted rounded w-40" /></CardHeader>
+            <CardContent><div className="h-48 bg-muted rounded" /></CardContent>
+          </Card>
+          <Card className="animate-pulse">
+            <CardHeader><div className="h-5 bg-muted rounded w-32" /></CardHeader>
+            <CardContent><div className="h-32 bg-muted rounded" /></CardContent>
+          </Card>
+        </main>
       </div>
     );
   }
@@ -141,7 +161,7 @@ export default function Stats() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.15 }}
         >
           <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
             <div>

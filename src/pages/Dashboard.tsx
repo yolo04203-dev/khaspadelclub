@@ -293,7 +293,7 @@ export default function Dashboard() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
+            transition={{ duration: 0.15 }}
           >
             <div className="mb-6 sm:mb-8">
               <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
