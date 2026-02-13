@@ -1,114 +1,132 @@
 
 
-# Security Audit Report and Remediation Plan
+# Comprehensive Security, Performance, and UX Audit -- Remediation Plan
 
-## Audit Results Summary
+## Audit Status Overview
 
-### PASSED (No Action Needed)
+### Already Passing (No Changes Needed)
 
-| Check | Status | Details |
-|-------|--------|---------|
-| Auth uses POST, not GET | PASS | `signInWithPassword` and `signUp` use POST via Supabase SDK |
-| No passwords in URLs | PASS | Credentials sent in request body only |
-| No hardcoded credentials | PASS | Only the public anon key is in the codebase (this is by design) |
-| Service role key server-side only | PASS | Used only in edge functions via `Deno.env.get()`, never in frontend |
-| Password hashing | PASS | Handled by Supabase Auth (bcrypt), never stored in plaintext |
-| HTTPS everywhere | PASS | All Supabase endpoints use HTTPS; no HTTP URLs in codebase |
-| No sensitive data in localStorage | PASS | Only Supabase session (managed by SDK with `autoRefreshToken`) |
-| Input validation | PASS | Zod schemas on login/signup/forgot-password forms |
-| Error boundaries | PASS | Global `ErrorBoundary` + per-route `RouteErrorBoundary` |
-| Crash reporting | PASS | Sentry with tracing and replay |
-| User enumeration prevention | PASS | Generic error messages on login, signup, and forgot password |
-| Token refresh | PASS | `autoRefreshToken: true` + manual 55-min interval fallback |
-| XSS via dangerouslySetInnerHTML | PASS | Only used in `chart.tsx` with static theme data, no user input |
-| RLS on all tables | PASS | Every table has RLS enabled with appropriate policies |
-| Role storage | PASS | Roles stored in separate `user_roles` table with `is_admin()` security definer function |
-| Edge function auth | PASS | Manual JWT validation + role checks before service role key usage |
-| File upload validation | PASS | Type check (`image/*`) and size limit (5MB) on avatar upload |
-
----
-
-### ISSUES FOUND (Require Fixes)
-
----
-
-### Issue 1: Sentry Session Replay Records All Text and Media (HIGH)
-
-**File:** `src/lib/errorReporting.ts` (line 16)
-
-Sentry Replay is configured with `maskAllText: false` and `blockAllMedia: false`. This means every session replay captures raw text content from the screen -- including email addresses, display names, phone numbers, bios, and any other PII visible in the UI. Sentry stores this data on their servers, creating a data exposure risk and potential GDPR violation.
-
-**Fix:** Set `maskAllText: true` and `blockAllMedia: true` so replays mask sensitive content by default. If specific non-sensitive elements need to be visible in replays, use Sentry's `data-sentry-unmask` attribute selectively.
-
----
-
-### Issue 2: Profiles Table Exposes Phone Numbers to Other Users (HIGH)
-
-**Current RLS:** The `profiles` table has SELECT policies for "Users can view their own profile" and "Admins can view all profiles." However, the `PlayerProfile.tsx` page queries another user's profile by `user_id` (line 57-61). This query will fail for non-admin users due to RLS, meaning the Players page currently cannot display other users' profiles correctly.
-
-There are two sub-issues:
-1. If a broader SELECT policy is added later to make player profiles work, it would expose `phone_number` to all authenticated users.
-2. The `PlayerProfile.tsx` page likely returns empty data for non-admin users right now, which is a functional bug.
-
-**Fix:** Create a database VIEW called `public_profiles` that exposes only safe fields (`user_id`, `display_name`, `avatar_url`, `skill_level`, `bio`, `is_looking_for_team`, `created_at`) and excludes `phone_number`. Add a permissive SELECT policy on the view for all authenticated users. Update `PlayerProfile.tsx` and `Players.tsx` to query from this view instead.
+| Category | Check | Status |
+|----------|-------|--------|
+| Security | Auth uses POST for credentials | PASS |
+| Security | No passwords in URLs | PASS |
+| Security | Password hashing (bcrypt via Supabase Auth) | PASS |
+| Security | HTTPS on all API endpoints | PASS |
+| Security | Service role key server-side only | PASS |
+| Security | RLS enabled on all tables | PASS |
+| Security | User enumeration prevention | PASS |
+| Security | Sentry PII masking (maskAllText, blockAllMedia) | PASS (fixed in prior round) |
+| Security | Public profiles view hides phone_number | PASS (fixed in prior round) |
+| Security | Edge function JWT validation + role checks | PASS |
+| Security | File upload type/size validation | PASS |
+| Security | Input validation with Zod schemas | PASS |
+| Performance | Code splitting (21 lazy routes, 3 vendor chunks) | PASS |
+| Performance | Query caching (2-min stale, 10-min gc, exponential backoff) | PASS |
+| Performance | Pagination (30-50 items per page) | PASS |
+| Performance | Search debouncing (300ms) | PASS |
+| Performance | Skeleton loaders on data-heavy pages | PASS |
+| Performance | Performance budgets defined (TTI, tap, FPS, 1000 users) | PASS |
+| Performance | Web Vitals tracking (FCP, LCP, CLS, INP) | PASS |
+| Performance | Font preloading + preconnect hints | PASS |
+| UX/Mobile | Safe area insets (notch, home indicator) | PASS |
+| UX/Mobile | Touch targets >= 44px | PASS |
+| UX/Mobile | No tap delay (touch-manipulation) | PASS |
+| UX/Mobile | Input font >= 16px (no iOS zoom) | PASS |
+| UX/Mobile | Keyboard handling (useKeyboardHeight) | PASS |
+| UX/Mobile | Haptic feedback | PASS |
+| UX/Mobile | Pull-to-refresh | PASS |
+| UX/Mobile | Deep linking (Capacitor) | PASS |
+| UX/Mobile | Status bar theme sync | PASS |
+| UX/Mobile | Splash screen controlled dismissal | PASS |
+| UX/Mobile | Dark mode support | PASS |
+| Error Handling | Global ErrorBoundary + RouteErrorBoundary | PASS |
+| Error Handling | Sentry crash reporting with tracing/replay | PASS |
+| Error Handling | Unhandled rejection listeners | PASS |
+| Error Handling | API client with timeouts, retries, AbortController | PASS |
 
 ---
 
-### Issue 3: Team Invitations Expose Email Addresses (MEDIUM)
+## Issues Found and Fixes
 
-**Current RLS:** The `team_invitations` table has a SELECT policy that allows users to view invitations where `invited_email` matches their own email. However, the policy reads the user's email from `auth.users` via a subquery, which could allow enumeration if an attacker crafts queries to probe different `invited_email` values.
+### Issue 1: Raw `console.error` Calls Across 17 Pages (MEDIUM -- Log Hygiene)
 
-The `invited_email` field is stored in plaintext and is visible to team captains who can view sent invitations.
+There are 138 instances of `console.error()` across 17 page files and several components. These bypass the structured `logger` utility, which means:
+- In production, raw stack traces and potentially sensitive error context (user IDs, team IDs, query parameters) appear in the browser console
+- Errors are not consistently formatted or filterable
+- No centralized control over what gets logged in production vs development
 
-**Fix:** This is partially mitigated because captains can only see invitations they created. However, the email should be sanitized in the response -- consider hashing or partially masking the email in the SELECT query (e.g., showing `j***@example.com`). Alternatively, store only `invited_user_id` when the user exists, and use `invited_email` only for users not yet registered.
+**Fix:** Replace all `console.error(...)` calls in `src/pages/` and `src/components/` with `logger.error(...)` or `logger.apiError(...)` as appropriate. This is a systematic find-and-replace across all affected files.
 
----
-
-### Issue 4: Leaked Password Protection Disabled (MEDIUM)
-
-**Source:** Supabase security linter
-
-The "Leaked Password Protection" feature in Supabase Auth is disabled. This feature checks passwords against known breached databases (HaveIBeenPwned) and prevents users from setting compromised passwords.
-
-**Fix:** This must be enabled manually in the Lovable Cloud backend settings (Authentication > Settings > Security). It cannot be done through code.
+**Files affected:** `PlayerProfile.tsx`, `Players.tsx`, `Profile.tsx`, `TournamentCreate.tsx`, `CreateTeam.tsx`, `LadderDetail.tsx`, `AmericanoCreate.tsx`, `LadderManage.tsx`, `Americano.tsx`, `Admin.tsx`, `Stats.tsx`, `Tournaments.tsx`, `AmericanoSession.tsx`, `FindOpponents.tsx`, `TournamentDetail.tsx`, `ScoreConfirmationCard.tsx`, `InvitePartnerDialog.tsx`, `PlayersTab.tsx`, `MatchesTab.tsx`, `PendingInvitations.tsx`, `JoinRequestsManagement.tsx`, `Hero.tsx`, `Header.tsx`
 
 ---
 
-### Issue 5: Console Logging of Error Objects May Leak Sensitive Context (LOW)
+### Issue 2: Seed Data Edge Function Has No Authentication (HIGH -- Security)
 
-**File:** `src/pages/Auth.tsx` (line 136)
+The `seed-test-data` edge function creates up to 1000 teams, 5000 challenges, and 3000 matches with no authentication check. Any unauthenticated request can flood the database with test data. The function also has `verify_jwt = false` in `config.toml`.
 
-The `console.error("Password reset error:", error)` call logs the full error object, which could contain request details or user input in some edge cases. While this is only visible in the user's own browser console, it's a best practice to sanitize error logging.
+**Fix:** Add JWT verification and admin role check to the seed function. Only users with the `admin` role should be able to seed test data. Update `config.toml` to set `verify_jwt = true` for this function.
 
-**Fix:** Replace with `logger.authError("passwordReset", error)` which uses the structured logger and strips stack traces in production.
+**Files:** `supabase/functions/seed-test-data/index.ts`, `supabase/config.toml`
 
 ---
 
-## Remediation Plan
+### Issue 3: Email Notification Function Logs Email Addresses (MEDIUM -- PII Leak)
 
-### Step 1: Fix Sentry Replay PII Exposure
-Update `src/lib/errorReporting.ts` line 16:
-- Change `maskAllText: false` to `maskAllText: true`
-- Change `blockAllMedia: false` to `blockAllMedia: true`
+In `send-challenge-notification/index.ts` (line 259), the function logs recipient email addresses:
+```
+console.log(`Sending ${type} notification to:`, emails);
+```
 
-### Step 2: Create Public Profiles View
-Create a database migration with a `public_profiles` view exposing only non-sensitive fields. Add RLS-equivalent security via the view definition. Update `PlayerProfile.tsx` and `Players.tsx` to query from the view.
+Edge function logs are stored and could be accessed by anyone with backend access. Email addresses are PII and should not appear in logs.
 
-### Step 3: Sanitize Auth Console Logging
-Replace `console.error("Password reset error:", error)` in `Auth.tsx` with `logger.authError("passwordReset", error)` for structured, non-leaking error logging.
+**Fix:** Replace the log with a count: `console.log(\`Sending ${type} notification to ${emails.length} recipients\`)`. Remove all other PII from edge function logs.
 
-### Step 4: Document Manual Steps
-The following require manual action outside of code:
-- Enable Leaked Password Protection in Lovable Cloud backend settings
-- Review Sentry replay recordings for any already-captured PII
+**File:** `supabase/functions/send-challenge-notification/index.ts`
 
-### Files to Modify
+---
+
+### Issue 4: No Account Deletion Feature (MEDIUM -- GDPR Compliance)
+
+There is no mechanism for users to delete their account and all associated data. Under GDPR Article 17 ("Right to Erasure"), users must be able to request deletion of their personal data.
+
+**Fix:** Add a "Delete Account" button to the Profile page that:
+1. Shows a confirmation dialog explaining what will be deleted
+2. Calls a new `delete-account` edge function
+3. The edge function deletes the user's profile, team memberships, and auth account using the service role
+4. Signs the user out and redirects to the landing page
+
+**Files:** New `supabase/functions/delete-account/index.ts`, update `src/pages/Profile.tsx`
+
+---
+
+### Issue 5: No In-App Feedback / Support Mechanism (LOW -- App Store Compliance)
+
+The Contact page exists but there is no in-app feedback mechanism for logged-in users to report issues or provide feedback. App Store and Play Store guidelines recommend providing a way for users to contact support from within the app.
+
+**Fix:** Add a "Report Issue" or "Send Feedback" link in the Profile page that navigates to `/contact` with context pre-filled (user ID, app version).
+
+**File:** `src/pages/Profile.tsx`
+
+---
+
+## Technical Details
+
+### File Changes Summary
 
 | File | Change |
 |------|--------|
-| `src/lib/errorReporting.ts` | Set `maskAllText: true`, `blockAllMedia: true` |
-| `src/pages/Auth.tsx` | Replace `console.error` with `logger.authError` |
-| Database migration | Create `public_profiles` view excluding `phone_number` |
-| `src/pages/PlayerProfile.tsx` | Query from `public_profiles` view |
-| `src/pages/Players.tsx` | Query from `public_profiles` view (if applicable) |
+| 17 page files + 6 component files | Replace `console.error` with `logger.error` / `logger.apiError` |
+| `supabase/functions/seed-test-data/index.ts` | Add admin-only auth check |
+| `supabase/config.toml` | Set `verify_jwt = true` for seed-test-data |
+| `supabase/functions/send-challenge-notification/index.ts` | Remove email addresses from logs |
+| `supabase/functions/delete-account/index.ts` | New -- account deletion edge function |
+| `src/pages/Profile.tsx` | Add Delete Account button + Feedback link |
+
+### Manual Steps Required (Outside Lovable Scope)
+
+- **Leaked Password Protection**: Must be enabled manually in the backend dashboard under Authentication > Settings > Security. This was flagged in a prior audit and remains the only linter warning.
+- **Real-Device Testing**: Battery/memory profiling, network throttling (3G/4G), and native permission testing require local device access.
+- **Penetration Testing**: OWASP ZAP, Burp Suite, or similar tools should be run against the deployed app for comprehensive vulnerability scanning.
+- **App Store Submission**: Privacy policy and terms pages exist at `/privacy` and `/terms` -- content should be reviewed by legal counsel before submission.
 
