@@ -1,9 +1,19 @@
-const CACHE_NAME = 'khas-padel-v1';
+// Service Worker v2
+const CACHE_NAME = 'khas-padel-v2';
 
-// Install: cache app shell
+const PRECACHE_ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/offline.html',
+  '/icon-192.png',
+  '/icon-512.png',
+];
+
+// Install: precache app shell
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(['/']))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_ASSETS))
   );
   self.skipWaiting();
 });
@@ -31,6 +41,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  const isNavigate = event.request.mode === 'navigate';
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
@@ -38,6 +50,21 @@ self.addEventListener('fetch', (event) => {
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() =>
+        caches.match(event.request).then((cached) => {
+          if (cached) return cached;
+          // Serve offline fallback for navigation requests
+          if (isNavigate) return caches.match('/offline.html');
+          return cached; // undefined – browser default error
+        })
+      )
   );
+});
+
+// Background sync foundation
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'sync-data') {
+    console.log('[SW] Background sync triggered');
+    // Future: replay queued mutations here
+  }
 });
