@@ -1,27 +1,36 @@
 
-
-# Fix Header Branding and Layout
+# Make Score & Schedule Dialogs Full-Width on Mobile
 
 ## Problem
-The AppHeader on the Americano page (and all pages) shows "Padel LEADERBOARD" from the Logo component, which is the old branding. It should say "Khas Padel Club". Additionally, the "New Session" button crowds into the logo text on mobile, making it look congested.
+The "Record Match Result" (SetScoreDialog) and "Schedule Match" (ScheduleMatchDialog) dialogs appear as narrow centered cards on mobile, wasting screen space and feeling congested. They should expand to fill the screen on mobile devices.
 
 ## Changes
 
-### 1. Update Logo text to "Khas Padel Club"
-**File:** `src/components/Logo.tsx`
-- Change "Padel" to "Khas Padel"
-- Change "Leaderboard" to "Club"
-- This fixes branding across the entire app since Logo is used everywhere
+### 1. Update Dialog base component for mobile-friendly variant
+**File:** `src/components/ui/dialog.tsx`
 
-### 2. Hide Logo text on small screens in AppHeader
-**File:** `src/components/AppHeader.tsx`
-- Add `showText` prop control or a responsive class so the Logo text hides on very small screens when actions (like "New Session" button) are present, preventing the congested layout
-- Alternatively, make the actions wrap below on small screens
+Currently the DialogContent has `max-w-lg` and `top-[10%]` on all screen sizes. Change mobile defaults to:
+- Remove side margins on mobile (full width)
+- Position at the very top on mobile (`top-0`, no translate)
+- Remove rounded corners on mobile (full-bleed feel)
+- Keep the current centered card style on `sm:` and above
 
-### 3. Make "New Session" button more compact on mobile
-**File:** `src/pages/Americano.tsx`
-- Use icon-only button on small screens (hide "New Session" text, show only the Plus icon)
-- Show full text on `sm:` breakpoint and above
+Updated classes on DialogContent:
+- Mobile: `top-0 translate-y-0 max-h-[100vh] rounded-none w-full max-w-full`
+- Desktop (`sm:`): `sm:top-[50%] sm:translate-y-[-50%] sm:max-w-lg sm:rounded-lg sm:max-h-[85vh]`
 
-These three changes will fix the branding inconsistency and the cramped header layout.
+### 2. Increase score input sizes in SetScoreDialog
+**File:** `src/components/challenges/SetScoreDialog.tsx`
 
+- Make the set score inputs larger on mobile (wider tap targets, bigger font)
+- Give the match score display more breathing room with larger padding
+- Make buttons full-width on mobile
+
+### 3. Improve ScheduleMatchDialog spacing
+**File:** `src/components/challenges/ScheduleMatchDialog.tsx`
+
+- Already uses `sm:max-w-[425px]` -- will inherit the full-width mobile behavior from the Dialog base change
+- No additional changes needed beyond the base Dialog fix
+
+## Summary
+The core fix is in `dialog.tsx` -- making all dialogs full-screen on mobile. This benefits every dialog in the app, not just these two. The SetScoreDialog gets additional spacing/sizing tweaks to make score entry feel spacious.
