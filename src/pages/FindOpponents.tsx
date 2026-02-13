@@ -170,33 +170,34 @@ export default function FindOpponents() {
       );
       setPendingChallenges(pendingSet);
 
-      // For each membership, get challengeable teams
+      // Fetch challengeable teams for all memberships in parallel
+      const opponentResults = await Promise.all(
+        memberships.map(membership => {
+          const minRank = Math.max(1, membership.rank - membership.challenge_range);
+          return supabase
+            .from("ladder_rankings")
+            .select(`
+              team_id,
+              rank,
+              ladder_category_id,
+              teams!inner (
+                id,
+                name,
+                is_frozen,
+                frozen_until
+              )
+            `)
+            .eq("ladder_category_id", membership.ladder_category_id)
+            .neq("team_id", memberData.team_id)
+            .lt("rank", membership.rank)
+            .gte("rank", minRank)
+            .order("rank", { ascending: true });
+        })
+      );
+
       const teamsData: Record<string, ChallengeableTeam[]> = {};
-
-      for (const membership of memberships) {
-        // Get teams ranked higher (lower rank number) within challenge range
-        const minRank = Math.max(1, membership.rank - membership.challenge_range);
-        
-        const { data: opponents } = await supabase
-          .from("ladder_rankings")
-          .select(`
-            team_id,
-            rank,
-            ladder_category_id,
-            teams!inner (
-              id,
-              name,
-              is_frozen,
-              frozen_until
-            )
-          `)
-          .eq("ladder_category_id", membership.ladder_category_id)
-          .neq("team_id", memberData.team_id)
-          .lt("rank", membership.rank)
-          .gte("rank", minRank)
-          .order("rank", { ascending: true });
-
-        teamsData[membership.ladder_category_id] = (opponents || []).map((o: any) => ({
+      memberships.forEach((membership, i) => {
+        teamsData[membership.ladder_category_id] = (opponentResults[i].data || []).map((o: any) => ({
           team_id: o.team_id,
           team_name: o.teams.name,
           rank: o.rank,
@@ -204,7 +205,7 @@ export default function FindOpponents() {
           is_frozen: o.teams.is_frozen,
           frozen_until: o.teams.frozen_until,
         }));
-      }
+      });
 
       setChallengeableTeams(teamsData);
       return memberData.team_id;
@@ -275,8 +276,30 @@ export default function FindOpponents() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background">
+        <AppHeader showBack backTo="/challenges" />
+        <main className="container py-8 max-w-3xl">
+          <div className="mb-8 text-center">
+            <div className="h-8 bg-muted rounded w-48 mx-auto mb-2 animate-pulse" />
+            <div className="h-4 bg-muted rounded w-64 mx-auto animate-pulse" />
+          </div>
+          <div className="space-y-3">
+            {[1, 2, 3].map(i => (
+              <Card key={i} className="animate-pulse">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-muted" />
+                    <div className="flex-1">
+                      <div className="h-4 bg-muted rounded w-1/3 mb-2" />
+                      <div className="h-3 bg-muted rounded w-1/4" />
+                    </div>
+                    <div className="h-9 bg-muted rounded w-24" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </main>
       </div>
     );
   }
@@ -290,7 +313,7 @@ export default function FindOpponents() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.15 }}
         >
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold text-foreground mb-2">Find Opponents</h1>

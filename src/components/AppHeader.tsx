@@ -5,12 +5,21 @@ import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
+import { useCallback } from "react";
 
 interface AppHeaderProps {
   showBack?: boolean;
   backTo?: string;
   actions?: React.ReactNode;
 }
+
+// Map nav routes to their lazy import keys for prefetching
+const prefetchMap: Record<string, string> = {
+  "/ladders": "Ladders",
+  "/challenges": "Challenges",
+  "/players": "Players",
+  "/stats": "Stats",
+};
 
 const navLinks = [
   { to: "/dashboard", label: "Home", icon: Home },
@@ -23,6 +32,16 @@ const navLinks = [
 export function AppHeader({ showBack = false, backTo = "/dashboard", actions }: AppHeaderProps) {
   const { user, role, signOut } = useAuth();
   const location = useLocation();
+
+  const handlePrefetch = useCallback((to: string) => {
+    const key = prefetchMap[to];
+    if (key) {
+      import("@/App").then(mod => {
+        const imports = (mod as any).lazyImports;
+        if (imports?.[key]) imports[key]();
+      }).catch(() => {});
+    }
+  }, []);
 
   return (
     <>
@@ -50,6 +69,8 @@ export function AppHeader({ showBack = false, backTo = "/dashboard", actions }: 
                     <Link
                       key={to}
                       to={to}
+                      onMouseEnter={() => handlePrefetch(to)}
+                      onTouchStart={() => handlePrefetch(to)}
                       className={cn(
                         "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
                         isActive
@@ -95,6 +116,7 @@ export function AppHeader({ showBack = false, backTo = "/dashboard", actions }: 
               <Link
                 key={to}
                 to={to}
+                onTouchStart={() => handlePrefetch(to)}
                 className={cn(
                   "flex flex-col items-center gap-0.5 px-2 py-1 text-xs rounded-md transition-colors",
                   isActive

@@ -77,13 +77,21 @@ export default function ProfilePage() {
     if (!user) return;
 
     try {
-      // Fetch profile
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("display_name, avatar_url, skill_level, phone_number, bio, is_looking_for_team, preferred_play_times")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      // Parallel fetch: profile + team membership
+      const [profileResult, memberResult] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("display_name, avatar_url, skill_level, phone_number, bio, is_looking_for_team, preferred_play_times")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("team_members")
+          .select("team_id, is_captain")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+      ]);
 
+      const { data: profileData, error: profileError } = profileResult;
       if (profileError && profileError.code !== "PGRST116") {
         console.error("Error fetching profile:", profileError);
       }
@@ -101,25 +109,33 @@ export default function ProfilePage() {
         setDisplayName(user.user_metadata?.display_name || user.email?.split("@")[0] || "");
       }
 
-      // Fetch team membership
-      const { data: memberData } = await supabase
-        .from("team_members")
-        .select("team_id, is_captain")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      const memberData = memberResult.data;
 
       if (memberData) {
-        const { data: teamData } = await supabase
-          .from("teams")
-          .select("id, name, is_recruiting, recruitment_message")
-          .eq("id", memberData.team_id)
-          .single();
+        // Parallel fetch: team details, rank, and match history
+        const [teamResult, rankResult, matchesResult] = await Promise.all([
+          supabase
+            .from("teams")
+            .select("id, name, is_recruiting, recruitment_message")
+            .eq("id", memberData.team_id)
+            .single(),
+          supabase
+            .from("ladder_rankings")
+            .select("rank")
+            .eq("team_id", memberData.team_id)
+            .maybeSingle(),
+          supabase
+            .from("matches")
+            .select("id, challenger_team_id, challenged_team_id, challenger_score, challenged_score, winner_team_id, completed_at")
+            .or(`challenger_team_id.eq.${memberData.team_id},challenged_team_id.eq.${memberData.team_id}`)
+            .eq("status", "completed")
+            .order("completed_at", { ascending: false })
+            .limit(10),
+        ]);
 
-        const { data: rankData } = await supabase
-          .from("ladder_rankings")
-          .select("rank")
-          .eq("team_id", memberData.team_id)
-          .maybeSingle();
+        const teamData = teamResult.data;
+        const rankData = rankResult.data;
+        const matches = matchesResult.data;
 
         if (teamData) {
           setUserTeam({
@@ -131,15 +147,6 @@ export default function ProfilePage() {
             recruitment_message: teamData.recruitment_message || null,
           });
         }
-
-        // Fetch match history
-        const { data: matches } = await supabase
-          .from("matches")
-          .select("id, challenger_team_id, challenged_team_id, challenger_score, challenged_score, winner_team_id, completed_at")
-          .or(`challenger_team_id.eq.${memberData.team_id},challenged_team_id.eq.${memberData.team_id}`)
-          .eq("status", "completed")
-          .order("completed_at", { ascending: false })
-          .limit(10);
 
         if (matches && matches.length > 0) {
           const teamIds = [...new Set(matches.flatMap(m => [m.challenger_team_id, m.challenged_team_id]))];
@@ -282,7 +289,7 @@ export default function ProfilePage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.15 }}
         >
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold text-foreground mb-2">Profile</h1>

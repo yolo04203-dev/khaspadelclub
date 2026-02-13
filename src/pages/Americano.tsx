@@ -40,24 +40,32 @@ export default function Americano() {
 
       if (error) throw error;
 
-      // Fetch player/team counts for each session
-      const sessionsWithCounts = await Promise.all(
-        (sessionsData || []).map(async (session) => {
-          if (session.mode === "team") {
-            const { count } = await supabase
-              .from("americano_teams")
-              .select("*", { count: "exact", head: true })
-              .eq("session_id", session.id);
-            return { ...session, team_count: count || 0 };
-          } else {
-            const { count } = await supabase
-              .from("americano_players")
-              .select("*", { count: "exact", head: true })
-              .eq("session_id", session.id);
-            return { ...session, player_count: count || 0 };
-          }
-        })
-      );
+      const sessionIds = (sessionsData || []).map(s => s.id);
+
+      // Bulk fetch counts instead of N+1
+      const [playersResult, teamsResult] = await Promise.all([
+        sessionIds.length > 0
+          ? supabase.from("americano_players").select("session_id").in("session_id", sessionIds)
+          : Promise.resolve({ data: [] as any[] }),
+        sessionIds.length > 0
+          ? supabase.from("americano_teams").select("session_id").in("session_id", sessionIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+
+      const playerCounts = new Map<string, number>();
+      (playersResult.data || []).forEach(p => {
+        playerCounts.set(p.session_id, (playerCounts.get(p.session_id) || 0) + 1);
+      });
+      const teamCounts = new Map<string, number>();
+      (teamsResult.data || []).forEach(t => {
+        teamCounts.set(t.session_id, (teamCounts.get(t.session_id) || 0) + 1);
+      });
+
+      const sessionsWithCounts = (sessionsData || []).map(session => ({
+        ...session,
+        player_count: session.mode !== "team" ? (playerCounts.get(session.id) || 0) : undefined,
+        team_count: session.mode === "team" ? (teamCounts.get(session.id) || 0) : undefined,
+      }));
 
       setSessions(sessionsWithCounts);
     } catch (error) {
@@ -123,7 +131,7 @@ export default function Americano() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.15 }}
         >
           {/* Header Section */}
           <div className="mb-8">
@@ -194,8 +202,21 @@ export default function Americano() {
             </div>
 
             {loading ? (
-              <div className="flex justify-center py-12">
-                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3].map(i => (
+                  <Card key={i} className="animate-pulse">
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="h-5 bg-muted rounded w-2/3" />
+                        <div className="h-5 bg-muted rounded w-16" />
+                      </div>
+                      <div className="h-4 bg-muted rounded w-1/2 mt-2" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-4 bg-muted rounded w-3/4" />
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             ) : sessions.length === 0 ? (
               <Card className="border-dashed">

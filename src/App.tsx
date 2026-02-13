@@ -20,27 +20,54 @@ import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 
 // Lazy load non-critical pages for better performance
-const Ladders = lazy(() => import("./pages/Ladders"));
-const LadderDetail = lazy(() => import("./pages/LadderDetail"));
-const LadderCreate = lazy(() => import("./pages/LadderCreate"));
-const LadderManage = lazy(() => import("./pages/LadderManage"));
-const CreateTeam = lazy(() => import("./pages/CreateTeam"));
-const Challenges = lazy(() => import("./pages/Challenges"));
-const FindOpponents = lazy(() => import("./pages/FindOpponents"));
-const Americano = lazy(() => import("./pages/Americano"));
-const AmericanoCreate = lazy(() => import("./pages/AmericanoCreate"));
-const AmericanoSession = lazy(() => import("./pages/AmericanoSession"));
-const Tournaments = lazy(() => import("./pages/Tournaments"));
-const TournamentCreate = lazy(() => import("./pages/TournamentCreate"));
-const TournamentDetail = lazy(() => import("./pages/TournamentDetail"));
-const Profile = lazy(() => import("./pages/Profile"));
-const Players = lazy(() => import("./pages/Players"));
-const PlayerProfile = lazy(() => import("./pages/PlayerProfile"));
-const Stats = lazy(() => import("./pages/Stats"));
-const Admin = lazy(() => import("./pages/Admin"));
-const Privacy = lazy(() => import("./pages/Privacy"));
-const Terms = lazy(() => import("./pages/Terms"));
-const Contact = lazy(() => import("./pages/Contact"));
+const lazyImports = {
+  Ladders: () => import("./pages/Ladders"),
+  LadderDetail: () => import("./pages/LadderDetail"),
+  LadderCreate: () => import("./pages/LadderCreate"),
+  LadderManage: () => import("./pages/LadderManage"),
+  CreateTeam: () => import("./pages/CreateTeam"),
+  Challenges: () => import("./pages/Challenges"),
+  FindOpponents: () => import("./pages/FindOpponents"),
+  Americano: () => import("./pages/Americano"),
+  AmericanoCreate: () => import("./pages/AmericanoCreate"),
+  AmericanoSession: () => import("./pages/AmericanoSession"),
+  Tournaments: () => import("./pages/Tournaments"),
+  TournamentCreate: () => import("./pages/TournamentCreate"),
+  TournamentDetail: () => import("./pages/TournamentDetail"),
+  Profile: () => import("./pages/Profile"),
+  Players: () => import("./pages/Players"),
+  PlayerProfile: () => import("./pages/PlayerProfile"),
+  Stats: () => import("./pages/Stats"),
+  Admin: () => import("./pages/Admin"),
+  Privacy: () => import("./pages/Privacy"),
+  Terms: () => import("./pages/Terms"),
+  Contact: () => import("./pages/Contact"),
+};
+
+// Export for prefetching in AppHeader
+export { lazyImports };
+
+const Ladders = lazy(lazyImports.Ladders);
+const LadderDetail = lazy(lazyImports.LadderDetail);
+const LadderCreate = lazy(lazyImports.LadderCreate);
+const LadderManage = lazy(lazyImports.LadderManage);
+const CreateTeam = lazy(lazyImports.CreateTeam);
+const Challenges = lazy(lazyImports.Challenges);
+const FindOpponents = lazy(lazyImports.FindOpponents);
+const Americano = lazy(lazyImports.Americano);
+const AmericanoCreate = lazy(lazyImports.AmericanoCreate);
+const AmericanoSession = lazy(lazyImports.AmericanoSession);
+const Tournaments = lazy(lazyImports.Tournaments);
+const TournamentCreate = lazy(lazyImports.TournamentCreate);
+const TournamentDetail = lazy(lazyImports.TournamentDetail);
+const Profile = lazy(lazyImports.Profile);
+const Players = lazy(lazyImports.Players);
+const PlayerProfile = lazy(lazyImports.PlayerProfile);
+const Stats = lazy(lazyImports.Stats);
+const Admin = lazy(lazyImports.Admin);
+const Privacy = lazy(lazyImports.Privacy);
+const Terms = lazy(lazyImports.Terms);
+const Contact = lazy(lazyImports.Contact);
 
 // Network status wrapper component
 function NetworkStatusProvider({ children }: { children: React.ReactNode }) {
