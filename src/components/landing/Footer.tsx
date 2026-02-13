@@ -16,9 +16,9 @@ export function Footer() {
           {/* Brand */}
           <div className="md:col-span-2">
             <Logo size="md" className="mb-4" />
-            <p className="text-primary-foreground/70 max-w-sm mb-6">
-              The ultimate competition platform for paddle sports academies. 
-              Track, compete, and grow together.
+            <p className="text-primary-foreground/70 max-w-sm mb-6">The ultimate competition platform for padel. 
+Track, compete, and grow together.
+
             </p>
             <p className="text-sm text-primary-foreground/50">
               © {new Date().getFullYear()} Paddle Leaderboard. All rights reserved.
@@ -74,6 +74,6 @@ export function Footer() {
           </div>
         </div>
       </div>
-    </footer>
-  );
+    </footer>);
+
 }
