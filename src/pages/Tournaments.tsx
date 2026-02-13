@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Plus, Trophy, Users, Calendar, Crown, Banknote } from "lucide-react";
+import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
@@ -109,8 +110,9 @@ export default function Tournaments() {
         }
       />
 
-      <main className="container py-8 pb-safe-nav sm:pb-8">
-        <motion.div
+      <PullToRefresh onRefresh={async () => { await fetchTournaments(); }} className="flex-1 overflow-auto">
+        <main className="container py-8 pb-safe-nav sm:pb-8">
+          <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.15 }}
@@ -229,8 +231,9 @@ export default function Tournaments() {
               </div>
             )}
           </div>
-        </motion.div>
-      </main>
+          </motion.div>
+        </main>
+      </PullToRefresh>
     </div>
   );
 }
