@@ -20,6 +20,15 @@ interface ChallengeNotificationRequest {
   venue?: string;
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -64,16 +73,14 @@ const handler = async (req: Request): Promise<Response> => {
 
     const payload: ChallengeNotificationRequest = await req.json();
 
-    const {
-      type,
-      challengerTeamId,
-      challengerTeamName,
-      challengedTeamId,
-      challengedTeamName,
-      declineReason,
-      scheduledAt,
-      venue,
-    } = payload;
+    const type = payload.type;
+    const challengerTeamId = payload.challengerTeamId;
+    const challengerTeamName = payload.challengerTeamName ? escapeHtml(payload.challengerTeamName) : undefined;
+    const challengedTeamId = payload.challengedTeamId;
+    const challengedTeamName = payload.challengedTeamName ? escapeHtml(payload.challengedTeamName) : undefined;
+    const declineReason = payload.declineReason ? escapeHtml(payload.declineReason) : undefined;
+    const scheduledAt = payload.scheduledAt;
+    const venue = payload.venue ? escapeHtml(payload.venue) : undefined;
 
     // Verify user is a member of one of the involved teams or is an admin
     const { data: isAdmin } = await supabase.rpc("is_admin", { _user_id: userId });
