@@ -401,7 +401,7 @@ export default function AmericanoSession() {
   const getPlayerName = (playerId: string) => players.find((p) => p.id === playerId)?.player_name || "Unknown";
   const getTeamName = (teamId: string) => teams.find((t) => t.id === teamId)?.team_name || "Unknown";
 
-  const isOwner = user?.id === session?.created_by || role === "admin";
+  const isOwner = user?.id === session?.created_by || role === "admin" || role === "super_admin";
   const isTeamMode = session?.mode === "team";
 
   if (loading) {
