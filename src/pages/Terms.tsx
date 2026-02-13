@@ -28,7 +28,7 @@ export default function Terms() {
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-4">1. Acceptance of Terms</h2>
             <p>
-              By accessing and using Paddle Leaderboard, you agree to be bound by these Terms of Service. 
+              By accessing and using Khas Padel Club, you agree to be bound by these Terms of Service. 
               If you do not agree to these terms, please do not use our service.
             </p>
           </section>
@@ -38,6 +38,7 @@ export default function Terms() {
             <p>
               You must provide accurate information when creating an account. You are responsible 
               for maintaining the security of your account and all activities under your account.
+              You must be at least 13 years old to create an account.
             </p>
           </section>
 
@@ -66,7 +67,17 @@ export default function Terms() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground mb-4">6. Modifications</h2>
+            <h2 className="text-xl font-semibold text-foreground mb-4">6. Account Termination</h2>
+            <p>
+              We may terminate or suspend your account at our discretion for violations of 
+              these terms or for any other reason we deem appropriate. You may delete your 
+              account at any time through your profile settings, which will remove your 
+              personal data as described in our Privacy Policy.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground mb-4">7. Modifications</h2>
             <p>
               We reserve the right to modify these terms at any time. Continued use of the 
               service after changes constitutes acceptance of the new terms.
@@ -74,16 +85,26 @@ export default function Terms() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground mb-4">7. Termination</h2>
+            <h2 className="text-xl font-semibold text-foreground mb-4">8. Limitation of Liability</h2>
             <p>
-              We may terminate or suspend your account at our discretion for violations of 
-              these terms or for any other reason we deem appropriate.
+              Khas Padel Club is provided "as is" without warranty of any kind. We shall not be 
+              liable for any indirect, incidental, or consequential damages arising from your 
+              use of the service.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground mb-4">9. Governing Law</h2>
+            <p>
+              These Terms of Service shall be governed by and construed in accordance with 
+              applicable laws. Any disputes arising from these terms shall be resolved through 
+              appropriate legal channels in the jurisdiction where the service operator is established.
             </p>
           </section>
         </div>
 
         <p className="text-sm text-muted-foreground mt-12">
-          Last updated: {new Date().toLocaleDateString()}
+          Last updated: February 13, 2026
         </p>
       </main>
     </div>

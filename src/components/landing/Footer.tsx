@@ -21,7 +21,7 @@ Track, compete, and grow together.
 
             </p>
             <p className="text-sm text-primary-foreground/50">
-              © {new Date().getFullYear()} Paddle Leaderboard. All rights reserved.
+              © {new Date().getFullYear()} Khas Padel Club. All rights reserved.
             </p>
           </div>
 
