@@ -11,6 +11,8 @@ import {
 const THRESHOLDS = {
   dashboardLoad: { acceptable: 3000, target: 1500 },
   ladderFetch: { acceptable: 2000, target: 800 },
+  playerFetch: { acceptable: 1500, target: 600 },
+  tournamentFetch: { acceptable: 1000, target: 400 },
   challengeSubmission: { acceptable: 1000, target: 300 },
   errorRate: { acceptable: 1, target: 0.1 },
 };

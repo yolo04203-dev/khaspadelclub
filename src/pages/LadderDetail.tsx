@@ -1,6 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, ArrowLeft, Users, TrendingDown, Flame, Swords, Loader2, Settings, Snowflake, Clock, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { isFuture, format } from "date-fns";
 import { JoinLadderDialog } from "@/components/ladder/JoinLadderDialog";
+import { VirtualizedRankingsList } from "@/components/ladder/VirtualizedRankingsList";
 import { LadderRowSkeleton } from "@/components/ui/skeleton-card";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { logger } from "@/lib/logger";
@@ -488,11 +488,7 @@ export default function LadderDetail() {
       {/* Main Content */}
       <PullToRefresh onRefresh={handleRefresh} className="min-h-[calc(100vh-4rem)]">
         <main className="container py-6 sm:py-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-          >
+          <div className="animate-fade-in">
             {/* Ladder Header */}
             <div className="mb-6 sm:mb-8 text-center">
               <h1 className="text-2xl sm:text-4xl font-bold text-foreground mb-2">{ladder.name}</h1>
@@ -565,241 +561,24 @@ export default function LadderDetail() {
                       </CardContent>
                     </Card>
                   ) : (
-                    <div className="space-y-3">
-                      <AnimatePresence mode="popLayout">
-                        {category.rankings.map((ranking, index) => {
-                          const isUserTeam = ranking.team?.id === userTeamId;
-                          const winRate =
-                            ranking.wins + ranking.losses > 0
-                              ? Math.round((ranking.wins / (ranking.wins + ranking.losses)) * 100)
-                              : 0;
-
-                          return (
-                            <motion.div
-                              key={ranking.id}
-                              layout
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.95 }}
-                              transition={{ duration: 0.3, delay: index * 0.05 }}
-                            >
-                              <Collapsible>
-                                <Card
-                                  className={cn(
-                                    "transition-all hover:shadow-md",
-                                    isUserTeam && "ring-2 ring-accent border-accent",
-                                    ranking.rank <= 3 && "border-transparent"
-                                  )}
-                                >
-                                  <CardContent className="p-4">
-                                    <div className="flex items-center gap-3 sm:gap-4">
-                                      {/* Rank Badge */}
-                                      <RankBadge rank={ranking.rank} />
-
-                                      {/* Team Info */}
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                          <h3 className="font-semibold text-foreground truncate">
-                                            {ranking.team?.name || "Unknown Team"}
-                                          </h3>
-                                          {isUserTeam && (
-                                            <Badge variant="secondary" className="text-xs">
-                                              Your Team
-                                            </Badge>
-                                          )}
-                                        </div>
-                                        <div className="flex items-center gap-3 mt-1">
-                                          <div className="flex -space-x-2">
-                                            {ranking.members.slice(0, 3).map((member) => (
-                                              <Avatar key={member.user_id} className="w-6 h-6 border-2 border-background">
-                                                <AvatarImage src={member.avatar_url || undefined} />
-                                                <AvatarFallback className="text-xs">
-                                                  {member.display_name?.charAt(0) || "?"}
-                                                </AvatarFallback>
-                                              </Avatar>
-                                            ))}
-                                          </div>
-                                          <span className="text-sm text-muted-foreground hidden sm:inline">
-                                            {ranking.members.length} member{ranking.members.length !== 1 ? "s" : ""}
-                                          </span>
-                                        </div>
-                                      </div>
-
-                                      {/* Desktop Stats */}
-                                      <div className="hidden sm:flex items-center gap-6 text-sm">
-                                        <div className="text-center">
-                                          <div className="font-semibold text-foreground">{ranking.points}</div>
-                                          <div className="text-xs text-muted-foreground">Points</div>
-                                        </div>
-                                        <div className="text-center">
-                                          <div className="font-semibold text-foreground">
-                                            {ranking.wins}-{ranking.losses}
-                                          </div>
-                                          <div className="text-xs text-muted-foreground">W-L</div>
-                                        </div>
-                                        <div className="text-center">
-                                          <div className="font-semibold text-foreground">{winRate}%</div>
-                                          <div className="text-xs text-muted-foreground">Win Rate</div>
-                                        </div>
-                                        {getStreakDisplay(ranking.streak)}
-                                      </div>
-
-                                      {/* Desktop Challenge Button or Frozen Badge */}
-                                      {user && ranking.team && isTeamFrozen(ranking.team) && (
-                                        <TooltipProvider>
-                                          <Tooltip>
-                                            <TooltipTrigger asChild>
-                                              <Badge variant="secondary" className="hidden sm:flex gap-1">
-                                                <Snowflake className="w-3 h-3" />
-                                                Frozen
-                                              </Badge>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                              Team frozen until {getFrozenUntilDate(ranking.team)}
-                                              {ranking.team.frozen_reason && ` • ${ranking.team.frozen_reason}`}
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        </TooltipProvider>
-                                      )}
-
-                                      {user && ranking.team && canChallenge(ranking.rank, ranking.team.id, category.id, ranking.team) && (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          className="hidden sm:flex"
-                                          onClick={() => handleChallenge(ranking.team!.id, ranking.team!.name)}
-                                          disabled={challengingTeamId === ranking.team.id}
-                                        >
-                                          {challengingTeamId === ranking.team.id ? (
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                          ) : (
-                                            <>
-                                              <Swords className="w-4 h-4 mr-1" />
-                                              Challenge
-                                            </>
-                                          )}
-                                        </Button>
-                                      )}
-
-                                      {ranking.team && pendingChallenges.has(ranking.team.id) && (
-                                        <Badge variant="secondary" className="hidden sm:flex">
-                                          Pending
-                                        </Badge>
-                                      )}
-
-                                      {/* Mobile: Stats summary + expand trigger */}
-                                      <div className="sm:hidden flex items-center gap-2">
-                                        <div className="text-right">
-                                          <div className="font-semibold text-foreground text-sm">{ranking.points} pts</div>
-                                          <div className="text-xs text-muted-foreground">
-                                            {ranking.wins}W-{ranking.losses}L
-                                          </div>
-                                        </div>
-                                        <CollapsibleTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                                            <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
-                                          </Button>
-                                        </CollapsibleTrigger>
-                                      </div>
-                                    </div>
-
-                                    {/* Mobile Expanded Content */}
-                                    <CollapsibleContent className="sm:hidden">
-                                      <div className="mt-4 pt-4 border-t border-border">
-                                        {/* Full Stats Grid */}
-                                        <div className="grid grid-cols-4 gap-2 mb-4 text-center">
-                                          <div>
-                                            <div className="font-semibold text-foreground">{ranking.points}</div>
-                                            <div className="text-xs text-muted-foreground">Points</div>
-                                          </div>
-                                          <div>
-                                            <div className="font-semibold text-foreground">{ranking.wins}</div>
-                                            <div className="text-xs text-muted-foreground">Wins</div>
-                                          </div>
-                                          <div>
-                                            <div className="font-semibold text-foreground">{ranking.losses}</div>
-                                            <div className="text-xs text-muted-foreground">Losses</div>
-                                          </div>
-                                          <div>
-                                            <div className="font-semibold text-foreground">{winRate}%</div>
-                                            <div className="text-xs text-muted-foreground">Win Rate</div>
-                                          </div>
-                                        </div>
-
-                                        {/* Streak */}
-                                        {ranking.streak !== 0 && (
-                                          <div className="flex items-center justify-center gap-2 mb-4">
-                                            {getStreakDisplay(ranking.streak)}
-                                            <span className="text-sm text-muted-foreground">streak</span>
-                                          </div>
-                                        )}
-
-                                        {/* Team Members */}
-                                        <div className="mb-4">
-                                          <p className="text-xs text-muted-foreground mb-2">Team Members:</p>
-                                          <div className="flex flex-wrap gap-2">
-                                            {ranking.members.map((member) => (
-                                              <div key={member.user_id} className="flex items-center gap-1.5 bg-muted/50 rounded-full px-2 py-1">
-                                                <Avatar className="w-5 h-5">
-                                                  <AvatarImage src={member.avatar_url || undefined} />
-                                                  <AvatarFallback className="text-xs">
-                                                    {member.display_name?.charAt(0) || "?"}
-                                                  </AvatarFallback>
-                                                </Avatar>
-                                                <span className="text-xs">{member.display_name || "Unknown"}</span>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
-
-                                        {/* Mobile Action Buttons */}
-                                        <div className="flex gap-2">
-                                          {ranking.team && isTeamFrozen(ranking.team) && (
-                                            <Badge variant="secondary" className="flex gap-1 flex-1 justify-center py-2">
-                                              <Snowflake className="w-3 h-3" />
-                                              Frozen until {getFrozenUntilDate(ranking.team)}
-                                            </Badge>
-                                          )}
-                                          
-                                          {ranking.team && pendingChallenges.has(ranking.team.id) && (
-                                            <Badge variant="secondary" className="flex-1 justify-center py-2">
-                                              Challenge Pending
-                                            </Badge>
-                                          )}
-
-                                          {user && ranking.team && canChallenge(ranking.rank, ranking.team.id, category.id, ranking.team) && (
-                                            <Button
-                                              className="flex-1"
-                                              onClick={() => handleChallenge(ranking.team!.id, ranking.team!.name)}
-                                              disabled={challengingTeamId === ranking.team.id}
-                                            >
-                                              {challengingTeamId === ranking.team.id ? (
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                              ) : (
-                                                <>
-                                                  <Swords className="w-4 h-4 mr-2" />
-                                                  Challenge Team
-                                                </>
-                                              )}
-                                            </Button>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </CollapsibleContent>
-                                  </CardContent>
-                                </Card>
-                              </Collapsible>
-                            </motion.div>
-                          );
-                        })}
-                      </AnimatePresence>
-                    </div>
+                    <VirtualizedRankingsList
+                      rankings={category.rankings}
+                      categoryId={category.id}
+                      userTeamId={userTeamId}
+                      user={user}
+                      isTeamFrozen={isTeamFrozen}
+                      getFrozenUntilDate={getFrozenUntilDate}
+                      canChallenge={canChallenge}
+                      handleChallenge={handleChallenge}
+                      challengingTeamId={challengingTeamId}
+                      pendingChallenges={pendingChallenges}
+                    />
                   )}
                 </TabsContent>
               ))}
             </Tabs>
           )}
-        </motion.div>
+        </div>
       </main>
     </PullToRefresh>
     </div>

@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap, Shuffle, Shield, Database } from "lucide-react";
+import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap, Shuffle, Shield, Database, Activity } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { AdminHeader } from "@/components/admin/AdminHeader";
@@ -87,7 +88,8 @@ export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [isSeeding, setIsSeeding] = useState(false);
-
+  const [perfResult, setPerfResult] = useState<any>(null);
+  const [isRunningPerf, setIsRunningPerf] = useState(false);
   const handleSeedData = async (clearExisting = false) => {
     setIsSeeding(true);
     try {
@@ -109,6 +111,20 @@ export default function Admin() {
       toast.error(`Seed error: ${e.message}`);
     } finally {
       setIsSeeding(false);
+    }
+  };
+
+  const handlePerfTest = async () => {
+    setIsRunningPerf(true);
+    setPerfResult(null);
+    try {
+      const { smokeTest } = await import("@/test/load-test");
+      const result = await smokeTest();
+      setPerfResult(result);
+    } catch (e: any) {
+      toast.error(`Perf test error: ${e.message}`);
+    } finally {
+      setIsRunningPerf(false);
     }
   };
 
@@ -311,7 +327,41 @@ export default function Admin() {
                 {isSeeding ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Database className="w-4 h-4 mr-2" />}
                 Clear &amp; Re-seed
               </Button>
+              <Button
+                onClick={handlePerfTest}
+                disabled={isRunningPerf}
+                variant="outline"
+                size="sm"
+              >
+                {isRunningPerf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Activity className="w-4 h-4 mr-2" />}
+                Run Perf Test
+              </Button>
             </div>
+
+            {perfResult && (
+              <Card className="mt-4">
+                <CardContent className="p-4">
+                  <h3 className="font-semibold text-foreground mb-2">📊 Performance Results</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                    <div><div className="text-muted-foreground">Total Requests</div><div className="font-semibold">{perfResult.totalRequests}</div></div>
+                    <div><div className="text-muted-foreground">Avg Response</div><div className="font-semibold">{perfResult.averageResponseTime?.toFixed(0)}ms</div></div>
+                    <div><div className="text-muted-foreground">P95 Response</div><div className="font-semibold">{perfResult.p95ResponseTime?.toFixed(0)}ms</div></div>
+                    <div><div className="text-muted-foreground">Error Rate</div><div className="font-semibold">{perfResult.errorRate?.toFixed(2)}%</div></div>
+                  </div>
+                  {perfResult.endpointStats?.length > 0 && (
+                    <div className="mt-3 border-t border-border pt-3">
+                      <p className="text-xs text-muted-foreground mb-2">Endpoint Breakdown:</p>
+                      {perfResult.endpointStats.map((s: any) => (
+                        <div key={s.name} className="flex justify-between text-xs py-1">
+                          <span>{s.name}</span>
+                          <span className="text-muted-foreground">{s.averageResponseTime?.toFixed(0)}ms avg, p95={s.p95ResponseTime?.toFixed(0)}ms</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           <AdminStats 

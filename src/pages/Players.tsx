@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
+import { List } from "react-window";
 import { Search, Users, Filter, User, Loader2, Clock } from "lucide-react";
 import { PlayerCardSkeleton } from "@/components/ui/skeleton-card";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +36,63 @@ interface Player {
 
 const PAGE_SIZE = 30;
 const SKILL_LEVELS = ["Beginner", "Intermediate", "Advanced", "Pro"];
+
+function PlayerCard({ player }: { player: Player }) {
+  return (
+    <Card className="hover:border-primary/30 transition-colors">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-4">
+          <Avatar className="w-14 h-14 border">
+            <AvatarImage src={player.avatar_url || undefined} />
+            <AvatarFallback className="text-lg bg-accent/20 text-accent">
+              {(player.display_name || "?").charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-semibold text-foreground">{player.display_name || "Unknown Player"}</h3>
+              {player.skill_level && <Badge variant="secondary" className="text-xs">{player.skill_level}</Badge>}
+              {player.is_looking_for_team && <Badge className="text-xs bg-accent text-accent-foreground">Looking for team</Badge>}
+            </div>
+            {player.team_name && (
+              <div className="mt-0.5">
+                <p className="text-sm text-muted-foreground">
+                  Team: {player.team_name}
+                  {player.team_is_recruiting && <Badge variant="outline" className="ml-2 text-xs border-accent text-accent">Recruiting</Badge>}
+                </p>
+                {player.team_is_recruiting && player.team_recruitment_message && (
+                  <p className="text-xs text-muted-foreground italic mt-1">"{player.team_recruitment_message}"</p>
+                )}
+              </div>
+            )}
+            {player.bio && <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{player.bio}</p>}
+            {player.preferred_play_times && player.preferred_play_times.length > 0 && (
+              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                {player.preferred_play_times.map((time) => (
+                  <Badge key={time} variant="outline" className="text-xs">{time}</Badge>
+                ))}
+              </div>
+            )}
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link to={`/players/${player.user_id}`}><User className="w-4 h-4 mr-2" />View</Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PlayerRow({ index, style, players }: { index: number; style: React.CSSProperties; ariaAttributes: any; players: Player[] }) {
+  const player = players[index];
+  if (!player) return null;
+  return (
+    <div style={style} className="pb-3 px-0.5">
+      <PlayerCard player={player} />
+    </div>
+  );
+}
 
 export default function Players() {
   const { user } = useAuth();
@@ -216,81 +274,23 @@ export default function Players() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-3">
-              {players.map((player) => (
-                <Card key={player.user_id} className="hover:border-primary/30 transition-colors">
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      <Avatar className="w-14 h-14 border">
-                        <AvatarImage src={player.avatar_url || undefined} />
-                        <AvatarFallback className="text-lg bg-accent/20 text-accent">
-                          {(player.display_name || "?").charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-semibold text-foreground">
-                            {player.display_name || "Unknown Player"}
-                          </h3>
-                          {player.skill_level && (
-                            <Badge variant="secondary" className="text-xs">
-                              {player.skill_level}
-                            </Badge>
-                          )}
-                          {player.is_looking_for_team && (
-                            <Badge className="text-xs bg-accent text-accent-foreground">
-                              Looking for team
-                            </Badge>
-                          )}
-                        </div>
-
-                        {player.team_name && (
-                          <div className="mt-0.5">
-                            <p className="text-sm text-muted-foreground">
-                              Team: {player.team_name}
-                              {player.team_is_recruiting && (
-                                <Badge variant="outline" className="ml-2 text-xs border-accent text-accent">
-                                  Recruiting
-                                </Badge>
-                              )}
-                            </p>
-                            {player.team_is_recruiting && player.team_recruitment_message && (
-                              <p className="text-xs text-muted-foreground italic mt-1">
-                                "{player.team_recruitment_message}"
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                        {player.bio && (
-                          <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                            {player.bio}
-                          </p>
-                        )}
-
-                        {player.preferred_play_times && player.preferred_play_times.length > 0 && (
-                          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                            <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                            {player.preferred_play_times.map((time) => (
-                              <Badge key={time} variant="outline" className="text-xs">
-                                {time}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <Button asChild variant="outline" size="sm">
-                        <Link to={`/players/${player.user_id}`}>
-                          <User className="w-4 h-4 mr-2" />
-                          View
-                        </Link>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+            <div>
+              {players.length > 20 ? (
+                <List
+                  rowComponent={PlayerRow}
+                  rowCount={players.length}
+                  rowHeight={120}
+                  rowProps={{ players } as any}
+                  overscanCount={5}
+                  style={{ height: Math.min(players.length * 120, typeof window !== "undefined" ? window.innerHeight - 300 : 600) }}
+                />
+              ) : (
+                <div className="space-y-3">
+                  {players.map((player) => (
+                    <PlayerCard key={player.user_id} player={player} />
+                  ))}
+                </div>
+              )}
 
               {hasMore && (
                 <div className="flex justify-center pt-4">
