@@ -309,7 +309,7 @@ export default function FindOpponents() {
       <AppHeader showBack backTo="/challenges" />
 
       {/* Main Content */}
-      <main className="container py-8 max-w-3xl">
+      <main className="container py-8 max-w-3xl pb-safe-nav">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -471,14 +471,14 @@ export default function FindOpponents() {
                         return (
                           <Card key={team.team_id} className={isFrozen ? "opacity-60" : ""}>
                             <CardContent className="p-4">
-                              <div className="flex items-center justify-between gap-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-accent/20 text-accent font-bold">
+                                <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-accent/20 text-accent font-bold shrink-0">
                                     #{team.rank}
                                   </div>
-                                  <div>
+                                  <div className="min-w-0">
                                     <div className="flex items-center gap-2">
-                                      <span className="font-semibold text-foreground">
+                                      <span className="font-semibold text-foreground truncate">
                                         {team.team_name}
                                       </span>
                                       {isFrozen && (

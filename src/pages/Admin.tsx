@@ -285,33 +285,33 @@ export default function Admin() {
 
           {/* Tabs */}
           <Tabs defaultValue="players" className="w-full">
-            <TabsList className="grid w-full grid-cols-7 mb-6">
-              <TabsTrigger value="players">
-                <Users className="w-4 h-4 mr-2 hidden sm:inline" />
+            <TabsList className="flex w-full mb-6 overflow-x-auto h-auto flex-nowrap justify-start gap-1 p-1">
+              <TabsTrigger value="players" className="text-xs sm:text-sm shrink-0">
+                <Users className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline" />
                 Players
               </TabsTrigger>
-              <TabsTrigger value="teams">
-                <Trophy className="w-4 h-4 mr-2 hidden sm:inline" />
+              <TabsTrigger value="teams" className="text-xs sm:text-sm shrink-0">
+                <Trophy className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline" />
                 Teams
               </TabsTrigger>
-              <TabsTrigger value="challenges">
-                <Zap className="w-4 h-4 mr-2 hidden sm:inline" />
+              <TabsTrigger value="challenges" className="text-xs sm:text-sm shrink-0">
+                <Zap className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline" />
                 Challenges
               </TabsTrigger>
-              <TabsTrigger value="matches">
-                <Swords className="w-4 h-4 mr-2 hidden sm:inline" />
+              <TabsTrigger value="matches" className="text-xs sm:text-sm shrink-0">
+                <Swords className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline" />
                 Matches
               </TabsTrigger>
-              <TabsTrigger value="ladders">
-                <Layers className="w-4 h-4 mr-2 hidden sm:inline" />
+              <TabsTrigger value="ladders" className="text-xs sm:text-sm shrink-0">
+                <Layers className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline" />
                 Ladders
               </TabsTrigger>
-              <TabsTrigger value="tournaments">
-                <LayoutGrid className="w-4 h-4 mr-2 hidden sm:inline" />
+              <TabsTrigger value="tournaments" className="text-xs sm:text-sm shrink-0">
+                <LayoutGrid className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline" />
                 Tournaments
               </TabsTrigger>
-              <TabsTrigger value="americano">
-                <Shuffle className="w-4 h-4 mr-2 hidden sm:inline" />
+              <TabsTrigger value="americano" className="text-xs sm:text-sm shrink-0">
+                <Shuffle className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline" />
                 Americano
               </TabsTrigger>
             </TabsList>

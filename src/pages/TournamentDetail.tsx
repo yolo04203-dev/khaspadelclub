@@ -946,17 +946,17 @@ export default function TournamentDetail() {
           )}
 
           <Tabs defaultValue="info" className="w-full">
-            <TabsList className="mb-6 flex-wrap">
-              <TabsTrigger value="info"><Info className="w-4 h-4 mr-2" />Info</TabsTrigger>
-              {isAdmin && <TabsTrigger value="manage"><Settings className="w-4 h-4 mr-2" />Manage</TabsTrigger>}
-              {isAdmin && <TabsTrigger value="categories"><Tag className="w-4 h-4 mr-2" />Categories</TabsTrigger>}
+            <TabsList className="mb-6 flex overflow-x-auto h-auto flex-nowrap justify-start gap-1 p-1">
+              <TabsTrigger value="info" className="text-xs sm:text-sm shrink-0"><Info className="w-4 h-4 mr-1 sm:mr-2" />Info</TabsTrigger>
+              {isAdmin && <TabsTrigger value="manage" className="text-xs sm:text-sm shrink-0"><Settings className="w-4 h-4 mr-1 sm:mr-2" />Manage</TabsTrigger>}
+              {isAdmin && <TabsTrigger value="categories" className="text-xs sm:text-sm shrink-0"><Tag className="w-4 h-4 mr-1 sm:mr-2" />Categories</TabsTrigger>}
               {isAdmin && tournament.entry_fee > 0 && (
-                <TabsTrigger value="payments"><Banknote className="w-4 h-4 mr-2" />Payments</TabsTrigger>
+                <TabsTrigger value="payments" className="text-xs sm:text-sm shrink-0"><Banknote className="w-4 h-4 mr-1 sm:mr-2" />Payments</TabsTrigger>
               )}
-              <TabsTrigger value="groups">Groups</TabsTrigger>
-              <TabsTrigger value="matches">Matches</TabsTrigger>
-              <TabsTrigger value="knockout">Knockout</TabsTrigger>
-              <TabsTrigger value="participants">Participants</TabsTrigger>
+              <TabsTrigger value="groups" className="text-xs sm:text-sm shrink-0">Groups</TabsTrigger>
+              <TabsTrigger value="matches" className="text-xs sm:text-sm shrink-0">Matches</TabsTrigger>
+              <TabsTrigger value="knockout" className="text-xs sm:text-sm shrink-0">Knockout</TabsTrigger>
+              <TabsTrigger value="participants" className="text-xs sm:text-sm shrink-0">Participants</TabsTrigger>
             </TabsList>
 
             {/* Info Tab */}
