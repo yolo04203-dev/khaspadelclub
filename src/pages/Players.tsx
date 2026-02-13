@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import { Search, Users, Filter, User, Loader2, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -134,11 +133,7 @@ export default function Players() {
       <AppHeader showBack />
 
       <main className="container py-8 max-w-4xl pb-safe-nav sm:pb-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.15 }}
-        >
+        <div>
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold text-foreground mb-2">Find Players</h1>
             <p className="text-muted-foreground">
@@ -219,84 +214,78 @@ export default function Players() {
           ) : (
             <div className="space-y-3">
               {players.map((player) => (
-                <motion.div
-                  key={player.user_id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  <Card className="hover:border-primary/30 transition-colors">
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-4">
-                        <Avatar className="w-14 h-14 border">
-                          <AvatarImage src={player.avatar_url || undefined} />
-                          <AvatarFallback className="text-lg bg-accent/20 text-accent">
-                            {(player.display_name || "?").charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
+                <Card key={player.user_id} className="hover:border-primary/30 transition-colors">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-4">
+                      <Avatar className="w-14 h-14 border">
+                        <AvatarImage src={player.avatar_url || undefined} />
+                        <AvatarFallback className="text-lg bg-accent/20 text-accent">
+                          {(player.display_name || "?").charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
 
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-semibold text-foreground">
-                              {player.display_name || "Unknown Player"}
-                            </h3>
-                            {player.skill_level && (
-                              <Badge variant="secondary" className="text-xs">
-                                {player.skill_level}
-                              </Badge>
-                            )}
-                            {player.is_looking_for_team && (
-                              <Badge className="text-xs bg-accent text-accent-foreground">
-                                Looking for team
-                              </Badge>
-                            )}
-                          </div>
-
-                          {player.team_name && (
-                            <div className="mt-0.5">
-                              <p className="text-sm text-muted-foreground">
-                                Team: {player.team_name}
-                                {player.team_is_recruiting && (
-                                  <Badge variant="outline" className="ml-2 text-xs border-accent text-accent">
-                                    Recruiting
-                                  </Badge>
-                                )}
-                              </p>
-                              {player.team_is_recruiting && player.team_recruitment_message && (
-                                <p className="text-xs text-muted-foreground italic mt-1">
-                                  "{player.team_recruitment_message}"
-                                </p>
-                              )}
-                            </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold text-foreground">
+                            {player.display_name || "Unknown Player"}
+                          </h3>
+                          {player.skill_level && (
+                            <Badge variant="secondary" className="text-xs">
+                              {player.skill_level}
+                            </Badge>
                           )}
-
-                          {player.bio && (
-                            <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                              {player.bio}
-                            </p>
-                          )}
-
-                          {player.preferred_play_times && player.preferred_play_times.length > 0 && (
-                            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                              {player.preferred_play_times.map((time) => (
-                                <Badge key={time} variant="outline" className="text-xs">
-                                  {time}
-                                </Badge>
-                              ))}
-                            </div>
+                          {player.is_looking_for_team && (
+                            <Badge className="text-xs bg-accent text-accent-foreground">
+                              Looking for team
+                            </Badge>
                           )}
                         </div>
 
-                        <Button asChild variant="outline" size="sm">
-                          <Link to={`/players/${player.user_id}`}>
-                            <User className="w-4 h-4 mr-2" />
-                            View
-                          </Link>
-                        </Button>
+                        {player.team_name && (
+                          <div className="mt-0.5">
+                            <p className="text-sm text-muted-foreground">
+                              Team: {player.team_name}
+                              {player.team_is_recruiting && (
+                                <Badge variant="outline" className="ml-2 text-xs border-accent text-accent">
+                                  Recruiting
+                                </Badge>
+                              )}
+                            </p>
+                            {player.team_is_recruiting && player.team_recruitment_message && (
+                              <p className="text-xs text-muted-foreground italic mt-1">
+                                "{player.team_recruitment_message}"
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {player.bio && (
+                          <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                            {player.bio}
+                          </p>
+                        )}
+
+                        {player.preferred_play_times && player.preferred_play_times.length > 0 && (
+                          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                            <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                            {player.preferred_play_times.map((time) => (
+                              <Badge key={time} variant="outline" className="text-xs">
+                                {time}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+
+                      <Button asChild variant="outline" size="sm">
+                        <Link to={`/players/${player.user_id}`}>
+                          <User className="w-4 h-4 mr-2" />
+                          View
+                        </Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
 
               {hasMore && (
@@ -316,7 +305,7 @@ export default function Players() {
               )}
             </div>
           )}
-        </motion.div>
+        </div>
       </main>
     </div>
   );
