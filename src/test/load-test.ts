@@ -64,7 +64,7 @@ export const defaultEndpoints: TestEndpoint[] = [
   {
     name: "Dashboard - Fetch Challenges",
     type: "query",
-    weight: 0.25,
+    weight: 0.20,
     execute: async () => {
       return supabase
         .from("challenges")
@@ -79,7 +79,7 @@ export const defaultEndpoints: TestEndpoint[] = [
   {
     name: "Ladder - Fetch Rankings",
     type: "query",
-    weight: 0.30,
+    weight: 0.25,
     execute: async () => {
       return supabase
         .from("ladder_rankings")
@@ -95,7 +95,7 @@ export const defaultEndpoints: TestEndpoint[] = [
   {
     name: "Teams - Fetch Team List",
     type: "query",
-    weight: 0.20,
+    weight: 0.15,
     execute: async () => {
       return supabase
         .from("teams")
@@ -109,7 +109,7 @@ export const defaultEndpoints: TestEndpoint[] = [
   {
     name: "Matches - Fetch History",
     type: "query",
-    weight: 0.15,
+    weight: 0.10,
     execute: async () => {
       return supabase
         .from("matches")
@@ -131,6 +131,45 @@ export const defaultEndpoints: TestEndpoint[] = [
         .from("profiles")
         .select("*")
         .limit(100);
+    },
+  },
+  {
+    name: "Mutation - Update Profile",
+    type: "mutation",
+    weight: 0.08,
+    execute: async () => {
+      // Simulates a profile update (will fail without auth, counted as mutation load)
+      return supabase
+        .from("profiles")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("user_id", "00000000-0000-0000-0000-000000000000");
+    },
+  },
+  {
+    name: "Mutation - Create Challenge",
+    type: "mutation",
+    weight: 0.07,
+    execute: async () => {
+      // Simulates challenge creation load (RLS will reject without auth)
+      return supabase
+        .from("challenges")
+        .insert({
+          challenger_team_id: "00000000-0000-0000-0000-000000000000",
+          challenged_team_id: "00000000-0000-0000-0000-000000000001",
+          expires_at: new Date(Date.now() + 86400000).toISOString(),
+        });
+    },
+  },
+  {
+    name: "Tournaments - Fetch List",
+    type: "query",
+    weight: 0.05,
+    execute: async () => {
+      return supabase
+        .from("tournaments")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(20);
     },
   },
 ];

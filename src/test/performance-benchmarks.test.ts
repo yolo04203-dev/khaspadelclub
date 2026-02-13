@@ -181,7 +181,7 @@ describe("Performance Benchmarks", () => {
 
 describe("Benchmark Verification", () => {
   it("should have all expected endpoints defined", () => {
-    expect(defaultEndpoints.length).toBeGreaterThanOrEqual(5);
+    expect(defaultEndpoints.length).toBeGreaterThanOrEqual(7);
     
     const endpointNames = defaultEndpoints.map(e => e.name);
     expect(endpointNames.some(n => n.includes("Challenges"))).toBe(true);
@@ -189,10 +189,17 @@ describe("Benchmark Verification", () => {
     expect(endpointNames.some(n => n.includes("Team"))).toBe(true);
     expect(endpointNames.some(n => n.includes("Matches"))).toBe(true);
     expect(endpointNames.some(n => n.includes("Players"))).toBe(true);
+    expect(endpointNames.some(n => n.includes("Mutation"))).toBe(true);
+    expect(endpointNames.some(n => n.includes("Tournaments"))).toBe(true);
   });
 
   it("should have valid endpoint weights summing to 1", () => {
     const totalWeight = defaultEndpoints.reduce((sum, e) => sum + e.weight, 0);
     expect(totalWeight).toBeCloseTo(1, 2);
+  });
+
+  it("should include mutation endpoints for write-path testing", () => {
+    const mutations = defaultEndpoints.filter(e => e.type === "mutation");
+    expect(mutations.length).toBeGreaterThanOrEqual(2);
   });
 });
