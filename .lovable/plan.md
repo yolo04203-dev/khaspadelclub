@@ -1,122 +1,119 @@
 
 
-# Performance Audit and Optimization Plan
+# Cross-Platform iOS/Android Audit Report and Optimization Plan
 
-## Current State Assessment
+## Current State: What's Already Done (Well)
 
-The codebase already has a strong performance foundation:
-- Route-level code splitting with lazy loading
-- Manual chunk splitting (react-vendor, ui-vendor, supabase)
-- Load testing infrastructure for 500+ concurrent users
-- Performance budget constants (TTI < 2.5s, tap < 100ms, 60fps scroll)
-- Query parallelization with Promise.all
-- Skeleton loaders on data pages
-- 44px touch targets with active:scale-[0.97] press feedback
-- touch-manipulation on all interactive elements (eliminates 300ms tap delay)
-- Image lazy loading via ImageWithFallback component
-- Debounced search (300ms) and server-side pagination (30-50 items)
-- QueryClient with 2-min staleTime and 10-min gcTime
+The codebase is already hardened for cross-platform mobile use. Here is a summary of what's in place:
 
-## Issues Found
+| Area | Status | Implementation |
+|------|--------|----------------|
+| Safe area insets | Done | CSS classes (safe-top, safe-bottom, pb-safe-nav), FAB positioning with env() |
+| Input font size >= 16px | Done | Global CSS rule prevents iOS auto-zoom |
+| Touch targets >= 44px | Done | CSS rule on pointer:coarse media query |
+| No tap delay | Done | touch-manipulation on all interactive elements |
+| No rubber-band bounce | Done | overscroll-behavior: none globally |
+| Tap highlight removed | Done | -webkit-tap-highlight-color: transparent |
+| Button press feedback | Done | active:scale-[0.97] + haptic-tap utility |
+| Haptic feedback | Done | useHaptics hook with Capacitor Haptics |
+| Error boundaries | Done | Global ErrorBoundary + RouteErrorBoundary |
+| Crash reporting | Done | Sentry with tracing, replay, user identity |
+| Unhandled rejection handling | Done | Global event listeners in App.tsx |
+| Dark mode | Done | next-themes with CSS variables |
+| Keyboard handling | Done | useKeyboardHeight hook (visualViewport API) |
+| Pull-to-refresh | Done | Custom PullToRefresh component with WebKit guards |
+| Skeleton loaders | Done | Dashboard, Players, Stats pages |
+| Code splitting | Done | 21 lazy-loaded routes |
+| Chunk splitting | Done | 3 manual vendor chunks |
+| PWA manifest | Done | Standalone, portrait, PNG icons with purpose:any |
+| Service worker | Done | Network-first, skips /~oauth and API routes |
+| Capacitor config | Done | iOS contentInset, Android mixedContent, StatusBar, SplashScreen |
+| Web Vitals tracking | Done | FCP, LCP, CLS, INP via PerformanceObserver |
+| Performance budgets | Done | TTI < 2.5s, tap < 100ms, 60fps scroll |
+| Safe navigation | Done | useSafeNavigation with WebKit fallback |
+| Network monitoring | Done | useNetworkStatus with offline/slow banners |
+| Query caching | Done | 2-min staleTime, 10-min gcTime, retry with backoff |
+| Font loading | Done | Preloaded in index.html, non-blocking |
+| Preconnect hints | Done | Supabase + Google Fonts domains |
+| FAB component | Done | Safe-area-aware positioning |
+| Image resilience | Done | ImageWithFallback with lazy loading + retry |
 
-### 1. Render-Blocking Font Loading (Impacts FCP)
-Google Fonts are loaded via a blocking `@import url(...)` in `index.css`. This delays First Contentful Paint by several hundred milliseconds as the browser must download and parse the CSS before rendering any text.
+## Gaps Found and Fixes
 
-**Fix:** Move font loading to `index.html` using `<link rel="preconnect">` and `<link rel="preload">` with `font-display: swap` to allow text to render immediately with a fallback font.
+### 1. Profile Page: Missing Skeleton Loader
+The Profile page shows a plain centered spinner during loading, unlike Dashboard and Players which use proper skeleton loaders. This creates an inconsistent perceived-performance experience.
 
-**File:** `index.html`, `src/index.css`
+**Fix:** Replace the Loader2 spinner with a skeleton layout matching the profile card structure.
 
----
-
-### 2. No Web Vitals Measurement (No FCP/TTI Tracking)
-There is no runtime measurement of Core Web Vitals (FCP, LCP, CLS, INP). Without this, performance regressions cannot be detected in production.
-
-**Fix:** Add a lightweight Web Vitals reporter that logs FCP, LCP, CLS, and INP metrics using the `web-vitals` library (or the native PerformanceObserver API to avoid adding a dependency).
-
-**File:** New file `src/lib/webVitals.ts`, update `src/main.tsx`
-
----
-
-### 3. No List Virtualization for Long Lists
-The Players page renders all loaded items (30+ cards with avatars, badges, metadata) in the DOM simultaneously. Each card includes framer-motion animation wrappers. As users click "Load More," the DOM grows unbounded.
-
-**Fix:** Add `react-window` for the Players list to virtualize rendering. Only visible items (plus a small overscan buffer) will be in the DOM.
-
-**File:** `src/pages/Players.tsx`
-
----
-
-### 4. Missing Resource Hints (Preconnect)
-No `<link rel="preconnect">` for the Supabase API domain. Every first request to the backend incurs DNS + TCP + TLS handshake latency (~200-400ms on mobile).
-
-**Fix:** Add preconnect hints for the Supabase domain and Google Fonts in `index.html`.
-
-**File:** `index.html`
+**File:** `src/pages/Profile.tsx`
 
 ---
 
-### 5. Framer Motion on List Items (Unnecessary Re-renders)
-Every player card in Players.tsx is wrapped in `<motion.div>` with `initial/animate` props. For a list of 30+ items, this creates 30+ animation instances on mount, adding main-thread work that can push TTI above budget.
+### 2. Dashboard: Duplicated Fetch Logic
+The Dashboard has identical data-fetching logic in both the initial `useEffect` and the `handleRefresh` callback (~80 lines duplicated). This is a maintainability risk -- bugs fixed in one path may not be fixed in the other.
 
-**Fix:** Remove per-item motion wrappers from list items. Keep only the parent container animation. This eliminates dozens of unnecessary animation calculations on page load.
+**Fix:** Extract the shared fetch logic into a single `fetchDashboardData` function and call it from both the initial effect and the pull-to-refresh handler.
 
-**File:** `src/pages/Players.tsx`
-
----
-
-### 6. Expand Load Test Coverage for 500+ Users
-The existing load test infrastructure is solid but only tests read queries. It does not simulate mutations (challenge creation, score submission, profile updates) which are the most likely bottlenecks under load.
-
-**Fix:** Add mutation endpoints to the load test suite and add a dedicated 500-user benchmark that reports per-endpoint P95 latency.
-
-**File:** `src/test/load-test.ts`, `src/test/performance-benchmarks.test.ts`
+**File:** `src/pages/Dashboard.tsx`
 
 ---
 
-### 7. Real-Time Subscription Scalability Check
-Supabase real-time channels are used for rankings and tournament updates. Under 500+ concurrent users, each user holds an open WebSocket connection. No connection management or reconnection strategy is documented.
+### 3. Deep Linking for Capacitor (iOS/Android)
+No deep linking configuration exists. Users cannot open specific app content (e.g., a tournament or player profile) from external links or notifications.
 
-**Fix:** Add a real-time connection health monitor that tracks subscription count and reconnection events. Ensure channels are properly cleaned up on unmount.
+**Fix:** Add a Capacitor App Listener in `App.tsx` that intercepts deep link URLs and routes them through React Router. Add associated link domain entries to the Capacitor config.
 
-**File:** New file `src/hooks/useRealtimeHealth.ts`
+**Files:** `src/App.tsx`, `capacitor.config.ts`
 
 ---
 
-## Technical Summary
+### 4. Status Bar and Navigation Bar Styling
+The Capacitor config sets a static dark status bar, but doesn't adapt to the current theme (light/dark mode). On iOS, this can cause white text on a white background in light mode.
 
-| Area | Current | Target | Change |
-|------|---------|--------|--------|
-| FCP | ~2.5-3.5s (blocked by fonts) | < 2.0s | Preload fonts, preconnect |
-| TTI | ~2.5-3.0s | < 2.5s | Remove per-item animations, virtualize lists |
-| Tap Latency | < 100ms (touch-manipulation) | < 100ms | Already met -- no change needed |
-| Button Feedback | active:scale[0.97] on all buttons | Immediate | Already met -- no change needed |
-| Long Lists | Full DOM rendering | Virtualized | Add react-window to Players |
-| Web Vitals | No measurement | Tracked | Add PerformanceObserver reporter |
-| Load Test | 500 users, reads only | 500 users, reads + writes | Add mutation endpoints |
-| Caching | 2-min stale, 10-min gc | No change needed | Already well configured |
-| Images | Lazy loaded, retry logic | No change needed | Already well implemented |
+**Fix:** Add a `useStatusBar` hook that listens to theme changes and dynamically updates the Capacitor StatusBar style to match.
 
-### Files to Create/Modify
+**File:** New `src/hooks/useStatusBar.ts`, integrate in `App.tsx`
+
+---
+
+### 5. App State Lifecycle Handling (Background/Foreground)
+When the app returns from background on mobile, stale data may be shown. There is no foreground-resume handler to refresh critical data.
+
+**Fix:** Add a Capacitor App state change listener that triggers a React Query refetch of active queries when the app returns to the foreground.
+
+**File:** `src/App.tsx`
+
+---
+
+### 6. Splash Screen Dismissal
+The Capacitor config has `launchAutoHide: true` for the splash screen, but for a smoother experience, the splash should be dismissed only after the auth state is resolved (preventing a flash of the login screen for authenticated users).
+
+**Fix:** Set `launchAutoHide: false` in `capacitor.config.ts` and programmatically hide the splash screen in `AuthContext.tsx` after `isLoading` becomes `false`.
+
+**Files:** `capacitor.config.ts`, `src/contexts/AuthContext.tsx`
+
+---
+
+## Technical Details
+
+### File Changes Summary
 
 | File | Action |
 |------|--------|
-| `index.html` | Add preconnect hints, preload fonts |
-| `src/index.css` | Remove blocking @import, use CSS @font-face with swap |
-| `src/lib/webVitals.ts` | New -- lightweight Web Vitals reporter |
-| `src/main.tsx` | Import and initialize Web Vitals |
-| `src/pages/Players.tsx` | Remove per-item motion wrappers, add react-window virtualization |
-| `src/test/load-test.ts` | Add mutation test endpoints |
-| `src/hooks/useRealtimeHealth.ts` | New -- real-time connection health monitor |
+| `src/pages/Profile.tsx` | Replace spinner with skeleton loader |
+| `src/pages/Dashboard.tsx` | Extract shared fetch logic to eliminate duplication |
+| `src/App.tsx` | Add deep link listener + foreground resume handler |
+| `capacitor.config.ts` | Disable splash auto-hide, add deep link config |
+| `src/contexts/AuthContext.tsx` | Dismiss splash screen after auth resolves |
+| `src/hooks/useStatusBar.ts` | New -- dynamic status bar style based on theme |
 
-### No Changes Needed (Already Optimized)
+### Items Outside Lovable Scope (Require Local Setup)
 
-- Button interaction speed (touch-manipulation + active states = sub-100ms)
-- Route code splitting (21 lazy-loaded routes)
-- Chunk splitting (3 manual vendor chunks)
-- Query caching strategy (staleTime/gcTime well tuned)
-- Search debouncing (300ms)
-- Pagination (30-50 items per page)
-- Skeleton loading screens
-- Network status monitoring
-- Image lazy loading with retry
+These items cannot be implemented within Lovable but are documented for completeness:
+
+- **Push Notifications (FCM):** Requires Firebase project setup, native permission handling, and server-side token management. Must be configured locally with `@capacitor/push-notifications`.
+- **E2E Testing (Detox/Appium):** Requires native build toolchain and physical/emulator device access.
+- **CI/CD Pipeline:** Requires GitHub Actions or similar configuration in the repository.
+- **Feature Flags:** Requires an external service (LaunchDarkly, Unleash) or a custom database-backed implementation.
+- **Staged Rollouts:** Handled at the App Store / Play Store level during submission.
 
