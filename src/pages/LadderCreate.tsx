@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Plus, Trash2, GripVertical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/usePermission";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +22,7 @@ interface CategoryInput {
 
 export default function LadderCreate() {
   const { user, role } = useAuth();
+  const { hasPermission, isLoading: permLoading } = usePermission("create_ladder");
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [name, setName] = useState("");
@@ -134,7 +136,15 @@ export default function LadderCreate() {
     }
   };
 
-  if (role !== "admin" && role !== "super_admin") {
+  if (permLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!hasPermission) {
     return (
       <div className="min-h-screen bg-background">
         <header className="border-b border-border bg-card">
@@ -151,7 +161,7 @@ export default function LadderCreate() {
           <Card className="text-center py-12">
             <CardContent>
               <h2 className="text-xl font-semibold">Access Denied</h2>
-              <p className="text-muted-foreground mt-2">Only administrators can create ladders.</p>
+              <p className="text-muted-foreground mt-2">You don't have permission to create ladders.</p>
             </CardContent>
           </Card>
         </main>

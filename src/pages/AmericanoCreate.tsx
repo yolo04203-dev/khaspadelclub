@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Plus, Trash2, Shuffle, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePermission } from "@/hooks/usePermission";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ interface Team {
 
 export default function AmericanoCreate() {
   const { user, isLoading: authLoading } = useAuth();
+  const { hasPermission, isLoading: permLoading } = usePermission("create_americano");
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -218,7 +220,7 @@ export default function AmericanoCreate() {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || permLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -228,6 +230,31 @@ export default function AmericanoCreate() {
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  if (!hasPermission) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b border-border bg-card">
+          <div className="container flex items-center h-16">
+            <Button variant="ghost" size="icon" asChild>
+              <Link to="/americano">
+                <ArrowLeft className="w-4 h-4" />
+              </Link>
+            </Button>
+            <Logo size="sm" className="ml-4" />
+          </div>
+        </header>
+        <main className="container py-8">
+          <Card className="text-center py-12">
+            <CardContent>
+              <h2 className="text-xl font-semibold">Access Denied</h2>
+              <p className="text-muted-foreground mt-2">You don't have permission to create Americano sessions.</p>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
   }
 
   const validTeamCount = teams.filter(
