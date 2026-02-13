@@ -6,26 +6,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// ── Name generators ──────────────────────────────────────────────
-const firstNames = [
-  "Carlos","Miguel","Pablo","Diego","Luis","Alejandro","Fernando","Roberto",
-  "Eduardo","Ricardo","Andres","Javier","Daniel","Gabriel","Santiago",
-  "Oscar","Rafael","Marco","Hugo","Ivan","Sofia","Maria","Isabella",
-  "Valentina","Camila","Ana","Laura","Elena","Lucia","Carmen",
-  "Alex","Sam","Jordan","Taylor","Casey","Morgan","Quinn","Riley",
-  "Noor","Ali","Omar","Hassan","Yuki","Kai","Leo","Max",
-  "Jan","Per","Erik","Sven",
-];
-const lastNames = [
-  "Garcia","Rodriguez","Martinez","Lopez","Hernandez","Gonzalez","Perez",
-  "Sanchez","Ramirez","Torres","Flores","Rivera","Morales","Ortiz",
-  "Cruz","Reyes","Gutierrez","Mendez","Ramos","Castillo","Vargas",
-  "Romero","Diaz","Alvarez","Jimenez","Silva","Rojas","Medina",
-  "Aguilar","Herrera","Navarro","Santos","Delgado","Rios","Vega",
-  "Acosta","Bautista","Campos","Contreras","Dominguez","Espinoza",
-  "Fuentes","Guerrero","Luna","Maldonado","Molina","Pacheco","Ruiz",
-  "Soto","Valencia",
-];
 const adjectives = [
   "Swift","Thunder","Iron","Golden","Silver","Blazing","Storm","Shadow",
   "Royal","Mighty","Fierce","Wild","Epic","Supreme","Elite","Prime",
@@ -36,18 +16,25 @@ const nouns = [
   "Knights","Titans","Warriors","Champions","Legends","Masters","Stars","Flames",
   "Thunder","Storm","Lightning","Phoenix","Falcons","Sharks","Bulls","Cobras",
 ];
-const skillLevels = ["Beginner","Intermediate","Advanced","Pro"];
-const bios = [
-  "Love padel!","Weekend warrior","Training hard","Looking for partners",
-  "Competitive player","Just started","All-rounder","Net specialist",
-  "Smash king","Wall master","Glass court fan","Tournament regular",
+const firstNames = [
+  "Carlos","Miguel","Pablo","Diego","Luis","Alejandro","Fernando","Roberto",
+  "Eduardo","Ricardo","Andres","Javier","Daniel","Gabriel","Santiago",
+  "Oscar","Rafael","Marco","Hugo","Ivan","Sofia","Maria","Isabella",
+  "Valentina","Camila","Ana","Laura","Elena","Lucia","Carmen",
+  "Alex","Sam","Jordan","Taylor","Casey","Morgan","Quinn","Riley",
+  "Noor","Ali","Omar","Hassan","Yuki","Kai","Leo","Max",
+];
+const lastNames = [
+  "Garcia","Rodriguez","Martinez","Lopez","Hernandez","Gonzalez","Perez",
+  "Sanchez","Ramirez","Torres","Flores","Rivera","Morales","Ortiz",
+  "Cruz","Reyes","Gutierrez","Mendez","Ramos","Castillo","Vargas",
+  "Romero","Diaz","Alvarez","Jimenez","Silva","Rojas","Medina",
 ];
 
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
 function randInt(min: number, max: number): number { return Math.floor(Math.random() * (max - min + 1)) + min; }
 function uuid(): string { return crypto.randomUUID(); }
 
-// ── Auth helper ──────────────────────────────────────────────────
 async function authenticateAdmin(req: Request) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -60,10 +47,10 @@ async function authenticateAdmin(req: Request) {
     global: { headers: { Authorization: authHeader } },
   });
   const token = authHeader.replace("Bearer ", "");
-  const { data: claimsData, error } = await supabaseAuth.auth.getClaims(token);
-  if (error || !claimsData?.claims) throw new Error("Unauthorized");
+  const { data, error } = await supabaseAuth.auth.getUser(token);
+  if (error || !data?.user) throw new Error("Unauthorized");
 
-  const userId = claimsData.claims.sub as string;
+  const userId = data.user.id;
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false },
   });
@@ -74,10 +61,8 @@ async function authenticateAdmin(req: Request) {
   return supabase;
 }
 
-// ── Cleanup ──────────────────────────────────────────────────────
 async function cleanupSeedData(supabase: any) {
   console.log("Cleaning existing seed data...");
-  // Get seed session IDs first
   const { data: seedSessions } = await supabase
     .from("americano_sessions").select("id").like("name", "%SEED%");
   const sessionIds = seedSessions?.map((s: any) => s.id) || [];
@@ -90,32 +75,24 @@ async function cleanupSeedData(supabase: any) {
     await supabase.from("americano_sessions").delete().in("id", sessionIds);
   }
 
-  // Get seed team IDs for tournament cleanup
   const { data: seedTeams } = await supabase
     .from("teams").select("id").like("name", "%SEED%");
   const seedTeamIds = seedTeams?.map((t: any) => t.id) || [];
 
   if (seedTeamIds.length > 0) {
-    // Tournament matches where either team is seed
     await supabase.from("tournament_matches").delete().in("team1_id", seedTeamIds);
     await supabase.from("tournament_matches").delete().in("team2_id", seedTeamIds);
     await supabase.from("tournament_participants").delete().in("team_id", seedTeamIds);
-  }
-
-  await supabase.from("challenges").delete().like("message", "SEED_DATA%");
-  await supabase.from("matches").delete().like("notes", "SEED_DATA%");
-  await supabase.from("ladder_rankings").delete().gte("rank", 100);
-
-  if (seedTeamIds.length > 0) {
-    await supabase.from("team_members").delete().in("team_id", seedTeamIds);
+    await supabase.from("challenges").delete().in("challenger_team_id", seedTeamIds);
+    await supabase.from("challenges").delete().in("challenged_team_id", seedTeamIds);
+    await supabase.from("matches").delete().in("challenger_team_id", seedTeamIds);
+    await supabase.from("matches").delete().in("challenged_team_id", seedTeamIds);
+    await supabase.from("ladder_rankings").delete().in("team_id", seedTeamIds);
     await supabase.from("teams").delete().in("id", seedTeamIds);
   }
-
-  await supabase.from("profiles").delete().like("bio", "SEED_DATA%");
   console.log("Cleanup complete");
 }
 
-// ── Main handler ─────────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -124,114 +101,85 @@ Deno.serve(async (req) => {
   try {
     const supabase = await authenticateAdmin(req);
     const body = await req.json().catch(() => ({}));
-    const userCount = body.userCount || 500;
+    const teamCount = body.teamCount || 250;
+    const teamsPerLadder = body.teamsPerLadder || 100;
     const clearExisting = body.clearExisting || false;
-    const batchSize = 100;
+    const batchSize = 50;
 
     const results = {
-      profiles: 0, teams: 0, teamMembers: 0, ladderRankings: 0,
-      challenges: 0, matches: 0, tournamentParticipants: 0,
-      tournamentMatches: 0, americanoSessions: 0, americanoPlayers: 0,
-      americanoRounds: 0, americanoTeams: 0, americanoTeamMatches: 0,
+      teams: 0, ladderRankings: 0, challenges: 0, matches: 0,
+      tournamentParticipants: 0, americanoSessions: 0,
+      americanoTeams: 0, americanoTeamMatches: 0,
+      americanoPlayers: 0, americanoRounds: 0,
       errors: [] as string[],
     };
 
     if (clearExisting) await cleanupSeedData(supabase);
 
-    // ── Phase 1: Profiles ────────────────────────────────────────
-    console.log(`Phase 1: Creating ${userCount} profiles...`);
-    const userIds: string[] = [];
-    for (let i = 0; i < userCount; i += batchSize) {
-      const batch = [];
-      for (let j = 0; j < Math.min(batchSize, userCount - i); j++) {
-        const uid = uuid();
-        userIds.push(uid);
-        batch.push({
-          user_id: uid,
-          display_name: `${pick(firstNames)} ${pick(lastNames)}`,
-          skill_level: pick(skillLevels),
-          bio: `SEED_DATA ${pick(bios)}`,
-          is_looking_for_team: Math.random() > 0.7,
-        });
-      }
-      const { error } = await supabase.from("profiles").insert(batch);
-      if (error) results.errors.push(`Profiles ${i}: ${error.message}`);
-      else results.profiles += batch.length;
-    }
-    console.log(`Created ${results.profiles} profiles`);
-
-    // ── Phase 2: Teams + Team Members ────────────────────────────
-    const teamCount = Math.floor(userCount / 2);
-    console.log(`Phase 2: Creating ${teamCount} teams...`);
+    // ── Phase 1: Create Teams (no FK to auth.users needed, created_by is nullable) ──
+    console.log(`Phase 1: Creating ${teamCount} teams...`);
     const teamIds: string[] = [];
-    const teamUserMap: { teamId: string; user1: string; user2: string }[] = [];
 
     for (let i = 0; i < teamCount; i += batchSize) {
-      const teamBatch = [];
-      const memberBatch = [];
+      const batch = [];
       for (let j = 0; j < Math.min(batchSize, teamCount - i); j++) {
-        const idx = (i + j) * 2;
         const teamId = uuid();
         teamIds.push(teamId);
-        const u1 = userIds[idx], u2 = userIds[idx + 1];
-        teamUserMap.push({ teamId, user1: u1, user2: u2 });
-
-        teamBatch.push({
+        batch.push({
           id: teamId,
-          name: `${pick(adjectives)} ${pick(nouns)} SEED`,
+          name: `${pick(adjectives)} ${pick(nouns)} ${i + j + 1} SEED`,
           is_recruiting: Math.random() > 0.8,
-          created_by: u1,
+          created_by: null,
         });
-        memberBatch.push(
-          { team_id: teamId, user_id: u1, is_captain: true },
-          { team_id: teamId, user_id: u2, is_captain: false },
-        );
       }
-      const { error: te } = await supabase.from("teams").insert(teamBatch);
-      if (te) results.errors.push(`Teams ${i}: ${te.message}`);
-      else results.teams += teamBatch.length;
-
-      const { error: me } = await supabase.from("team_members").insert(memberBatch);
-      if (me) results.errors.push(`Members ${i}: ${me.message}`);
-      else results.teamMembers += memberBatch.length;
+      const { error } = await supabase.from("teams").insert(batch);
+      if (error) results.errors.push(`Teams ${i}: ${error.message}`);
+      else results.teams += batch.length;
     }
-    console.log(`Created ${results.teams} teams, ${results.teamMembers} members`);
+    console.log(`Created ${results.teams} teams`);
 
-    // ── Phase 3: Ladder Rankings ─────────────────────────────────
-    console.log("Phase 3: Ladder rankings...");
+    // ── Phase 2: Ladder Rankings ──
+    console.log("Phase 2: Ladder rankings...");
     const { data: ladderCats } = await supabase
-      .from("ladder_categories").select("id").limit(10);
+      .from("ladder_categories").select("id, name").limit(10);
     const catIds = ladderCats?.map((c: any) => c.id) || [];
+    console.log(`Found ${catIds.length} ladder categories: ${ladderCats?.map((c: any) => c.name).join(", ")}`);
 
-    if (catIds.length > 0) {
-      for (let i = 0; i < teamIds.length; i += batchSize) {
-        const batch = [];
-        for (let j = 0; j < Math.min(batchSize, teamIds.length - i); j++) {
-          batch.push({
-            team_id: teamIds[i + j],
-            ladder_category_id: pick(catIds),
-            rank: 100 + i + j,
-            points: randInt(0, 1500),
-            wins: randInt(0, 60),
-            losses: randInt(0, 40),
-            streak: randInt(-5, 15),
-          });
+    if (catIds.length > 0 && teamIds.length > 0) {
+      // Distribute teamsPerLadder teams into each category
+      let teamIdx = 0;
+      for (const catId of catIds) {
+        const count = Math.min(teamsPerLadder, teamIds.length - teamIdx);
+        if (count <= 0) break;
+
+        for (let i = 0; i < count; i += batchSize) {
+          const batch = [];
+          for (let j = 0; j < Math.min(batchSize, count - i); j++) {
+            batch.push({
+              team_id: teamIds[teamIdx],
+              ladder_category_id: catId,
+              rank: 100 + teamIdx,
+              points: randInt(100, 2000),
+              wins: randInt(0, 80),
+              losses: randInt(0, 50),
+              streak: randInt(-5, 15),
+            });
+            teamIdx++;
+          }
+          const { error } = await supabase.from("ladder_rankings").insert(batch);
+          if (error) results.errors.push(`Rankings cat ${catId} batch ${i}: ${error.message}`);
+          else results.ladderRankings += batch.length;
         }
-        const { error } = await supabase.from("ladder_rankings").insert(batch);
-        if (error) results.errors.push(`Rankings ${i}: ${error.message}`);
-        else results.ladderRankings += batch.length;
       }
     }
     console.log(`Created ${results.ladderRankings} ladder rankings`);
 
-    // ── Phase 4: Challenges ──────────────────────────────────────
+    // ── Phase 3: Challenges ──
     const challengeCount = Math.min(500, teamIds.length * 2);
-    console.log(`Phase 4: Creating ${challengeCount} challenges...`);
+    console.log(`Phase 3: Creating ${challengeCount} challenges...`);
     const statusWeights = [
-      ...Array(40).fill("pending"),
-      ...Array(20).fill("accepted"),
-      ...Array(15).fill("declined"),
-      ...Array(15).fill("expired"),
+      ...Array(40).fill("pending"), ...Array(20).fill("accepted"),
+      ...Array(15).fill("declined"), ...Array(15).fill("expired"),
       ...Array(10).fill("cancelled"),
     ];
 
@@ -257,9 +205,9 @@ Deno.serve(async (req) => {
     }
     console.log(`Created ${results.challenges} challenges`);
 
-    // ── Phase 5: Matches ─────────────────────────────────────────
+    // ── Phase 4: Matches ──
     const matchCount = Math.min(400, teamIds.length * 2);
-    console.log(`Phase 5: Creating ${matchCount} matches...`);
+    console.log(`Phase 4: Creating ${matchCount} matches...`);
 
     for (let i = 0; i < matchCount; i += batchSize) {
       const batch = [];
@@ -291,22 +239,19 @@ Deno.serve(async (req) => {
     }
     console.log(`Created ${results.matches} matches`);
 
-    // ── Phase 6: Tournament Participants ─────────────────────────
-    console.log("Phase 6: Tournament participants...");
+    // ── Phase 5: Tournament Participants ──
+    console.log("Phase 5: Tournament participants...");
     const { data: tournCats } = await supabase
-      .from("tournament_categories")
-      .select("id, tournament_id, max_teams")
-      .limit(20);
+      .from("tournament_categories").select("id, tournament_id, max_teams").limit(20);
 
     if (tournCats && tournCats.length > 0) {
-      const participantBatch = [];
-      let teamIdx = 0;
+      let tIdx = 0;
       for (const cat of tournCats) {
-        const count = Math.min(cat.max_teams || 8, 15); // up to 15 per category
-        for (let k = 0; k < count && teamIdx < teamIds.length; k++, teamIdx++) {
-          const tm = teamUserMap[teamIdx];
-          participantBatch.push({
-            team_id: teamIds[teamIdx],
+        const count = Math.min(cat.max_teams || 8, 15);
+        const batch = [];
+        for (let k = 0; k < count && tIdx < teamIds.length; k++, tIdx++) {
+          batch.push({
+            team_id: teamIds[tIdx % teamIds.length],
             tournament_id: cat.tournament_id,
             category_id: cat.id,
             payment_status: Math.random() > 0.3 ? "paid" : "pending",
@@ -316,22 +261,19 @@ Deno.serve(async (req) => {
             custom_team_name: `${pick(adjectives)} ${pick(nouns)} SEED`,
           });
         }
-      }
-
-      // Insert in batches
-      for (let i = 0; i < participantBatch.length; i += batchSize) {
-        const slice = participantBatch.slice(i, i + batchSize);
-        const { error } = await supabase.from("tournament_participants").insert(slice);
-        if (error) results.errors.push(`TournPart ${i}: ${error.message}`);
-        else results.tournamentParticipants += slice.length;
+        if (batch.length > 0) {
+          const { error } = await supabase.from("tournament_participants").insert(batch);
+          if (error) results.errors.push(`TournPart: ${error.message}`);
+          else results.tournamentParticipants += batch.length;
+        }
       }
     }
     console.log(`Created ${results.tournamentParticipants} tournament participants`);
 
-    // ── Phase 7: Americano Sessions ──────────────────────────────
-    console.log("Phase 7: Americano sessions...");
+    // ── Phase 6: Americano Sessions ──
+    console.log("Phase 6: Americano sessions...");
 
-    // 3 individual sessions
+    // 3 individual sessions (user_id set to null to avoid FK issues)
     for (let s = 0; s < 3; s++) {
       const sessionId = uuid();
       const { error: se } = await supabase.from("americano_sessions").insert({
@@ -344,11 +286,11 @@ Deno.serve(async (req) => {
         current_round: 3,
         completed_at: new Date().toISOString(),
         started_at: new Date(Date.now() - randInt(1, 14) * 86400000).toISOString(),
+        created_by: null,
       });
       if (se) { results.errors.push(`AmerSession ${s}: ${se.message}`); continue; }
       results.americanoSessions++;
 
-      // 8 players per session
       const playerIds: string[] = [];
       const playerBatch = [];
       for (let p = 0; p < 8; p++) {
@@ -358,22 +300,19 @@ Deno.serve(async (req) => {
           id: pid,
           session_id: sessionId,
           player_name: `${pick(firstNames)} ${pick(lastNames)}`,
-          user_id: userIds[s * 8 + p] || null,
+          user_id: null,
           total_points: randInt(10, 63),
           matches_played: 3,
         });
       }
       const { error: pe } = await supabase.from("americano_players").insert(playerBatch);
-      if (pe) results.errors.push(`AmerPlayers ${s}: ${pe.message}`);
-      else results.americanoPlayers += playerBatch.length;
+      if (pe) { results.errors.push(`AmerPlayers ${s}: ${pe.message}`); continue; }
+      results.americanoPlayers += playerBatch.length;
 
-      // 3 rounds with 2 matches each (4v4 split)
       const roundBatch = [];
       for (let r = 1; r <= 3; r++) {
         for (let court = 1; court <= 2; court++) {
-          const offset = (court - 1) * 4;
           const shuffled = [...playerIds].sort(() => Math.random() - 0.5);
-          const s1 = randInt(5, 21), s2 = randInt(5, 21);
           roundBatch.push({
             session_id: sessionId,
             round_number: r,
@@ -382,8 +321,8 @@ Deno.serve(async (req) => {
             team1_player2_id: shuffled[1],
             team2_player1_id: shuffled[2],
             team2_player2_id: shuffled[3],
-            team1_score: s1,
-            team2_score: s2,
+            team1_score: randInt(5, 21),
+            team2_score: randInt(5, 21),
             completed_at: new Date(Date.now() - randInt(0, 7) * 86400000).toISOString(),
           });
         }
@@ -406,11 +345,11 @@ Deno.serve(async (req) => {
         current_round: 5,
         completed_at: new Date().toISOString(),
         started_at: new Date(Date.now() - randInt(1, 14) * 86400000).toISOString(),
+        created_by: null,
       });
       if (se) { results.errors.push(`AmerTeamSession ${s}: ${se.message}`); continue; }
       results.americanoSessions++;
 
-      // 6 teams per session
       const ateamIds: string[] = [];
       const teamBatch = [];
       for (let t = 0; t < 6; t++) {
@@ -432,20 +371,18 @@ Deno.serve(async (req) => {
       if (te) results.errors.push(`AmerTeams ${s}: ${te.message}`);
       else results.americanoTeams += teamBatch.length;
 
-      // Round-robin matches (each pair plays once = 15 matches over 5 rounds)
       const matchBatch = [];
       let roundNum = 1;
       for (let i = 0; i < ateamIds.length; i++) {
         for (let j = i + 1; j < ateamIds.length; j++) {
-          const s1 = randInt(5, 21), s2 = randInt(5, 21);
           matchBatch.push({
             session_id: sessionId,
             round_number: roundNum,
             court_number: ((matchBatch.length % 3) + 1),
             team1_id: ateamIds[i],
             team2_id: ateamIds[j],
-            team1_score: s1,
-            team2_score: s2,
+            team1_score: randInt(5, 21),
+            team2_score: randInt(5, 21),
             completed_at: new Date(Date.now() - randInt(0, 7) * 86400000).toISOString(),
           });
           if (matchBatch.length % 3 === 0) roundNum++;
@@ -455,26 +392,19 @@ Deno.serve(async (req) => {
       if (me) results.errors.push(`AmerTeamMatches ${s}: ${me.message}`);
       else results.americanoTeamMatches += matchBatch.length;
     }
-    console.log(`Created ${results.americanoSessions} sessions, ${results.americanoPlayers} players, ${results.americanoRounds} rounds, ${results.americanoTeams} teams, ${results.americanoTeamMatches} team matches`);
 
-    // ── Summary ──────────────────────────────────────────────────
+    console.log(`Americano: ${results.americanoSessions} sessions, ${results.americanoPlayers} players, ${results.americanoRounds} rounds, ${results.americanoTeams} teams, ${results.americanoTeamMatches} team matches`);
+
     const total = Object.entries(results)
       .filter(([k]) => k !== "errors")
       .reduce((sum, [, v]) => sum + (v as number), 0);
 
-    const summary = {
-      success: true,
-      message: "Seed data created successfully",
-      results,
-      totalRecords: total,
-      timestamp: new Date().toISOString(),
-    };
-
+    const summary = { success: true, message: "Seed complete", results, totalRecords: total, timestamp: new Date().toISOString() };
     console.log("Seed complete:", JSON.stringify(summary));
+
     return new Response(JSON.stringify(summary), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-
   } catch (error) {
     console.error("Seed error:", error);
     return new Response(

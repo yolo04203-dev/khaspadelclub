@@ -95,14 +95,14 @@ export default function Admin() {
       if (!session) { toast.error("Not authenticated"); return; }
 
       const res = await supabase.functions.invoke("seed-test-data", {
-        body: { userCount: 500, clearExisting },
+        body: { teamCount: 250, teamsPerLadder: 100, clearExisting },
       });
 
       if (res.error) {
         toast.error(`Seed failed: ${res.error.message}`);
       } else {
         const r = res.data;
-        toast.success(`Seeded ${r.totalRecords} records! (${r.results.profiles} profiles, ${r.results.teams} teams, ${r.results.matches} matches)`);
+        toast.success(`Seeded ${r.totalRecords} records! (${r.results.teams} teams, ${r.results.ladderRankings} rankings, ${r.results.matches} matches)`);
         fetchAdminData();
       }
     } catch (e: any) {
