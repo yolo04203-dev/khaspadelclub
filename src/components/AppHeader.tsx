@@ -56,7 +56,7 @@ export function AppHeader({ showBack = false, backTo = "/dashboard", actions }: 
               </Button>
             )}
             <Link to={user ? "/dashboard" : "/"}>
-              <Logo size="sm" />
+              <Logo size="sm" showText={!actions} className="sm:[&>div:last-child]:block [&>div:last-child]:hidden sm:[&>div:last-child]:flex" />
             </Link>
 
             {/* Navigation Links - Desktop */}

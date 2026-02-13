@@ -39,9 +39,9 @@ export function Logo({
       </motion.div>
       
       {showText && <div className="flex flex-col">
-          <span className={`font-display font-bold ${textSizeClasses[size]} text-foreground leading-tight`}>Padel</span>
+          <span className={`font-display font-bold ${textSizeClasses[size]} text-foreground leading-tight`}>Khas Padel</span>
           <span className={`font-display font-medium text-xs uppercase tracking-widest text-muted-foreground`}>
-            Leaderboard
+            Club
           </span>
         </div>}
     </div>;
