@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { TrendingUp, Shuffle, Trophy } from "lucide-react";
 
 const modes = [
@@ -29,12 +28,7 @@ export function SportsModes() {
   return (
     <section className="py-24">
       <div className="container">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-center mb-16"
-        >
+        <div className="text-center mb-16 hero-animate">
           <span className="inline-block px-4 py-2 rounded-full bg-primary/10 text-primary font-medium text-sm mb-4">
             Competition Formats
           </span>
@@ -44,17 +38,14 @@ export function SportsModes() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Choose the format that fits your play style. Switch between modes anytime.
           </p>
-        </motion.div>
+        </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
           {modes.map((mode, i) => (
-            <motion.div
+            <div
               key={mode.title}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-              className="relative group"
+              className="relative group hero-animate"
+              style={{ animationDelay: `${0.1 + i * 0.1}s` }}
             >
               <div className="absolute inset-0 bg-gradient-to-b from-transparent to-accent/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
               
@@ -92,7 +83,7 @@ export function SportsModes() {
                   ))}
                 </ul>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>

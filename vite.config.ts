@@ -24,8 +24,11 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['framer-motion', 'recharts', '@radix-ui/react-dialog', '@radix-ui/react-tabs', '@radix-ui/react-select', '@radix-ui/react-popover'],
+          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-tabs', '@radix-ui/react-select', '@radix-ui/react-popover'],
+          'animation': ['framer-motion'],
+          'charts': ['recharts'],
           'supabase': ['@supabase/supabase-js'],
+          'sentry': ['@sentry/react'],
         },
       },
     },
