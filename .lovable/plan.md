@@ -1,93 +1,91 @@
 
+# Preventing Crashes with 100 Concurrent Users
 
-# In-App Error Analytics for Mobile (iOS & Android)
+## The Problem
 
-## What This Solves
+With 100 users on the app simultaneously, the biggest crash risks are not about frontend rendering (which is already optimized with virtualization) -- they are about **connection exhaustion** and **query stampedes** hitting the backend.
 
-When a user on their phone hits a crash, API failure, or broken screen, you currently have zero visibility -- errors only live in the browser console which is inaccessible on mobile. This builds a complete error tracking pipeline that stores every client error in your database and shows them live on your Admin dashboard, with extra mobile-specific context like device model, OS version, network type, and whether the app is running natively via Capacitor or as a PWA.
+## Root Causes Found
 
-## How It Works
+### 1. TournamentDetail opens 4 realtime channels per user -- 3 are unfiltered
 
-1. User on their phone encounters an error (crash, failed API call, broken page)
-2. The logger silently batches the error and writes it to the database within 3 seconds
-3. Includes mobile-specific context: device (iPhone 16, Samsung Galaxy), OS (iOS 18.2, Android 15), network type (4G/WiFi/offline), and whether it's native Capacitor or web
-4. The Admin "Errors" tab receives the new error in real-time -- no refresh needed
-5. You can see exactly which page, device, and user triggered it, expand the full stack trace, and mark it resolved
+When a user views a tournament, the app subscribes to `tournament_matches`, `tournament_participants`, and `tournament_groups` tables **without any filter**. This means every change to ANY row in those tables triggers a full `fetchData()` reload for ALL 100 users. If 20 users are viewing tournaments, that is 80 unfiltered channels. A single score update triggers 60+ simultaneous database fetches.
 
-## Implementation Details
+### 2. ErrorsTab realtime channel has no cleanup guard
 
-### 1. Database: `client_errors` table
+The admin Errors tab subscribes to ALL `client_errors` inserts globally. If errors are being logged frequently (which they will be under load), this triggers constant re-fetches.
 
-Create a table to store error reports with these columns:
-- `id` (UUID, primary key)
-- `user_id` (UUID, nullable -- captures errors from logged-out users too)
-- `message` (text -- the error message)
-- `stack` (text -- full stack trace)
-- `page_url` (text -- which page they were on)
-- `user_agent` (text -- raw browser/device string)
-- `device_info` (JSONB -- parsed mobile context: platform, os_version, model, network_type, is_native)
-- `severity` (text -- "error" or "warn")
-- `resolved` (boolean, default false)
-- `created_at` (timestamp)
+### 3. Dashboard makes sequential queries that could fail under load
 
-RLS policies:
-- Any user (authenticated or anonymous) can INSERT their own errors
-- Admins can SELECT all errors and UPDATE the `resolved` flag
+The Dashboard fetches team data, then stats, then challenges in a waterfall. Under load, if any query times out, the entire dashboard shows an error state with no partial data.
 
-Enable real-time on this table so the admin dashboard updates instantly.
+### 4. No request deduplication for realtime-triggered refetches
 
-### 2. Update Logger (`src/lib/logger.ts`)
+When a realtime event fires, `fetchData()` runs immediately. If 10 events arrive within 1 second (common during a tournament), 10 identical fetches fire simultaneously.
 
-Add a batched database writer to the existing Logger class:
-- Collect errors in a queue
-- Every 3 seconds, flush the queue with a single batch insert
-- Include mobile context using Capacitor's Device plugin (platform, OS version, model) and the Network API (connection type)
-- Fire-and-forget: never blocks the UI or throws errors itself
-- Only sends `error` and `warn` level logs (not debug/info)
+## Implementation Plan
 
-### 3. Global error capture (`src/main.tsx`)
+### 1. Filter TournamentDetail realtime channels by tournament ID
 
-Add `window.addEventListener("error", ...)` and `window.addEventListener("unhandledrejection", ...)` that feed into the logger's database writer. This catches errors outside React's tree (e.g., third-party scripts, async code).
+**File:** `src/pages/TournamentDetail.tsx`
 
-### 4. ErrorBoundary integration (`src/components/ErrorBoundary.tsx`)
+Add `filter: \`tournament_id=eq.\${id}\`` to the `tournament_matches`, `tournament_participants`, and `tournament_groups` channels. This ensures each user only receives events for the tournament they are viewing, reducing broadcast volume by ~95%.
 
-When `componentDidCatch` fires, also send the error through the logger's database writer with the component stack trace included.
+### 2. Debounce realtime-triggered refetches
 
-### 5. New Admin "Errors" tab (`src/components/admin/ErrorsTab.tsx`)
+**File:** `src/pages/TournamentDetail.tsx`
 
-A new tab on the Admin page showing:
-- Live-updating list of recent errors (real-time subscription)
-- Each row: timestamp, user name (if available), error message, page, device type icon (phone/desktop)
-- Click to expand: full stack trace, device details (OS, model, network), component stack
-- Filter by: severity, resolved/unresolved, time range (last hour/day/week)
-- "Mark Resolved" button per error
-- Unresolved error count shown as a badge on the tab
+Wrap the `fetchData()` call triggered by realtime events in a debounce (500ms). If 10 events arrive within 500ms, only one fetch fires. This prevents query stampedes during active tournament play.
 
-### 6. Admin page update (`src/pages/Admin.tsx`)
+### 3. Add a connection limiter utility
 
-- Add the "Errors" tab with a `Bug` icon
-- Show unresolved count badge (red dot with number)
-- Real-time subscription to `client_errors` table for instant updates
+**File:** `src/lib/realtimeDebounce.ts` (new)
+
+Create a small utility that:
+- Debounces realtime callbacks (configurable delay, default 500ms)
+- Provides a `debouncedCallback` wrapper for use in any realtime subscription
+- Prevents the same query from running multiple times within the debounce window
+
+### 4. Protect ErrorsTab from excessive refetches
+
+**File:** `src/components/admin/ErrorsTab.tsx`
+
+Debounce the realtime callback so rapid error bursts (common under load) don't cause 50 refetches per second. Also add a `limit(100)` to the fetch query to prevent loading thousands of rows.
+
+### 5. Add graceful degradation for Dashboard
+
+**File:** `src/pages/Dashboard.tsx`
+
+Split the data fetch into independent try/catch blocks so if the stats RPC times out, the team card and quick actions still render. Currently a single failure shows a full-page error message.
+
+### 6. Add QueryClient request deduplication settings
+
+**File:** `src/App.tsx`
+
+The existing QueryClient config is good but the Dashboard doesn't use React Query -- it uses raw `useState` + `useEffect`. Convert the Dashboard data fetching to use `useQuery` hooks so that React Query's built-in deduplication, caching, and retry logic handles concurrent access automatically.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| New database migration | Create `client_errors` table, RLS policies, enable real-time |
-| `src/lib/logger.ts` | Add batched DB writer with mobile device context |
-| `src/main.tsx` | Add global `onerror` + `unhandledrejection` handlers |
-| `src/components/ErrorBoundary.tsx` | Add DB logging alongside existing Sentry call |
-| `src/components/admin/ErrorsTab.tsx` | New component -- error list with filters, expand, resolve |
-| `src/pages/Admin.tsx` | Add "Errors" tab with real-time subscription and badge |
+| `src/lib/realtimeDebounce.ts` | New utility -- debounced realtime callback wrapper |
+| `src/pages/TournamentDetail.tsx` | Add tournament_id filter to 3 channels, debounce refetches |
+| `src/components/admin/ErrorsTab.tsx` | Debounce realtime callback, add query limit |
+| `src/pages/Dashboard.tsx` | Independent error handling per data section, partial rendering on failure |
 
-## Mobile-Specific Context Captured
+## Expected Impact
 
-| Field | Source | Example |
-|-------|--------|---------|
-| Platform | `Capacitor.getPlatform()` | "ios", "android", "web" |
-| OS Version | User agent parsing | "iOS 18.2", "Android 15" |
-| Network Type | `navigator.connection.effectiveType` | "4g", "3g", "wifi" |
-| Is Native | `Capacitor.isNativePlatform()` | true/false |
-| Screen Size | `window.innerWidth x innerHeight` | "390x844" |
-| App Version | Build-time constant | "1.0.0" |
+| Scenario | Before | After |
+|----------|--------|-------|
+| 20 users on tournament page, 1 score update | 60 unfiltered broadcasts + 60 fetches | 20 filtered broadcasts + 20 debounced fetches |
+| Error burst (10 errors in 1s) on admin page | 10 full refetches | 1 debounced refetch |
+| Dashboard with slow stats RPC | Full page error | Team card + actions render, stats show "unavailable" |
+| 100 users all on Dashboard | 100 independent fetch chains | 100 fetch chains with independent failure isolation |
 
+## What This Does NOT Change
+
+- No database schema changes needed
+- No new dependencies
+- Backend query performance stays the same (already optimized)
+- Existing virtualization and animation optimizations remain
+- Service worker and caching strategy untouched
