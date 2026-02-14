@@ -360,6 +360,45 @@ export type Database = {
           },
         ]
       }
+      client_errors: {
+        Row: {
+          created_at: string
+          device_info: Json | null
+          id: string
+          message: string
+          page_url: string | null
+          resolved: boolean
+          severity: string
+          stack: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          device_info?: Json | null
+          id?: string
+          message: string
+          page_url?: string | null
+          resolved?: boolean
+          severity?: string
+          stack?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          device_info?: Json | null
+          id?: string
+          message?: string
+          page_url?: string | null
+          resolved?: boolean
+          severity?: string
+          stack?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       ladder_categories: {
         Row: {
           challenge_range: number

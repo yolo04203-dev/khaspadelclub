@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { initWebVitals } from "@/lib/webVitals";
+import { logger } from "@/lib/logger";
 
 initWebVitals();
 
@@ -11,6 +12,23 @@ if ('requestIdleCallback' in window) {
 } else {
   setTimeout(() => import("@/lib/errorReporting").then(m => m.initErrorReporting()), 2000);
 }
+
+// Global error handlers — catch errors outside React's tree
+window.addEventListener("error", (event) => {
+  logger.error(`Uncaught: ${event.message}`, event.error, {
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno,
+  });
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  const reason = event.reason;
+  logger.error(
+    `Unhandled rejection: ${reason?.message || String(reason)}`,
+    reason instanceof Error ? reason : new Error(String(reason))
+  );
+});
 
 createRoot(document.getElementById("root")!).render(<App />);
 

@@ -27,7 +27,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Log error details for debugging
+    // Log error details for debugging — also writes to client_errors table via batched logger
     logger.error("ErrorBoundary caught error", error, {
       componentStack: errorInfo.componentStack || undefined,
     });
