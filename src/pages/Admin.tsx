@@ -21,6 +21,8 @@ import { AmericanoTab } from "@/components/admin/AmericanoTab";
 import { PermissionsTab } from "@/components/admin/PermissionsTab";
 import { ErrorsTab } from "@/components/admin/ErrorsTab";
 import { logger } from "@/lib/logger";
+import { sendTestError } from "@/lib/errorReporting";
+import { AlertTriangle } from "lucide-react";
 
 interface Player {
   id: string;
@@ -337,6 +339,18 @@ export default function Admin() {
               >
                 {isRunningPerf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Activity className="w-4 h-4 mr-2" />}
                 Run Perf Test
+              </Button>
+              <Button
+                onClick={() => {
+                  logger.error("Test error from admin panel", new Error("Admin test error"));
+                  sendTestError();
+                  toast.success("Test error sent to Sentry + DB");
+                }}
+                variant="outline"
+                size="sm"
+              >
+                <AlertTriangle className="w-4 h-4 mr-2" />
+                Test Error
               </Button>
             </div>
 

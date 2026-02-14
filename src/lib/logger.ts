@@ -4,6 +4,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import * as Sentry from "@sentry/react";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -30,29 +31,24 @@ const FLUSH_INTERVAL_MS = 3000;
 function getDeviceInfo(): Record<string, unknown> {
   const ua = navigator.userAgent;
 
-  // Detect platform
   let platform = "web";
   try {
-    // Capacitor sets this on the window object
     const cap = (window as any).Capacitor;
     if (cap?.getPlatform) platform = cap.getPlatform();
   } catch { /* noop */ }
 
-  // Parse OS version from user agent
   let osVersion = "unknown";
   const iosMatch = ua.match(/OS (\d+[._]\d+[._]?\d*)/);
   const androidMatch = ua.match(/Android (\d+(\.\d+)*)/);
   if (iosMatch) osVersion = `iOS ${iosMatch[1].replace(/_/g, ".")}`;
   else if (androidMatch) osVersion = `Android ${androidMatch[1]}`;
 
-  // Network type
   let networkType = "unknown";
   try {
     const conn = (navigator as any).connection;
     if (conn?.effectiveType) networkType = conn.effectiveType;
   } catch { /* noop */ }
 
-  // Native check
   let isNative = false;
   try {
     isNative = !!(window as any).Capacitor?.isNativePlatform?.();
@@ -99,7 +95,6 @@ class Logger {
     const batch = this.errorQueue.splice(0, this.errorQueue.length);
 
     try {
-      // Get current user id if available (fire-and-forget, no await on session)
       let userId: string | null = null;
       try {
         const { data } = await supabase.auth.getSession();
@@ -132,13 +127,7 @@ class Logger {
     context?: Record<string, unknown>,
     error?: Error
   ): LogEntry {
-    return {
-      level,
-      message,
-      timestamp: new Date().toISOString(),
-      context,
-      error,
-    };
+    return { level, message, timestamp: new Date().toISOString(), context, error };
   }
 
   debug(message: string, context?: Record<string, unknown>): void {
@@ -156,6 +145,14 @@ class Logger {
     const entry = this.createEntry("warn", message, context);
     console.warn(this.formatLog(entry), context || "");
     this.enqueue(message, undefined, "warn");
+
+    // Wire to Sentry breadcrumbs
+    Sentry.addBreadcrumb({
+      category: "logger",
+      message,
+      level: "warning",
+      data: context,
+    });
   }
 
   error(message: string, error?: Error | unknown, context?: Record<string, unknown>): void {
@@ -167,35 +164,28 @@ class Logger {
       errorStack: err.stack,
     });
     this.enqueue(message, err, "error");
-  }
 
-  /**
-   * Log API/network errors with additional context
-   */
-  apiError(operation: string, error: unknown, context?: Record<string, unknown>): void {
-    this.error(`API Error: ${operation}`, error, {
-      ...context,
-      operation,
+    // Wire to Sentry breadcrumbs
+    Sentry.addBreadcrumb({
+      category: "logger",
+      message,
+      level: "error",
+      data: { ...context, errorMessage: err.message },
     });
   }
 
-  /**
-   * Log navigation errors
-   */
+  apiError(operation: string, error: unknown, context?: Record<string, unknown>): void {
+    this.error(`API Error: ${operation}`, error, { ...context, operation });
+  }
+
   navigationError(path: string, error: unknown): void {
     this.error(`Navigation Error: Failed to navigate to ${path}`, error, { path });
   }
 
-  /**
-   * Log auth errors
-   */
   authError(action: string, error: unknown): void {
     this.error(`Auth Error: ${action}`, error, { action });
   }
 
-  /**
-   * Force flush the error queue (useful before page unload)
-   */
   forceFlush(): void {
     this.flush();
   }
