@@ -1,8 +1,10 @@
 import * as Sentry from "@sentry/react";
 
 declare const __APP_VERSION__: string;
+declare const __GIT_COMMIT_SHA__: string;
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
+const IS_DEV = import.meta.env.DEV;
 
 const SENSITIVE_KEYS = /authorization|cookie|token|password|secret|credential|api[_-]?key/i;
 const PII_KEYS = /email|phone|ssn|address|birth/i;
@@ -37,6 +39,11 @@ function redactQueryParams(url: string): string {
   }
 }
 
+// Environment-conditional sampling rates
+const TRACES_SAMPLE_RATE = IS_DEV ? 1.0 : 0.1;
+const REPLAYS_SESSION_RATE = IS_DEV ? 1.0 : 0.05;
+const REPLAYS_ERROR_RATE = 1.0; // Always capture replays on error
+
 export function initErrorReporting() {
   if (!SENTRY_DSN) {
     console.warn("[ErrorReporting] No VITE_SENTRY_DSN configured, skipping Sentry init");
@@ -44,18 +51,19 @@ export function initErrorReporting() {
   }
 
   const appVersion = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "unknown";
+  const gitSha = typeof __GIT_COMMIT_SHA__ !== "undefined" ? __GIT_COMMIT_SHA__ : "unknown";
 
   Sentry.init({
     dsn: SENTRY_DSN,
     environment: import.meta.env.MODE,
-    release: `khas-padel@${appVersion}`,
+    release: `khas-padel@${appVersion}+${gitSha}`,
     integrations: [
       Sentry.browserTracingIntegration(),
       Sentry.replayIntegration({ maskAllText: true, blockAllMedia: true }),
     ],
-    tracesSampleRate: 0.2,
-    replaysSessionSampleRate: 0.1,
-    replaysOnErrorSampleRate: 1.0,
+    tracesSampleRate: TRACES_SAMPLE_RATE,
+    replaysSessionSampleRate: REPLAYS_SESSION_RATE,
+    replaysOnErrorSampleRate: REPLAYS_ERROR_RATE,
 
     beforeSend(event) {
       // Drop bot events
@@ -93,6 +101,33 @@ export function initErrorReporting() {
         }
       }
 
+      return event;
+    },
+
+    beforeSendTransaction(event) {
+      // Scrub PII from transaction/span data
+      if (event.request?.headers) {
+        event.request.headers = scrubObject(event.request.headers) as Record<string, string>;
+      }
+      if (event.request?.url) {
+        event.request.url = redactQueryParams(event.request.url);
+      }
+      // Scrub span descriptions containing sensitive URLs
+      if (event.spans) {
+        for (const span of event.spans) {
+          if (span.description && typeof span.description === "string") {
+            try {
+              span.description = redactQueryParams(span.description);
+            } catch {
+              // not a URL, leave as-is
+            }
+          }
+          if (span.data && typeof span.data === "object") {
+            const scrubbed = scrubObject(span.data as Record<string, unknown>);
+            (span as any).data = scrubbed;
+          }
+        }
+      }
       return event;
     },
 
