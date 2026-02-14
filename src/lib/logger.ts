@@ -71,6 +71,7 @@ class Logger {
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private rateLimitCount = 0;
   private rateLimitWindowStart = Date.now();
+  private dedupMap = new Map<string, { count: number; item: ErrorQueueItem }>();
 
   constructor() {
     this.startFlushTimer();
@@ -93,21 +94,39 @@ class Logger {
 
   private enqueue(message: string, error?: Error | unknown, severity: string = "error") {
     if (this.isRateLimited()) return;
+
+    const dedupKey = `${severity}:${message}`;
+    const existing = this.dedupMap.get(dedupKey);
+    if (existing) {
+      existing.count++;
+      return;
+    }
+
     const err = error instanceof Error ? error : (error ? new Error(String(error)) : null);
-    this.errorQueue.push({
+    const item: ErrorQueueItem = {
       message,
       stack: err?.stack || null,
       page_url: window.location.href,
       user_agent: navigator.userAgent,
       device_info: getDeviceInfo(),
       severity,
-    });
+    };
+    this.dedupMap.set(dedupKey, { count: 1, item });
+    this.errorQueue.push(item);
   }
 
   private async flush() {
     if (this.errorQueue.length === 0) return;
 
-    const batch = this.errorQueue.splice(0, this.errorQueue.length);
+    // Collapse duplicates: append count to message if > 1
+    const collapsed = Array.from(this.dedupMap.values()).map(({ count, item }) => ({
+      ...item,
+      message: count > 1 ? `${item.message} (x${count})` : item.message,
+    }));
+    this.errorQueue.length = 0;
+    this.dedupMap.clear();
+
+    if (collapsed.length === 0) return;
 
     try {
       let userId: string | null = null;
@@ -116,7 +135,7 @@ class Logger {
         userId = data.session?.user?.id ?? null;
       } catch { /* noop */ }
 
-      const rows = batch.map(item => ({
+      const rows = collapsed.map(item => ({
         user_id: userId,
         message: item.message.slice(0, 2000),
         stack: item.stack?.slice(0, 10000) || null,
