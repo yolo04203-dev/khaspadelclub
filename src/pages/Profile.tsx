@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { User, Users, Trophy, Loader2, Save, Trash2, MessageSquare } from "lucide-react";
+import { User, Users, Trophy, Loader2, Save, Trash2 } from "lucide-react";
+import { ReportProblemDialog } from "@/components/ReportProblemDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -624,12 +625,7 @@ export default function ProfilePage() {
             {/* Support & Account Actions */}
             <Card>
               <CardContent className="pt-6 space-y-4">
-                <Button variant="outline" className="w-full justify-start" asChild>
-                  <Link to="/contact">
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    Report Issue / Send Feedback
-                  </Link>
-                </Button>
+                <ReportProblemDialog />
                 <Button variant="destructive" className="w-full justify-start" onClick={() => setDeleteDialogOpen(true)}>
                   <Trash2 className="w-4 h-4 mr-2" />
                   Delete Account
