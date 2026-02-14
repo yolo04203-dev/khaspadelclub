@@ -1,7 +1,9 @@
 /**
  * Lightweight Web Vitals reporter using native PerformanceObserver.
- * Tracks FCP, LCP, CLS, and INP without external dependencies.
+ * Tracks FCP, LCP, CLS, INP, and long tasks without external dependencies.
  */
+
+import * as Sentry from "@sentry/react";
 
 interface VitalMetric {
   name: string;
@@ -26,6 +28,13 @@ function rate(name: string, value: number): VitalMetric['rating'] {
 function report(metric: VitalMetric) {
   const icon = metric.rating === 'good' ? '✅' : metric.rating === 'needs-improvement' ? '⚠️' : '❌';
   console.log(`${icon} [WebVital] ${metric.name}: ${metric.value.toFixed(1)}ms (${metric.rating})`);
+
+  Sentry.addBreadcrumb({
+    category: "web-vital",
+    message: `${metric.name}: ${metric.value.toFixed(1)}ms (${metric.rating})`,
+    level: metric.rating === "poor" ? "warning" : "info",
+    data: { name: metric.name, value: metric.value, rating: metric.rating },
+  });
 }
 
 export function initWebVitals() {
@@ -54,7 +63,6 @@ export function initWebVitals() {
     });
     lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true });
 
-    // Report on page hide (final LCP)
     const reportLCP = () => {
       if (lcpValue > 0) {
         report({ name: 'LCP', value: lcpValue, rating: rate('LCP', lcpValue) });
@@ -86,7 +94,7 @@ export function initWebVitals() {
     }, { once: true });
   } catch { /* unsupported */ }
 
-  // INP (Interaction to Next Paint)
+  // INP
   try {
     let inpValue = 0;
     const inpObserver = new PerformanceObserver((list) => {
@@ -104,4 +112,27 @@ export function initWebVitals() {
       }
     }, { once: true });
   } catch { /* unsupported */ }
+
+  // Long Task Detection (>100ms)
+  try {
+    const longTaskObserver = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        if (entry.duration > 100) {
+          const attribution = (entry as any).attribution?.[0];
+          Sentry.addBreadcrumb({
+            category: "performance",
+            message: `Long task: ${entry.duration.toFixed(0)}ms`,
+            level: entry.duration > 200 ? "warning" : "info",
+            data: {
+              duration: entry.duration,
+              startTime: entry.startTime,
+              containerType: attribution?.containerType,
+              containerName: attribution?.containerName,
+            },
+          });
+        }
+      }
+    });
+    longTaskObserver.observe({ type: "longtask", buffered: true });
+  } catch { /* longtask not supported in all browsers */ }
 }

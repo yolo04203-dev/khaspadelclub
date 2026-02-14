@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { reportApiError } from "@/lib/errorReporting";
+import * as Sentry from "@sentry/react";
 
 export type AppErrorCode =
   | "offline"
@@ -84,6 +85,7 @@ async function request<T>(
   const maxAttempts = isIdempotent ? 2 : 1;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const startTime = Date.now();
     try {
       const res = await fetch(url, {
         method,
@@ -93,6 +95,13 @@ async function request<T>(
       });
 
       clearTimeout(timeoutId);
+
+      Sentry.addBreadcrumb({
+        category: "http",
+        message: `${method} ${url}`,
+        level: res.ok ? "info" : "warning",
+        data: { method, url, status_code: res.status, duration_ms: Date.now() - startTime },
+      });
 
       if (!res.ok) {
         const errorBody = await res.json().catch(() => null);

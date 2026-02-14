@@ -13,7 +13,6 @@ import { OfflineBanner, SlowConnectionBanner } from "@/components/ui/error-state
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useStatusBar } from "@/hooks/useStatusBar";
 import { logger } from "@/lib/logger";
-import { reportError } from "@/lib/errorReporting";
 import { PerfOverlay } from "@/components/dev/PerfOverlay";
 
 // Eager load critical pages
@@ -165,50 +164,15 @@ const queryClient = new QueryClient({
 });
 
 const App = () => {
-  // Global error handlers for production stability
+  // Storage availability check (global error handlers are in main.tsx)
   useEffect(() => {
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      logger.error("Unhandled promise rejection", event.reason, {
-        type: "unhandledrejection",
-      });
-      reportError(event.reason, { type: "unhandledrejection" });
-      event.preventDefault();
-    };
-
-    const handleError = (event: ErrorEvent) => {
-      logger.error("Unhandled error", event.error, {
-        type: "error",
-        filename: event.filename,
-        lineno: event.lineno,
-        colno: event.colno,
-      });
-      reportError(event.error, { filename: event.filename, lineno: event.lineno });
-      event.preventDefault();
-    };
-
-    // Handle Safari/iOS specific storage errors
-    const handleStorageError = () => {
-      logger.warn("Storage quota exceeded or unavailable", {
-        type: "storage",
-      });
-    };
-
-    window.addEventListener("unhandledrejection", handleUnhandledRejection);
-    window.addEventListener("error", handleError);
-    
-    // Check storage availability on mount
     try {
       const testKey = "__storage_test__";
       localStorage.setItem(testKey, testKey);
       localStorage.removeItem(testKey);
-    } catch (e) {
-      handleStorageError();
+    } catch {
+      logger.warn("Storage quota exceeded or unavailable", { type: "storage" });
     }
-
-    return () => {
-      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
-      window.removeEventListener("error", handleError);
-    };
   }, []);
 
   return (
