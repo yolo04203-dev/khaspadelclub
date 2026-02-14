@@ -20,6 +20,7 @@ import { PaymentManagement } from "@/components/tournament/PaymentManagement";
 import { CategoryManagement, TournamentCategory } from "@/components/tournament/CategoryManagement";
 import { logger } from "@/lib/logger";
 import { toast as sonnerToast } from "sonner";
+import { createDebouncedCallback } from "@/lib/realtimeDebounce";
 
 interface Tournament {
   id: string;
@@ -197,7 +198,10 @@ export default function TournamentDetail() {
       }
     }
 
-    // Subscribe to realtime changes for tournament data
+    // Debounced refetch to prevent query stampedes from rapid realtime events
+    const debouncedFetch = createDebouncedCallback(() => fetchData(), 500);
+
+    // Subscribe to realtime changes — filtered by tournament_id
     const matchesChannel = supabase
       .channel(`tournament-${id}-matches`)
       .on(
@@ -206,10 +210,9 @@ export default function TournamentDetail() {
           event: '*',
           schema: 'public',
           table: 'tournament_matches',
+          filter: `tournament_id=eq.${id}`,
         },
-        () => {
-          fetchData();
-        }
+        debouncedFetch
       )
       .subscribe();
 
@@ -221,10 +224,9 @@ export default function TournamentDetail() {
           event: '*',
           schema: 'public',
           table: 'tournament_participants',
+          filter: `tournament_id=eq.${id}`,
         },
-        () => {
-          fetchData();
-        }
+        debouncedFetch
       )
       .subscribe();
 
@@ -236,10 +238,9 @@ export default function TournamentDetail() {
           event: '*',
           schema: 'public',
           table: 'tournament_groups',
+          filter: `tournament_id=eq.${id}`,
         },
-        () => {
-          fetchData();
-        }
+        debouncedFetch
       )
       .subscribe();
 
@@ -253,9 +254,7 @@ export default function TournamentDetail() {
           table: 'tournaments',
           filter: `id=eq.${id}`,
         },
-        () => {
-          fetchData();
-        }
+        debouncedFetch
       )
       .subscribe();
 
