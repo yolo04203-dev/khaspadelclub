@@ -27,6 +27,8 @@ interface ErrorQueueItem {
 
 const LOG_PREFIX = "[App]";
 const FLUSH_INTERVAL_MS = 3000;
+const MAX_ERRORS_PER_WINDOW = 20;
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 
 function getDeviceInfo(): Record<string, unknown> {
   const ua = navigator.userAgent;
@@ -67,6 +69,8 @@ class Logger {
   private isDevelopment = import.meta.env.DEV;
   private errorQueue: ErrorQueueItem[] = [];
   private flushTimer: ReturnType<typeof setInterval> | null = null;
+  private rateLimitCount = 0;
+  private rateLimitWindowStart = Date.now();
 
   constructor() {
     this.startFlushTimer();
@@ -77,7 +81,18 @@ class Logger {
     this.flushTimer = setInterval(() => this.flush(), FLUSH_INTERVAL_MS);
   }
 
+  private isRateLimited(): boolean {
+    const now = Date.now();
+    if (now - this.rateLimitWindowStart > RATE_LIMIT_WINDOW_MS) {
+      this.rateLimitCount = 0;
+      this.rateLimitWindowStart = now;
+    }
+    this.rateLimitCount++;
+    return this.rateLimitCount > MAX_ERRORS_PER_WINDOW;
+  }
+
   private enqueue(message: string, error?: Error | unknown, severity: string = "error") {
+    if (this.isRateLimited()) return;
     const err = error instanceof Error ? error : (error ? new Error(String(error)) : null);
     this.errorQueue.push({
       message,
