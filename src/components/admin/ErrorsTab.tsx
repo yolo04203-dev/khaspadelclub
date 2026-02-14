@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { CheckCircle, ChevronDown, Smartphone, Monitor, AlertTriangle, XCircle, Loader2, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
+import { createDebouncedCallback } from "@/lib/realtimeDebounce";
 
 interface ClientError {
   id: string;
@@ -90,14 +91,16 @@ export function ErrorsTab({ onUnresolvedCountChange }: ErrorsTabProps) {
     fetchErrors();
   }, [severityFilter, resolvedFilter, timeFilter]);
 
-  // Real-time subscription
+  // Real-time subscription with debounce to prevent stampedes under load
   useEffect(() => {
+    const debouncedFetch = createDebouncedCallback(() => fetchErrors(), 1000);
+
     const channel = supabase
       .channel("client-errors-realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "client_errors" },
-        () => fetchErrors()
+        debouncedFetch
       )
       .subscribe();
 

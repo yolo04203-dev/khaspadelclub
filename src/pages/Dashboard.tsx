@@ -55,6 +55,7 @@ export default function Dashboard() {
     try {
       setFetchError(null);
       
+      // Fetch team membership first — independent sections below degrade gracefully
       const { data: memberData, error: memberError } = await supabase
         .from("team_members")
         .select("team_id")
@@ -67,72 +68,60 @@ export default function Dashboard() {
       }
 
       if (memberData?.team_id) {
-        const [teamResult, rankResult] = await Promise.all([
-          supabase
-            .from("teams")
-            .select("id, name")
-            .eq("id", memberData.team_id)
-            .maybeSingle(),
-          supabase
-            .from("ladder_rankings")
-            .select("rank, wins, losses")
-            .eq("team_id", memberData.team_id)
-            .maybeSingle(),
-        ]);
-
-        if (teamResult.error) {
-          logger.apiError("fetchTeam", teamResult.error);
-          throw teamResult.error;
-        }
-
-        if (teamResult.data) {
-          setUserTeam({
-            id: teamResult.data.id,
-            name: safeString(teamResult.data.name, "Unknown Team"),
-            rank: rankResult.data?.rank ?? null,
-          });
-        }
-
         const teamId = memberData.team_id;
-        
-        const [matchesResult, pendingResult, incomingResult, unifiedResult] = await Promise.all([
-          supabase
-            .from("matches")
-            .select("*", { count: "exact", head: true })
-            .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
-            .eq("status", "completed"),
-          supabase
-            .from("challenges")
-            .select("*", { count: "exact", head: true })
-            .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
-            .eq("status", "pending"),
-          supabase
-            .from("challenges")
-            .select("*", { count: "exact", head: true })
-            .eq("challenged_team_id", teamId)
-            .eq("status", "pending"),
-          supabase.rpc("get_player_unified_stats", {
-            p_user_id: user.id,
-            p_days: 0,
-          }),
-        ]);
 
-        setIncomingChallenges(safeCount(incomingResult.count));
+        // Section 1: Team info (critical — if this fails, show error)
+        try {
+          const [teamResult, rankResult] = await Promise.all([
+            supabase.from("teams").select("id, name").eq("id", teamId).maybeSingle(),
+            supabase.from("ladder_rankings").select("rank, wins, losses").eq("team_id", teamId).maybeSingle(),
+          ]);
 
-        const unified = unifiedResult.data as any;
-        if (unified?.by_mode) {
-          setModeBreakdown(unified.by_mode);
+          if (teamResult.error) throw teamResult.error;
+          if (teamResult.data) {
+            setUserTeam({
+              id: teamResult.data.id,
+              name: safeString(teamResult.data.name, "Unknown Team"),
+              rank: rankResult.data?.rank ?? null,
+            });
+          }
+        } catch (err) {
+          logger.error("Dashboard: team info failed", err);
         }
 
-        const totalWins = unified?.overall?.wins ?? rankResult.data?.wins ?? 0;
-        const totalLosses = unified?.overall?.losses ?? rankResult.data?.losses ?? 0;
+        // Section 2: Stats + challenges (non-critical — degrade to defaults)
+        try {
+          const [matchesResult, pendingResult, incomingResult, unifiedResult] = await Promise.all([
+            supabase.from("matches").select("*", { count: "exact", head: true })
+              .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+              .eq("status", "completed"),
+            supabase.from("challenges").select("*", { count: "exact", head: true })
+              .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+              .eq("status", "pending"),
+            supabase.from("challenges").select("*", { count: "exact", head: true })
+              .eq("challenged_team_id", teamId)
+              .eq("status", "pending"),
+            supabase.rpc("get_player_unified_stats", { p_user_id: user.id, p_days: 0 }),
+          ]);
 
-        setStats({
-          matchesPlayed: totalWins + totalLosses,
-          wins: totalWins,
-          losses: totalLosses,
-          pendingChallenges: safeCount(pendingResult.count),
-        });
+          setIncomingChallenges(safeCount(incomingResult.count));
+
+          const unified = unifiedResult.data as any;
+          if (unified?.by_mode) setModeBreakdown(unified.by_mode);
+
+          const totalWins = unified?.overall?.wins ?? 0;
+          const totalLosses = unified?.overall?.losses ?? 0;
+
+          setStats({
+            matchesPlayed: totalWins + totalLosses,
+            wins: totalWins,
+            losses: totalLosses,
+            pendingChallenges: safeCount(pendingResult.count),
+          });
+        } catch (err) {
+          logger.warn("Dashboard: stats section failed, using defaults", err);
+          // Stats keep their default zero values — UI still renders
+        }
       }
       
       logger.debug("Dashboard data loaded");
