@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap, Shuffle, Shield, Database, Activity } from "lucide-react";
+import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap, Shuffle, Shield, Database, Activity, Bug } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +19,7 @@ import { TournamentsTab } from "@/components/admin/TournamentsTab";
 import { ChallengesTab } from "@/components/admin/ChallengesTab";
 import { AmericanoTab } from "@/components/admin/AmericanoTab";
 import { PermissionsTab } from "@/components/admin/PermissionsTab";
+import { ErrorsTab } from "@/components/admin/ErrorsTab";
 import { logger } from "@/lib/logger";
 
 interface Player {
@@ -90,6 +91,7 @@ export default function Admin() {
   const [isSeeding, setIsSeeding] = useState(false);
   const [perfResult, setPerfResult] = useState<any>(null);
   const [isRunningPerf, setIsRunningPerf] = useState(false);
+  const [unresolvedErrorCount, setUnresolvedErrorCount] = useState(0);
   const handleSeedData = async (clearExisting = false) => {
     setIsSeeding(true);
     try {
@@ -414,11 +416,20 @@ export default function Admin() {
                 Americano
               </TabsTrigger>
               {role === "super_admin" && (
-                <TabsTrigger value="permissions" className="text-xs sm:text-sm shrink-0">
+              <TabsTrigger value="permissions" className="text-xs sm:text-sm shrink-0">
                   <Shield className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline" />
                   Permissions
                 </TabsTrigger>
               )}
+              <TabsTrigger value="errors" className="text-xs sm:text-sm shrink-0 relative">
+                <Bug className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline" />
+                Errors
+                {unresolvedErrorCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                    {unresolvedErrorCount > 99 ? "99+" : unresolvedErrorCount}
+                  </span>
+                )}
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="players">
@@ -454,6 +465,10 @@ export default function Admin() {
                 <PermissionsTab players={players} />
               </TabsContent>
             )}
+
+            <TabsContent value="errors">
+              <ErrorsTab onUnresolvedCountChange={setUnresolvedErrorCount} />
+            </TabsContent>
           </Tabs>
         </motion.div>
       </main>
