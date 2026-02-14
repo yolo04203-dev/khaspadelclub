@@ -62,6 +62,7 @@ export default defineConfig(({ mode }) => ({
           'charts': ['recharts'],
           'supabase': ['@supabase/supabase-js'],
           'sentry': ['@sentry/react'],
+          'analytics': ['posthog-js'],
         },
       },
     },

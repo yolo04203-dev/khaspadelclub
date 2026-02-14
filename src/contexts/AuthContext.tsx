@@ -4,6 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
 import { setErrorReportingUser, clearErrorReportingUser } from "@/lib/errorReporting";
+import { analytics } from "@/lib/analytics/posthog";
 
 /** Hide the native splash screen once auth is resolved */
 async function hideSplashScreen() {
@@ -125,6 +126,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === "SIGNED_OUT") {
         setRole(null);
         clearErrorReportingUser();
+        analytics.reset();
+        analytics.track("Logout");
         // Clear refresh interval on sign out
         if (refreshIntervalRef.current) {
           clearInterval(refreshIntervalRef.current);
@@ -167,6 +170,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(initialSession?.user ?? null);
         if (initialSession?.user) {
           setErrorReportingUser({ id: initialSession.user.id, email: initialSession.user.email });
+          analytics.identify({
+            id: initialSession.user.id,
+            createdAt: initialSession.user.created_at,
+          });
         }
 
         // Ensure role is resolved before marking app ready
@@ -217,6 +224,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         logger.authError("signUp", error);
+      } else {
+        analytics.track("Signup Completed");
       }
 
       return { error: error ? new Error(error.message) : null };
@@ -236,6 +245,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         logger.authError("signIn", error);
+      } else {
+        analytics.track("Login");
       }
 
       return { error: error ? new Error(error.message) : null };

@@ -16,6 +16,8 @@ import { useStatusBar } from "@/hooks/useStatusBar";
 import { logger } from "@/lib/logger";
 import { PerfOverlay } from "@/components/dev/PerfOverlay";
 import { PageTransition } from "@/components/PageTransition";
+import { useScreenTracking } from "@/hooks/useScreenTracking";
+import { useCapacitorAnalytics } from "@/hooks/useCapacitorAnalytics";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 
@@ -126,6 +128,7 @@ function NetworkStatusProvider({ children }: { children: React.ReactNode }) {
 /** Animated routes with page transitions */
 function AnimatedRoutes() {
   const location = useLocation();
+  useScreenTracking();
   return (
     <Suspense fallback={<LoadingScreen message="Loading page..." />}>
       <AnimatePresence mode="wait" initial={false}>
@@ -170,6 +173,7 @@ function AnimatedRoutes() {
 function NativeLifecycleManager() {
   const navigate = useNavigate();
   useStatusBar();
+  useCapacitorAnalytics();
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
