@@ -1,4 +1,4 @@
-import { useEffect, Suspense, lazy } from "react";
+import { useEffect, Suspense, lazy, ComponentType } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,12 +14,45 @@ import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useStatusBar } from "@/hooks/useStatusBar";
 import { logger } from "@/lib/logger";
 import { PerfOverlay } from "@/components/dev/PerfOverlay";
+import { Button } from "@/components/ui/button";
+import { RefreshCw } from "lucide-react";
 
 // Eager load critical pages
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 
 import NotFound from "./pages/NotFound";
+
+// Chunk-load error fallback
+function ChunkErrorFallback() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 p-6 text-center">
+      <h2 className="text-lg font-semibold text-foreground">Failed to load page</h2>
+      <p className="text-sm text-muted-foreground max-w-sm">
+        This can happen on slow connections or after an app update. Please reload to try again.
+      </p>
+      <Button onClick={() => window.location.reload()} variant="outline">
+        <RefreshCw className="w-4 h-4 mr-2" />
+        Reload
+      </Button>
+    </div>
+  );
+}
+
+// Lazy loader with one retry before showing fallback
+function lazyWithRetry(importFn: () => Promise<{ default: ComponentType<any> }>) {
+  return lazy(() =>
+    importFn().catch(() =>
+      new Promise<{ default: ComponentType<any> }>((resolve) =>
+        setTimeout(() => {
+          importFn()
+            .then(resolve)
+            .catch(() => resolve({ default: ChunkErrorFallback }));
+        }, 1500)
+      )
+    )
+  );
+}
 
 // Lazy load non-critical pages for better performance
 const lazyImports = {
@@ -50,28 +83,28 @@ const lazyImports = {
 // Export for prefetching in AppHeader
 export { lazyImports };
 
-const Dashboard = lazy(lazyImports.Dashboard);
-const Ladders = lazy(lazyImports.Ladders);
-const LadderDetail = lazy(lazyImports.LadderDetail);
-const LadderCreate = lazy(lazyImports.LadderCreate);
-const LadderManage = lazy(lazyImports.LadderManage);
-const CreateTeam = lazy(lazyImports.CreateTeam);
-const Challenges = lazy(lazyImports.Challenges);
-const FindOpponents = lazy(lazyImports.FindOpponents);
-const Americano = lazy(lazyImports.Americano);
-const AmericanoCreate = lazy(lazyImports.AmericanoCreate);
-const AmericanoSession = lazy(lazyImports.AmericanoSession);
-const Tournaments = lazy(lazyImports.Tournaments);
-const TournamentCreate = lazy(lazyImports.TournamentCreate);
-const TournamentDetail = lazy(lazyImports.TournamentDetail);
-const Profile = lazy(lazyImports.Profile);
-const Players = lazy(lazyImports.Players);
-const PlayerProfile = lazy(lazyImports.PlayerProfile);
-const Stats = lazy(lazyImports.Stats);
-const Admin = lazy(lazyImports.Admin);
-const Privacy = lazy(lazyImports.Privacy);
-const Terms = lazy(lazyImports.Terms);
-const Contact = lazy(lazyImports.Contact);
+const Dashboard = lazyWithRetry(lazyImports.Dashboard);
+const Ladders = lazyWithRetry(lazyImports.Ladders);
+const LadderDetail = lazyWithRetry(lazyImports.LadderDetail);
+const LadderCreate = lazyWithRetry(lazyImports.LadderCreate);
+const LadderManage = lazyWithRetry(lazyImports.LadderManage);
+const CreateTeam = lazyWithRetry(lazyImports.CreateTeam);
+const Challenges = lazyWithRetry(lazyImports.Challenges);
+const FindOpponents = lazyWithRetry(lazyImports.FindOpponents);
+const Americano = lazyWithRetry(lazyImports.Americano);
+const AmericanoCreate = lazyWithRetry(lazyImports.AmericanoCreate);
+const AmericanoSession = lazyWithRetry(lazyImports.AmericanoSession);
+const Tournaments = lazyWithRetry(lazyImports.Tournaments);
+const TournamentCreate = lazyWithRetry(lazyImports.TournamentCreate);
+const TournamentDetail = lazyWithRetry(lazyImports.TournamentDetail);
+const Profile = lazyWithRetry(lazyImports.Profile);
+const Players = lazyWithRetry(lazyImports.Players);
+const PlayerProfile = lazyWithRetry(lazyImports.PlayerProfile);
+const Stats = lazyWithRetry(lazyImports.Stats);
+const Admin = lazyWithRetry(lazyImports.Admin);
+const Privacy = lazyWithRetry(lazyImports.Privacy);
+const Terms = lazyWithRetry(lazyImports.Terms);
+const Contact = lazyWithRetry(lazyImports.Contact);
 
 // Network status wrapper component
 function NetworkStatusProvider({ children }: { children: React.ReactNode }) {
@@ -98,6 +131,7 @@ function NativeLifecycleManager() {
 
     let appListener: { remove: () => void } | undefined;
     let resumeListener: { remove: () => void } | undefined;
+    let backListener: { remove: () => void } | undefined;
 
     const setup = async () => {
       try {
@@ -124,6 +158,15 @@ function NativeLifecycleManager() {
             queryClient.refetchQueries({ type: "active", stale: true });
           }
         });
+
+        // Android hardware back button
+        backListener = await CapApp.addListener("backButton", ({ canGoBack }) => {
+          if (canGoBack) {
+            navigate(-1);
+          } else {
+            CapApp.exitApp();
+          }
+        });
       } catch {
         // @capacitor/app not installed — safe to ignore on web
       }
@@ -134,6 +177,7 @@ function NativeLifecycleManager() {
     return () => {
       appListener?.remove();
       resumeListener?.remove();
+      backListener?.remove();
     };
   }, [navigate]);
 

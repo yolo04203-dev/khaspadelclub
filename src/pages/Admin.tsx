@@ -23,6 +23,7 @@ import { ErrorsTab } from "@/components/admin/ErrorsTab";
 import { logger } from "@/lib/logger";
 import { sendTestError } from "@/lib/errorReporting";
 import { AlertTriangle } from "lucide-react";
+import * as Sentry from "@sentry/react";
 
 interface Player {
   id: string;
@@ -351,6 +352,39 @@ export default function Admin() {
               >
                 <AlertTriangle className="w-4 h-4 mr-2" />
                 Test Error
+              </Button>
+              <Button
+                onClick={() => {
+                  Promise.reject(new Error("Test unhandled rejection from admin"));
+                  toast.success("Unhandled rejection fired");
+                }}
+                variant="outline"
+                size="sm"
+              >
+                <Bug className="w-4 h-4 mr-2" />
+                Unhandled Rejection
+              </Button>
+              <Button
+                onClick={() => {
+                  Sentry.addBreadcrumb({ category: "test", message: "Manual breadcrumb from admin", level: "info" });
+                  toast.success("Breadcrumb added to Sentry");
+                }}
+                variant="outline"
+                size="sm"
+              >
+                <Layers className="w-4 h-4 mr-2" />
+                Send Breadcrumb
+              </Button>
+              <Button
+                onClick={() => {
+                  Sentry.captureMessage("Test message from admin panel");
+                  toast.success("Message captured in Sentry");
+                }}
+                variant="outline"
+                size="sm"
+              >
+                <Zap className="w-4 h-4 mr-2" />
+                Capture Message
               </Button>
             </div>
 
