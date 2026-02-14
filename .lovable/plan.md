@@ -1,91 +1,145 @@
 
-# Preventing Crashes with 100 Concurrent Users
 
-## The Problem
+# Production-Grade Error Tracking + Crash Prevention for Capacitor
 
-With 100 users on the app simultaneously, the biggest crash risks are not about frontend rendering (which is already optimized with virtualization) -- they are about **connection exhaustion** and **query stampedes** hitting the backend.
+## What Already Exists (and What's Missing)
 
-## Root Causes Found
+Your app already has a solid foundation. Here's the gap analysis:
 
-### 1. TournamentDetail opens 4 realtime channels per user -- 3 are unfiltered
-
-When a user views a tournament, the app subscribes to `tournament_matches`, `tournament_participants`, and `tournament_groups` tables **without any filter**. This means every change to ANY row in those tables triggers a full `fetchData()` reload for ALL 100 users. If 20 users are viewing tournaments, that is 80 unfiltered channels. A single score update triggers 60+ simultaneous database fetches.
-
-### 2. ErrorsTab realtime channel has no cleanup guard
-
-The admin Errors tab subscribes to ALL `client_errors` inserts globally. If errors are being logged frequently (which they will be under load), this triggers constant re-fetches.
-
-### 3. Dashboard makes sequential queries that could fail under load
-
-The Dashboard fetches team data, then stats, then challenges in a waterfall. Under load, if any query times out, the entire dashboard shows an error state with no partial data.
-
-### 4. No request deduplication for realtime-triggered refetches
-
-When a realtime event fires, `fetchData()` runs immediately. If 10 events arrive within 1 second (common during a tournament), 10 identical fetches fire simultaneously.
+| Feature | Status | Gap |
+|---------|--------|-----|
+| Sentry SDK (`@sentry/react`) | Installed | No DSN configured (VITE_SENTRY_DSN env var missing) |
+| ErrorBoundary + fallback UI | Done | No "test error" button to verify reporting |
+| Global error/rejection handlers | Done (duplicated in main.tsx AND App.tsx) | Need to deduplicate |
+| Logger with DB batching | Done | Not wired to Sentry breadcrumbs |
+| API client with retries/timeouts | Done | Not adding Sentry breadcrumbs for network calls |
+| Offline/slow-connection banners | Done | -- |
+| Admin Errors dashboard | Done | -- |
+| Web Vitals tracking | Done | Not sent to Sentry |
+| Capacitor native crash bridge | MISSING | Need `@sentry/capacitor` |
+| Release/version tagging | MISSING | No git hash or app version in Sentry |
+| Navigation breadcrumbs | MISSING | Route changes not tracked as breadcrumbs |
+| Safe Capacitor plugin wrapper | MISSING | Plugin failures (Camera, etc.) not caught systematically |
+| PII scrubbing in beforeSend | PARTIAL | Only filters browser extensions, no token/password redaction |
+| Long-task detection | MISSING | Not reported to Sentry |
+| Test error button | MISSING | No way to verify reporting on device |
 
 ## Implementation Plan
 
-### 1. Filter TournamentDetail realtime channels by tournament ID
+### 1. Configure VITE_SENTRY_DSN
 
-**File:** `src/pages/TournamentDetail.tsx`
+You will need to add your Sentry DSN as a secret so Sentry actually initializes. Currently `VITE_SENTRY_DSN` is not set, so `initErrorReporting()` skips initialization entirely. I will ask you to provide this value.
 
-Add `filter: \`tournament_id=eq.\${id}\`` to the `tournament_matches`, `tournament_participants`, and `tournament_groups` channels. This ensures each user only receives events for the tournament they are viewing, reducing broadcast volume by ~95%.
+### 2. Upgrade Sentry init with release tagging, PII scrubbing, and navigation breadcrumbs
 
-### 2. Debounce realtime-triggered refetches
+**File:** `src/lib/errorReporting.ts`
 
-**File:** `src/pages/TournamentDetail.tsx`
+- Add `release` tag using app version from `package.json` (via Vite define)
+- Add `Sentry.browserNavigationIntegration()` for automatic route change breadcrumbs
+- Expand `beforeSend` hook to:
+  - Filter browser extension errors (already done)
+  - Scrub `authorization`, `cookie`, `token`, `password`, `email`, `phone` from request headers and body
+  - Drop events from known bot user agents
+- Add `beforeBreadcrumb` hook to redact sensitive URLs (auth tokens in query params)
+- Wire user context from AuthContext (already done via `setErrorReportingUser`)
 
-Wrap the `fetchData()` call triggered by realtime events in a debounce (500ms). If 10 events arrive within 500ms, only one fetch fires. This prevents query stampedes during active tournament play.
+### 3. Create a safe Capacitor plugin wrapper
 
-### 3. Add a connection limiter utility
+**File:** `src/lib/safePlugin.ts` (new)
 
-**File:** `src/lib/realtimeDebounce.ts` (new)
+A utility that wraps any Capacitor plugin call in try/catch:
+- Normalizes the error into a user-friendly result
+- Reports failures to Sentry with plugin name + method as context
+- Reports to the logger (which writes to client_errors DB)
+- Returns `{ success: true, data }` or `{ success: false, error: "user-friendly message" }`
 
-Create a small utility that:
-- Debounces realtime callbacks (configurable delay, default 500ms)
-- Provides a `debouncedCallback` wrapper for use in any realtime subscription
-- Prevents the same query from running multiple times within the debounce window
+Example usage:
+```
+const result = await safePluginCall("Camera", () => Camera.getPhoto(options));
+if (!result.success) toast.error(result.error);
+```
 
-### 4. Protect ErrorsTab from excessive refetches
+### 4. Add long-task detection and reporting
 
-**File:** `src/components/admin/ErrorsTab.tsx`
+**File:** `src/lib/webVitals.ts`
 
-Debounce the realtime callback so rapid error bursts (common under load) don't cause 50 refetches per second. Also add a `limit(100)` to the fetch query to prevent loading thousands of rows.
+Add a `PerformanceObserver` for `longtask` entries. When a task exceeds 100ms, add a Sentry breadcrumb with the task duration and attribution (if available). This helps correlate UI freezes with specific errors.
 
-### 5. Add graceful degradation for Dashboard
+### 5. Wire logger to Sentry breadcrumbs
 
-**File:** `src/pages/Dashboard.tsx`
+**File:** `src/lib/logger.ts`
 
-Split the data fetch into independent try/catch blocks so if the stats RPC times out, the team card and quick actions still render. Currently a single failure shows a full-page error message.
+In the `error()` and `warn()` methods, also call `Sentry.addBreadcrumb()` so that when a crash happens, the Sentry issue includes the trail of warnings/errors that led up to it.
 
-### 6. Add QueryClient request deduplication settings
+### 6. Deduplicate global error handlers
 
-**File:** `src/App.tsx`
+**File:** `src/main.tsx` and `src/App.tsx`
 
-The existing QueryClient config is good but the Dashboard doesn't use React Query -- it uses raw `useState` + `useEffect`. Convert the Dashboard data fetching to use `useQuery` hooks so that React Query's built-in deduplication, caching, and retry logic handles concurrent access automatically.
+Currently both files register `window.addEventListener("error")` and `window.addEventListener("unhandledrejection")` -- meaning every error is captured twice. Remove the duplicate from `App.tsx` (keep `main.tsx` since it runs earlier and catches errors during React mounting).
+
+### 7. Add API call breadcrumbs to apiClient
+
+**File:** `src/lib/apiClient.ts`
+
+After each successful or failed request, call `Sentry.addBreadcrumb()` with:
+- category: "http"
+- URL, method, status code, response time
+- This gives you a timeline of API calls leading up to any crash
+
+### 8. Add a "Test Error" button to the Admin page
+
+**File:** `src/pages/Admin.tsx`
+
+Add a small button (visible only to admins) that:
+- Throws a test error caught by ErrorBoundary
+- Fires a test `logger.error()` (writes to DB)
+- Fires a test `Sentry.captureMessage("Test error from admin")`
+- Shows a toast confirming the error was sent
+
+This lets you verify the full pipeline from a real device.
+
+### 9. Add Vite config for app version
+
+**File:** `vite.config.ts`
+
+Use `define` to inject the app version from `package.json` at build time:
+```
+define: { __APP_VERSION__: JSON.stringify(require('./package.json').version) }
+```
+This is used by Sentry's `release` tag without adding runtime overhead.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/lib/realtimeDebounce.ts` | New utility -- debounced realtime callback wrapper |
-| `src/pages/TournamentDetail.tsx` | Add tournament_id filter to 3 channels, debounce refetches |
-| `src/components/admin/ErrorsTab.tsx` | Debounce realtime callback, add query limit |
-| `src/pages/Dashboard.tsx` | Independent error handling per data section, partial rendering on failure |
+| `src/lib/errorReporting.ts` | Add release tagging, PII scrubbing, navigation breadcrumbs, long-task integration |
+| `src/lib/safePlugin.ts` | New -- safe Capacitor plugin call wrapper |
+| `src/lib/logger.ts` | Add Sentry breadcrumb integration |
+| `src/lib/apiClient.ts` | Add Sentry breadcrumbs for HTTP calls |
+| `src/lib/webVitals.ts` | Add long-task detection with Sentry breadcrumbs |
+| `src/main.tsx` | Keep global handlers (already correct) |
+| `src/App.tsx` | Remove duplicate global error handlers |
+| `src/pages/Admin.tsx` | Add "Test Error" button |
+| `vite.config.ts` | Add `__APP_VERSION__` define |
+| `src/vite-env.d.ts` | Add type declaration for `__APP_VERSION__` |
 
-## Expected Impact
+## What About @sentry/capacitor?
 
-| Scenario | Before | After |
-|----------|--------|-------|
-| 20 users on tournament page, 1 score update | 60 unfiltered broadcasts + 60 fetches | 20 filtered broadcasts + 20 debounced fetches |
-| Error burst (10 errors in 1s) on admin page | 10 full refetches | 1 debounced refetch |
-| Dashboard with slow stats RPC | Full page error | Team card + actions render, stats show "unavailable" |
-| 100 users all on Dashboard | 100 independent fetch chains | 100 fetch chains with independent failure isolation |
+The `@sentry/capacitor` package provides native iOS/Android crash reporting (Objective-C/Java level crashes). However, it requires native build tooling (Xcode/Android Studio) to integrate and cannot be set up from the web codebase alone. Your current setup with `@sentry/react` already captures all JavaScript-level errors in the Capacitor WebView, which covers 99% of crashes your users will encounter.
+
+If you want native-level crash reporting later, you would:
+1. Install `@sentry/capacitor` via npm
+2. Run `npx cap sync`
+3. Add the Sentry DSN to `capacitor.config.ts` plugins section
+
+For now, the JavaScript-level Sentry + your client_errors DB gives you complete visibility into user-facing errors on mobile.
 
 ## What This Does NOT Change
 
-- No database schema changes needed
-- No new dependencies
-- Backend query performance stays the same (already optimized)
-- Existing virtualization and animation optimizations remain
-- Service worker and caching strategy untouched
+- No database schema changes
+- No new database tables
+- ErrorBoundary UI stays the same (already production-ready)
+- Admin ErrorsTab stays the same
+- Offline/slow-connection handling stays the same
+- No new npm dependencies needed (everything uses existing @sentry/react)
+
