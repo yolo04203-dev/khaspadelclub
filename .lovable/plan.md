@@ -1,90 +1,93 @@
 
 
-# Performance Testing and Optimization for 500 Users
+# In-App Error Analytics for Mobile (iOS & Android)
 
-## Current Performance Risks Found
+## What This Solves
 
-After analyzing the codebase, several bottlenecks will degrade mobile performance with 500 users:
+When a user on their phone hits a crash, API failure, or broken screen, you currently have zero visibility -- errors only live in the browser console which is inaccessible on mobile. This builds a complete error tracking pipeline that stores every client error in your database and shows them live on your Admin dashboard, with extra mobile-specific context like device model, OS version, network type, and whether the app is running natively via Capacitor or as a PWA.
 
-### Critical Issues
+## How It Works
 
-1. **Ladder rankings render ALL items without virtualization** -- LadderDetail.tsx renders every team in a category (now 100+) as individual animated cards with staggered delays (`delay: index * 0.05`), meaning the last item waits 5 seconds before appearing.
+1. User on their phone encounters an error (crash, failed API call, broken page)
+2. The logger silently batches the error and writes it to the database within 3 seconds
+3. Includes mobile-specific context: device (iPhone 16, Samsung Galaxy), OS (iOS 18.2, Android 15), network type (4G/WiFi/offline), and whether it's native Capacitor or web
+4. The Admin "Errors" tab receives the new error in real-time -- no refresh needed
+5. You can see exactly which page, device, and user triggered it, expand the full stack trace, and mark it resolved
 
-2. **Per-item Framer Motion animations on long lists** -- Each ranking row gets its own `motion.div` with `layout`, `initial`, `animate`, and staggered `exit` animations. With 100+ items, this overwhelms the main thread on mobile.
+## Implementation Details
 
-3. **No list virtualization implemented** -- Despite project memories referencing react-window, no page actually uses it. All lists render every DOM node.
+### 1. Database: `client_errors` table
 
-4. **LadderDetail fetches all members + profiles in separate queries** -- For 100 teams with 2 members each, this means processing 200 member rows and 200 profile lookups client-side.
+Create a table to store error reports with these columns:
+- `id` (UUID, primary key)
+- `user_id` (UUID, nullable -- captures errors from logged-out users too)
+- `message` (text -- the error message)
+- `stack` (text -- full stack trace)
+- `page_url` (text -- which page they were on)
+- `user_agent` (text -- raw browser/device string)
+- `device_info` (JSONB -- parsed mobile context: platform, os_version, model, network_type, is_native)
+- `severity` (text -- "error" or "warn")
+- `resolved` (boolean, default false)
+- `created_at` (timestamp)
 
-## Implementation Plan
+RLS policies:
+- Any user (authenticated or anonymous) can INSERT their own errors
+- Admins can SELECT all errors and UPDATE the `resolved` flag
 
-### 1. Remove per-item animations on long lists
+Enable real-time on this table so the admin dashboard updates instantly.
 
-**Files:** `src/pages/LadderDetail.tsx`
-- Remove `AnimatePresence` and per-row `motion.div` with staggered delays from the rankings list
-- Keep the page-level fade-in animation (already 0.4s, will reduce to 0.15s to match other pages)
-- Replace with plain `div` elements -- eliminates layout thrashing on scroll
+### 2. Update Logger (`src/lib/logger.ts`)
 
-### 2. Add list virtualization for ladder rankings
+Add a batched database writer to the existing Logger class:
+- Collect errors in a queue
+- Every 3 seconds, flush the queue with a single batch insert
+- Include mobile context using Capacitor's Device plugin (platform, OS version, model) and the Network API (connection type)
+- Fire-and-forget: never blocks the UI or throws errors itself
+- Only sends `error` and `warn` level logs (not debug/info)
 
-**Files:** `src/pages/LadderDetail.tsx`
-- Install `react-window` (lightweight virtual list renderer, ~6KB gzipped)
-- Wrap the rankings list in a `FixedSizeList` that only renders visible rows
-- Each row height: ~88px (card with padding)
-- Container height: `calc(100vh - 300px)` to fill available space
-- This reduces DOM nodes from 100+ cards to ~10-12 visible at a time
+### 3. Global error capture (`src/main.tsx`)
 
-### 3. Add list virtualization for Players page
+Add `window.addEventListener("error", ...)` and `window.addEventListener("unhandledrejection", ...)` that feed into the logger's database writer. This catches errors outside React's tree (e.g., third-party scripts, async code).
 
-**Files:** `src/pages/Players.tsx`
-- Wrap the player cards list in a `FixedSizeList`
-- Row height: ~120px (player card with avatar, badges, bio)
-- Keep the existing "Load More" pagination -- virtualization handles what's already loaded
+### 4. ErrorBoundary integration (`src/components/ErrorBoundary.tsx`)
 
-### 4. Enhance the load test suite for 500-user scenario
+When `componentDidCatch` fires, also send the error through the logger's database writer with the component stack trace included.
 
-**Files:** `src/test/performance-benchmarks.test.ts`
-- Update the existing 500-user stress test to check:
-  - Ladder ranking fetch time under 2s (was 3s threshold)
-  - Player list fetch time under 1.5s
-  - Tournament participant fetch time under 1s
-- Add a new "Mobile Simulation" test that measures with throttled network conditions
+### 5. New Admin "Errors" tab (`src/components/admin/ErrorsTab.tsx`)
 
-### 5. Add a performance test page (admin-only)
+A new tab on the Admin page showing:
+- Live-updating list of recent errors (real-time subscription)
+- Each row: timestamp, user name (if available), error message, page, device type icon (phone/desktop)
+- Click to expand: full stack trace, device details (OS, model, network), component stack
+- Filter by: severity, resolved/unresolved, time range (last hour/day/week)
+- "Mark Resolved" button per error
+- Unresolved error count shown as a badge on the tab
 
-**Files:** `src/pages/Admin.tsx` (add a "Perf Test" tab or section)
-- Add a button to run the existing `smokeTest()` from `load-test.ts` directly in the browser
-- Display results (avg response time, P95, error rate, per-endpoint breakdown) in a results card
-- This lets you test from a real mobile device without needing DevTools
+### 6. Admin page update (`src/pages/Admin.tsx`)
 
-### 6. Reduce LadderDetail animation duration
-
-**Files:** `src/pages/LadderDetail.tsx`
-- Change page-level `motion.div` transition from `0.4s` to `0.15s` (consistent with Ladders, Tournaments pages)
+- Add the "Errors" tab with a `Bug` icon
+- Show unresolved count badge (red dot with number)
+- Real-time subscription to `client_errors` table for instant updates
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `package.json` | Add `react-window` and `@types/react-window` dependencies |
-| `src/pages/LadderDetail.tsx` | Remove per-item animations, add react-window virtualization, reduce page transition to 0.15s |
-| `src/pages/Players.tsx` | Add react-window virtualization for player cards |
-| `src/pages/Admin.tsx` | Add "Run Perf Test" button with results display |
-| `src/test/performance-benchmarks.test.ts` | Tighten thresholds for 500-user scenario |
+| New database migration | Create `client_errors` table, RLS policies, enable real-time |
+| `src/lib/logger.ts` | Add batched DB writer with mobile device context |
+| `src/main.tsx` | Add global `onerror` + `unhandledrejection` handlers |
+| `src/components/ErrorBoundary.tsx` | Add DB logging alongside existing Sentry call |
+| `src/components/admin/ErrorsTab.tsx` | New component -- error list with filters, expand, resolve |
+| `src/pages/Admin.tsx` | Add "Errors" tab with real-time subscription and badge |
 
-## Expected Outcomes
+## Mobile-Specific Context Captured
 
-| Metric | Before | After |
-|--------|--------|-------|
-| Ladder page DOM nodes (100 teams) | ~800+ | ~80-100 (virtualized) |
-| Ladder page initial render | ~2-3s (staggered animations) | < 300ms |
-| Scroll FPS on ladder list | ~30-40 FPS | 55-60 FPS |
-| Players page DOM nodes (30 loaded) | ~300 | ~80-100 (virtualized) |
-| LadderDetail animation duration | 400ms + 5s stagger | 150ms flat |
-
-## What This Does NOT Change
-- Backend queries remain the same (already optimized with parallel fetches and column selection)
-- Service worker and caching strategy untouched
-- Existing load test infrastructure reused, not replaced
-- No changes to the seed data function
+| Field | Source | Example |
+|-------|--------|---------|
+| Platform | `Capacitor.getPlatform()` | "ios", "android", "web" |
+| OS Version | User agent parsing | "iOS 18.2", "Android 15" |
+| Network Type | `navigator.connection.effectiveType` | "4g", "3g", "wifi" |
+| Is Native | `Capacitor.isNativePlatform()` | true/false |
+| Screen Size | `window.innerWidth x innerHeight` | "390x844" |
+| App Version | Build-time constant | "1.0.0" |
 
