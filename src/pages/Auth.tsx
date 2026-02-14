@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { logger } from "@/lib/logger";
 import { Logo } from "@/components/Logo";
+import { analytics } from "@/lib/analytics/posthog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -226,7 +227,10 @@ export default function Auth() {
                 </Form>
               </div>
             ) : (
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <Tabs value={activeTab} onValueChange={(val) => {
+                  setActiveTab(val);
+                  if (val === "signup") analytics.track("Signup Started");
+                }} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-8">
                   <TabsTrigger value="login">Sign In</TabsTrigger>
                   <TabsTrigger value="signup">Sign Up</TabsTrigger>

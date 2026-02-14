@@ -3,8 +3,10 @@ import App from "./App.tsx";
 import "./index.css";
 import { initWebVitals } from "@/lib/webVitals";
 import { logger } from "@/lib/logger";
+import { analytics } from "@/lib/analytics/posthog";
 
 initWebVitals();
+analytics.init();
 
 // Defer Sentry to after first render to remove ~30KB from critical path
 if ('requestIdleCallback' in window) {

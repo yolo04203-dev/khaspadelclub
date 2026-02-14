@@ -22,6 +22,7 @@ import { PermissionsTab } from "@/components/admin/PermissionsTab";
 import { ErrorsTab } from "@/components/admin/ErrorsTab";
 import { logger } from "@/lib/logger";
 import { sendTestError } from "@/lib/errorReporting";
+import { analytics } from "@/lib/analytics/posthog";
 import { AlertTriangle } from "lucide-react";
 import * as Sentry from "@sentry/react";
 
@@ -385,6 +386,17 @@ export default function Admin() {
               >
                 <Zap className="w-4 h-4 mr-2" />
                 Capture Message
+              </Button>
+              <Button
+                onClick={() => {
+                  analytics.track("Analytics Test", { source: "admin" });
+                  toast.success("Test event sent to PostHog");
+                }}
+                variant="outline"
+                size="sm"
+              >
+                <LayoutGrid className="w-4 h-4 mr-2" />
+                Test Analytics
               </Button>
             </div>
 
