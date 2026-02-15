@@ -1,103 +1,90 @@
 
-# PostHog Product Analytics Integration
+
+# Update Observability: Sentry + PostHog Clear Responsibilities
 
 ## Overview
-Add PostHog as a dedicated product analytics layer alongside the existing Sentry observability stack. PostHog handles events, funnels, and retention. Sentry continues to own crashes, session replays, and performance tracing -- no overlap.
 
-## New Files
+Reassign session replay from Sentry to PostHog, add cross-linking between the two systems, and tighten sampling/privacy settings on both sides.
 
-### `src/lib/analytics/posthog.ts` -- Single source of truth
-- Reads `VITE_POSTHOG_KEY` and `VITE_POSTHOG_HOST` (defaults to `https://app.posthog.com`)
-- Guards against double-init (important with React StrictMode)
-- Only enables in staging/production by default (dev opt-in via `VITE_POSTHOG_DEV_ENABLED=true`)
-- Exports a thin wrapper API:
-  - `analytics.init()` -- called once in `main.tsx`
-  - `analytics.identify(user)` -- called on login (sends id, role, plan -- no email/phone)
-  - `analytics.track(name, props?)` -- manual event capture
-  - `analytics.screen(name, props?)` -- screen view with platform + app version
-  - `analytics.reset()` -- called on logout, resets distinct_id
-- Privacy config passed to `posthog.init()`:
-  - `autocapture: true` (clicks/navigation only)
-  - `capture_pageview: false` (we handle it manually via router)
-  - `mask_all_text: false` (not session replay -- that's Sentry)
-  - `sanitize_properties` callback to strip any property matching `token`, `password`, `authorization`, `secret`, `otp`, `credit_card`
-  - `property_denylist` for sensitive super properties
-  - Only allowed user traits: `role`, `plan`, `created_at`, `platform`
+## Changes
 
-### `src/hooks/useScreenTracking.ts` -- SPA route tracker
-- Uses `useLocation()` from React Router
-- On route change, calls `analytics.screen()` with route path, route name, platform, and app version
-- Deduplicates consecutive identical paths (prevents double-fires)
-- Mounted inside `AnimatedRoutes` in `App.tsx`
+### 1. `src/lib/analytics/posthog.ts` -- Enable session replay + cross-linking
 
-### `src/hooks/useCapacitorAnalytics.ts` -- Native lifecycle events
-- Only runs when `Capacitor.isNativePlatform()` is true
-- Listens to `@capacitor/app` `appStateChange`:
-  - `isActive: true` -> tracks `App Resumed` with platform + network status
-  - `isActive: false` -> tracks `App Backgrounded`
-- Includes platform (ios/android), app version, and connection type
-- Mounted inside `NativeLifecycleManager` in `App.tsx`
+- Change `disable_session_recording: true` to `disable_session_recording: false` (production only; stays disabled in dev via `isEnabled()` gate)
+- Add `session_recording` config block with privacy-first settings:
+  - `maskAllInputs: true`
+  - `maskTextSelector: "input[type=password], input[type=email], input[name*=otp], input[name*=pin], input[name*=card], input[name*=cvc], input[name*=phone]"`
+  - `networkPayloadCapture: { recordBody: false, recordHeaders: false }`
+- Add a `getSessionId()` helper that returns `posthogInstance?.get_session_id()` for cross-linking
+- Add a `getDistinctId()` helper that returns `posthogInstance?.get_distinct_id()`
 
-## Modified Files
+### 2. `src/lib/errorReporting.ts` -- Reduce Sentry replay, add cross-linking
 
-### `src/main.tsx`
-- Import and call `analytics.init()` before rendering (after web vitals, before Sentry idle-load)
+- Change `REPLAYS_SESSION_RATE` from `0.05` (prod) to `0` -- Sentry no longer records general sessions (PostHog owns replay)
+- Change `REPLAYS_ERROR_RATE` from `1.0` to `0.5` -- moderate crash-only sampling
+- In `beforeSend`, attach PostHog context to every Sentry event:
+  - Import `analytics` and call `getSessionId()` / `getDistinctId()`
+  - Set `event.tags.posthog_session_id` and `event.contexts.posthog.distinct_id`
+- Add `set-cookie` and `session` to the `SENSITIVE_KEYS` regex (currently missing per the request)
+- In `setErrorReportingUser`, stop sending `email` to Sentry (change to `{ id: user.id }` only) to match PII policy
+- The existing `beforeSend` PII scrubbing, bot filtering, and breadcrumb redaction remain unchanged
 
-### `src/App.tsx`
-- Add `useScreenTracking()` hook inside `AnimatedRoutes`
-- Add `useCapacitorAnalytics()` hook inside `NativeLifecycleManager`
+### 3. `src/contexts/AuthContext.tsx` -- Dual identification
 
-### `src/contexts/AuthContext.tsx`
-- On `SIGNED_IN` / `INITIAL_SESSION`: call `analytics.identify({ id, role })`
-- On `SIGNED_OUT`: call `analytics.reset()`
-- Track `Login`, `Logout`, `Signup Completed` events at the appropriate points in `signIn`, `signOut`, `signUp`
+Already calls both `setErrorReportingUser` and `analytics.identify` on login, and `clearErrorReportingUser` + `analytics.reset` on logout. No changes needed -- this is already correct.
 
-### `src/pages/Auth.tsx`
-- Track `Signup Started` when user switches to the signup tab
-- Track `Login` attempt (success/failure) -- complements the AuthContext tracking
+### 4. `src/pages/Admin.tsx` -- No changes needed
 
-### `src/pages/Admin.tsx`
-- Add one more test button: "Test Analytics Event" that calls `analytics.track("Analytics Test", { source: "admin" })` and shows a toast
+Already has "Test Error" (Sentry) and "Test Analytics" (PostHog) buttons.
 
-### `vite.config.ts`
-- Add `posthog-js` to `manualChunks` under a new `analytics` chunk to keep bundle lean
+### 5. Environment variables
 
-## Standard Events Tracked
+- `VITE_POSTHOG_KEY` -- already configured as a secret
+- `VITE_POSTHOG_HOST` -- reads from env, defaults to `https://app.posthog.com` (already in code)
+- `VITE_SENTRY_DSN` -- already reads from env (line 6 of errorReporting.ts)
 
-| Event | Where |
-|---|---|
-| `App Opened` | `main.tsx` (on init) |
-| `Screen Viewed` | `useScreenTracking` (every route change) |
-| `Signup Started` | `Auth.tsx` (tab switch) |
-| `Signup Completed` | `AuthContext` (after successful signUp) |
-| `Login` | `AuthContext` (after successful signIn) |
-| `Logout` | `AuthContext` (signOut) |
-| `App Resumed` | `useCapacitorAnalytics` (native only) |
-| `App Backgrounded` | `useCapacitorAnalytics` (native only) |
-| `CTA Clicked` | Available via `analytics.track()` for key buttons as needed |
-
-## Privacy & Security Defaults
-
-- `autocapture` enabled for clicks/navigation but input values are NOT captured (PostHog default when `mask_all_text` is not relevant -- autocapture does not capture input values by default)
-- `sanitize_properties` strips any property key matching sensitive patterns before it leaves the browser
-- `analytics.identify()` only sends: `id`, `role`, `platform`, `created_at` -- no email, phone, or tokens
-- PostHog is completely disabled when `VITE_POSTHOG_KEY` is not set (safe no-op wrapper)
-
-## Dependencies
-
-- `posthog-js` (new install, ~30KB gzipped, loaded in its own chunk)
+No new secrets to add.
 
 ## Technical Details
 
-- No database changes needed
-- No edge functions needed
-- PostHog key is a **publishable** client-side key (safe to store in env vars, same as the existing Supabase anon key)
-- The wrapper pattern (`analytics.track()` instead of raw `posthog.capture()`) ensures all events go through privacy sanitization and makes it trivial to swap providers later
+### Files modified
 
-## Environment Variables Needed
+| File | What changes |
+|---|---|
+| `src/lib/analytics/posthog.ts` | Enable replay, add masking config, export `getSessionId`/`getDistinctId` |
+| `src/lib/errorReporting.ts` | Lower replay rates, add PostHog cross-link tags in `beforeSend`, expand sensitive key regex, remove email from `setUser` |
 
-| Variable | Required | Default |
-|---|---|---|
-| `VITE_POSTHOG_KEY` | Yes | (none -- analytics disabled if missing) |
-| `VITE_POSTHOG_HOST` | No | `https://app.posthog.com` |
-| `VITE_POSTHOG_DEV_ENABLED` | No | `false` |
+### Files unchanged
+
+| File | Why |
+|---|---|
+| `src/contexts/AuthContext.tsx` | Already calls both Sentry `setUser` and PostHog `identify`/`reset` |
+| `src/pages/Admin.tsx` | Already has test buttons for both systems |
+| `src/main.tsx` | Already initializes both systems |
+| `src/components/ErrorBoundary.tsx` | Already provides friendly fallback UI with "Report issue" copy-to-clipboard |
+| `src/components/ReportProblemDialog.tsx` | Already sends feedback via `Sentry.captureFeedback` |
+| `vite.config.ts` | Already has `analytics` and `sentry` chunks |
+
+### Responsibility matrix after changes
+
+```text
++-----------------------+---------+---------+
+| Capability            | Sentry  | PostHog |
++-----------------------+---------+---------+
+| Error monitoring      |   Yes   |   No    |
+| Performance tracing   |   Yes   |   No    |
+| Session replay (UX)   |   No    |   Yes   |
+| Session replay (crash)|  0.5x   |   No    |
+| Product analytics     |   No    |   Yes   |
+| Feature flags         |   No    |   Yes   |
+| User identification   |   Yes   |   Yes   |
+| Cross-linking         |   Yes   |   Yes   |
++-----------------------+---------+---------+
+```
+
+### Privacy controls summary
+
+- PostHog replay: all inputs masked, sensitive field selectors blocked, no network bodies/headers captured
+- Sentry: existing PII scrubbing in `beforeSend`/`beforeBreadcrumb` plus expanded `set-cookie`/`session` keywords; email removed from `setUser`
+- Both systems: no passwords, tokens, OTPs, or card data leave the browser
+
