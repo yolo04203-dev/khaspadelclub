@@ -38,11 +38,6 @@ export function Logo({
         </svg>
       </motion.div>
       
-      {showText && <div className="flex flex-col">
-          <span className={`font-display font-bold ${textSizeClasses[size]} text-foreground leading-tight`}>Khas Padel</span>
-          <span className={`font-display font-medium text-xs uppercase tracking-widest text-muted-foreground`}>
-            Club
-          </span>
-        </div>}
+      {showText && <span className={`font-display font-bold ${textSizeClasses[size]} text-foreground leading-tight whitespace-nowrap`}>Khas Padel Club</span>}
     </div>;
 }
