@@ -126,9 +126,9 @@ export function JoinLadderDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="default">
-          <UserPlus className="w-4 h-4 mr-2" />
-          Join Ladder
+        <Button variant="default" size="icon" className="sm:w-auto sm:px-4">
+          <UserPlus className="w-4 h-4 sm:mr-2" />
+          <span className="hidden sm:inline">Join Ladder</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
