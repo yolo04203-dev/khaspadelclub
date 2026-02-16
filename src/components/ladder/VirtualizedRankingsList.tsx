@@ -107,8 +107,8 @@ function RankingRow({ index, style, rankings, catId, uTeamId, uObj, frozenCheck,
                       </Avatar>
                     ))}
                   </div>
-                  <span className="text-sm text-muted-foreground hidden sm:inline">
-                    {ranking.members.length} member{ranking.members.length !== 1 ? "s" : ""}
+                  <span className="text-sm text-muted-foreground">
+                    {ranking.members.map(m => m.display_name || "Unknown").join(" & ")}
                   </span>
                 </div>
               </div>
