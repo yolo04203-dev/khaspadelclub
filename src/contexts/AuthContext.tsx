@@ -169,7 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(initialSession);
         setUser(initialSession?.user ?? null);
         if (initialSession?.user) {
-          setErrorReportingUser({ id: initialSession.user.id, email: initialSession.user.email });
+          setErrorReportingUser({ id: initialSession.user.id });
           analytics.identify({
             id: initialSession.user.id,
             createdAt: initialSession.user.created_at,

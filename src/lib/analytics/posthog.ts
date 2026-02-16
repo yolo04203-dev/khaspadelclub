@@ -61,7 +61,12 @@ export const analytics = {
         autocapture: true,
         capture_pageview: false, // We handle this manually via useScreenTracking
         capture_pageleave: true,
-        disable_session_recording: true, // Sentry owns session replay
+        disable_session_recording: false, // PostHog owns session replay
+        session_recording: {
+          maskAllInputs: true,
+          maskTextSelector:
+            "input[type=password], input[type=email], input[name*=otp], input[name*=pin], input[name*=card], input[name*=cvc], input[name*=phone]",
+        } as any,
         sanitize_properties: (props: Record<string, any>) => sanitizeProperties(props),
         property_denylist: [
           "$current_url", // We send our own cleaned version
@@ -121,5 +126,19 @@ export const analytics = {
   reset() {
     if (!posthogInstance) return;
     posthogInstance.reset();
+  },
+
+  /**
+   * Get current PostHog session ID for cross-linking with Sentry.
+   */
+  getSessionId(): string | undefined {
+    return posthogInstance?.get_session_id?.();
+  },
+
+  /**
+   * Get current PostHog distinct ID for cross-linking with Sentry.
+   */
+  getDistinctId(): string | undefined {
+    return posthogInstance?.get_distinct_id?.();
   },
 };
