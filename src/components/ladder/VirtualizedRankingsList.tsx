@@ -89,7 +89,10 @@ function RankingRow({ index, style, rankings, catId, uTeamId, uObj, frozenCheck,
   return (
     <div style={style} className="pb-3 px-0.5">
       <Collapsible>
-        <Card className={cn("transition-all hover:shadow-md h-full", isUserTeam && "ring-2 ring-accent border-accent", ranking.rank <= 3 && "border-transparent")}>
+        <Card className={cn("transition-all hover:shadow-md h-full relative", isUserTeam && "ring-2 ring-accent border-accent", ranking.rank <= 3 && "border-transparent")}>
+              {ranking.team && pendingSet.has(ranking.team.id) && (
+                <Badge variant="secondary" className="absolute top-2 right-2 text-xs sm:hidden z-10">Pending</Badge>
+              )}
           <CardContent className="p-4">
             <div className="flex items-center gap-3 sm:gap-4">
               <RankBadge rank={ranking.rank} />
@@ -161,7 +164,7 @@ function RankingRow({ index, style, rankings, catId, uTeamId, uObj, frozenCheck,
                     {challengingId === ranking.team.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Swords className="w-4 h-4" />}
                   </Button>
                 )}
-                {ranking.team && pendingSet.has(ranking.team.id) && <Badge variant="secondary" className="text-xs">Pending</Badge>}
+                
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8">
                     <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
