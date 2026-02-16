@@ -83,6 +83,8 @@ export default function PlayerProfile() {
               .from("ladder_rankings")
               .select("rank")
               .eq("team_id", teamData.id)
+              .order("rank", { ascending: true })
+              .limit(1)
               .maybeSingle();
 
             setTeam({

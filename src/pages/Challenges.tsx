@@ -124,6 +124,8 @@ export default function Challenges() {
         .from("ladder_rankings")
         .select("rank")
         .eq("team_id", memberData.team_id)
+        .order("rank", { ascending: true })
+        .limit(1)
         .maybeSingle(),
     ]);
 
