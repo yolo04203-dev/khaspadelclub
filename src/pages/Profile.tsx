@@ -139,6 +139,8 @@ export default function ProfilePage() {
             .from("ladder_rankings")
             .select("rank")
             .eq("team_id", memberData.team_id)
+            .order("rank", { ascending: true })
+            .limit(1)
             .maybeSingle(),
           supabase
             .from("matches")

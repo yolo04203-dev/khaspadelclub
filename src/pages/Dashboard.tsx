@@ -74,7 +74,7 @@ export default function Dashboard() {
         try {
           const [teamResult, rankResult] = await Promise.all([
             supabase.from("teams").select("id, name").eq("id", teamId).maybeSingle(),
-            supabase.from("ladder_rankings").select("rank, wins, losses").eq("team_id", teamId).maybeSingle(),
+            supabase.from("ladder_rankings").select("rank, wins, losses").eq("team_id", teamId).order("rank", { ascending: true }).limit(1).maybeSingle(),
           ]);
 
           if (teamResult.error) throw teamResult.error;
