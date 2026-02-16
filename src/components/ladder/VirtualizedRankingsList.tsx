@@ -95,7 +95,7 @@ function RankingRow({ index, style, rankings, catId, uTeamId, uObj, frozenCheck,
               <RankBadge rank={ranking.rank} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-foreground text-sm sm:text-base break-words">{ranking.team?.name || "Unknown Team"}</h3>
+                  <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">{ranking.team?.name || "Unknown Team"}</h3>
                   {isUserTeam && <Badge variant="secondary" className="text-xs">Your Team</Badge>}
                 </div>
                 <div className="flex items-center gap-3 mt-1">
@@ -151,7 +151,7 @@ function RankingRow({ index, style, rankings, catId, uTeamId, uObj, frozenCheck,
 
               {ranking.team && pendingSet.has(ranking.team.id) && <Badge variant="secondary" className="hidden sm:flex">Pending</Badge>}
 
-              <div className="sm:hidden flex items-center gap-2">
+              <div className="sm:hidden flex items-center gap-2 shrink-0">
                 <div className="text-right">
                   <div className="font-semibold text-foreground text-sm">{ranking.points} pts</div>
                   <div className="text-xs text-muted-foreground">{ranking.wins}W-{ranking.losses}L</div>
