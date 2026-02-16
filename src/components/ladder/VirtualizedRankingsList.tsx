@@ -156,6 +156,12 @@ function RankingRow({ index, style, rankings, catId, uTeamId, uObj, frozenCheck,
                   <div className="font-semibold text-foreground text-sm">{ranking.points} pts</div>
                   <div className="text-xs text-muted-foreground">{ranking.wins}W-{ranking.losses}L</div>
                 </div>
+                {uObj && ranking.team && challengeCheck(ranking.rank, ranking.team.id, catId, ranking.team) && (
+                  <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => challengeAction(ranking.team!.id, ranking.team!.name)} disabled={challengingId === ranking.team.id}>
+                    {challengingId === ranking.team.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Swords className="w-4 h-4" />}
+                  </Button>
+                )}
+                {ranking.team && pendingSet.has(ranking.team.id) && <Badge variant="secondary" className="text-xs">Pending</Badge>}
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8">
                     <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
