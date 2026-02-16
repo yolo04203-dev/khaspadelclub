@@ -1,28 +1,30 @@
 
-# Fix: "Find Opponents" FAB Overlapping Challenge Content
+
+# Fix: Show Full Team Names on Mobile in Ladder Rankings
 
 ## Problem
-The floating "Find Opponents" button sits too low on mobile, covering the Dispute/Confirm buttons on challenge cards.
+Team names are truncated to "K..." on mobile in the ladder detail page because of the CSS `truncate` class combined with limited horizontal space (the "Your Team" badge, avatar stack, and points column all compete for width).
 
 ## Solution
-Increase the FAB's bottom offset in `src/components/ui/fab.tsx` so it floats higher above the bottom navigation bar, clearing the card action buttons.
+Remove the `truncate` class from the team name and allow it to wrap to two lines naturally. Also reduce the font size slightly on mobile to give more room.
 
-### File: `src/components/ui/fab.tsx`
+### File: `src/components/ladder/VirtualizedRankingsList.tsx`
 
-**Change line 49 from:**
-```
-"bottom-[calc(4.5rem+env(safe-area-inset-bottom))] sm:bottom-6",
+**Line 89 -- Change the team name heading from:**
+```tsx
+<h3 className="font-semibold text-foreground truncate">{ranking.team?.name || "Unknown Team"}</h3>
 ```
 
 **To:**
-```
-"bottom-[calc(5.5rem+env(safe-area-inset-bottom))] sm:bottom-6",
+```tsx
+<h3 className="font-semibold text-foreground text-sm sm:text-base break-words">{ranking.team?.name || "Unknown Team"}</h3>
 ```
 
-This adds 1rem (~16px) of extra clearance above the mobile nav bar, pushing the FAB up enough to stop overlapping card action buttons while still staying visually anchored to the bottom of the screen.
+This removes `truncate`, uses `break-words` to allow wrapping onto a second line, and reduces font size to `text-sm` on mobile (normal `text-base` on desktop).
 
 ## Files Modified
 
 | File | Change |
 |---|---|
-| `src/components/ui/fab.tsx` | Increase mobile bottom offset from `4.5rem` to `5.5rem` |
+| `src/components/ladder/VirtualizedRankingsList.tsx` | Remove `truncate`, add `text-sm sm:text-base break-words` on team name |
+
