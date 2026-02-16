@@ -1,29 +1,28 @@
 
-# Make "Khas Padel Club" Display on One Line
+# Fix: "Find Opponents" FAB Overlapping Challenge Content
 
 ## Problem
-The `Logo` component in `src/components/Logo.tsx` renders the brand name as two lines:
-- Line 1: **Khas Padel**
-- Line 2: **Club** (smaller, uppercase, muted)
+The floating "Find Opponents" button sits too low on mobile, covering the Dispute/Confirm buttons on challenge cards.
 
-## Fix
-Merge the text into a single `<span>` that reads **Khas Padel Club** on one line. Remove the wrapping `flex-col` div and the separate "Club" span.
+## Solution
+Increase the FAB's bottom offset in `src/components/ui/fab.tsx` so it floats higher above the bottom navigation bar, clearing the card action buttons.
 
-### File: `src/components/Logo.tsx`
+### File: `src/components/ui/fab.tsx`
 
-**Current (lines 41-46):**
-```tsx
-{showText && <div className="flex flex-col">
-    <span className="font-display font-bold {size} text-foreground leading-tight">Khas Padel</span>
-    <span className="font-display font-medium text-xs uppercase tracking-widest text-muted-foreground">
-      Club
-    </span>
-  </div>}
+**Change line 49 from:**
+```
+"bottom-[calc(4.5rem+env(safe-area-inset-bottom))] sm:bottom-6",
 ```
 
-**New:**
-```tsx
-{showText && <span className={`font-display font-bold ${textSizeClasses[size]} text-foreground leading-tight whitespace-nowrap`}>Khas Padel Club</span>}
+**To:**
+```
+"bottom-[calc(5.5rem+env(safe-area-inset-bottom))] sm:bottom-6",
 ```
 
-This single change affects every place the `Logo` component is used (landing header, footer, admin header, dashboard, auth page, etc.) since they all render the same component.
+This adds 1rem (~16px) of extra clearance above the mobile nav bar, pushing the FAB up enough to stop overlapping card action buttons while still staying visually anchored to the bottom of the screen.
+
+## Files Modified
+
+| File | Change |
+|---|---|
+| `src/components/ui/fab.tsx` | Increase mobile bottom offset from `4.5rem` to `5.5rem` |
