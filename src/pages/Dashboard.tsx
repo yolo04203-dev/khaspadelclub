@@ -190,7 +190,7 @@ export default function Dashboard() {
           position="bottom-right"
           asChild
         >
-          <Link to="/challenges" />
+          <Link to="/ladders" />
         </FAB>
       </FABContainer>
 
