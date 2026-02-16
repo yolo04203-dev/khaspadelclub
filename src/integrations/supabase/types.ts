@@ -680,6 +680,7 @@ export type Database = {
           display_name: string | null
           id: string
           is_looking_for_team: boolean | null
+          is_test: boolean | null
           phone_number: string | null
           preferred_play_times: string[] | null
           skill_level: string | null
@@ -693,6 +694,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           is_looking_for_team?: boolean | null
+          is_test?: boolean | null
           phone_number?: string | null
           preferred_play_times?: string[] | null
           skill_level?: string | null
@@ -706,6 +708,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           is_looking_for_team?: boolean | null
+          is_test?: boolean | null
           phone_number?: string | null
           preferred_play_times?: string[] | null
           skill_level?: string | null

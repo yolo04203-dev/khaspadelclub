@@ -280,6 +280,7 @@ export default function Auth() {
                                   type="email"
                                   placeholder="you@example.com"
                                   autoComplete="email"
+                                  autoFocus
                                   {...field}
                                 />
                               </FormControl>

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -71,7 +70,7 @@ export function Header() {
 
           {/* Mobile menu button */}
           <button
-            className="md:hidden p-2 -mr-2"
+            className="md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? (
@@ -84,40 +83,35 @@ export function Header() {
       </div>
 
       {/* Mobile menu */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-background border-b border-border"
-          >
-            <div className="container py-4 space-y-4">
-              {navLinks.map((link) => (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  className="block py-2 text-foreground font-medium"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {link.label}
-                </a>
-              ))}
-              <div className="pt-4 space-y-2 border-t border-border">
-                <Button variant="outline" className="w-full" onClick={handleNavigateToAuth}>
-                  Sign In
-                </Button>
-                <Button 
-                  className="w-full bg-accent text-accent-foreground hover:bg-accent/90" 
-                  onClick={handleNavigateToAuth}
-                >
-                  Get Started
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div
+        className={`md:hidden bg-background border-b border-border overflow-hidden transition-all duration-200 ${
+          mobileMenuOpen ? "max-h-[400px] opacity-100" : "max-h-0 opacity-0 border-b-0"
+        }`}
+      >
+        <div className="container py-4 space-y-4">
+          {navLinks.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              className="block py-2 text-foreground font-medium"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              {link.label}
+            </a>
+          ))}
+          <div className="pt-4 space-y-2 border-t border-border">
+            <Button variant="outline" className="w-full" onClick={handleNavigateToAuth}>
+              Sign In
+            </Button>
+            <Button 
+              className="w-full bg-accent text-accent-foreground hover:bg-accent/90" 
+              onClick={handleNavigateToAuth}
+            >
+              Get Started
+            </Button>
+          </div>
+        </div>
+      </div>
     </header>
   );
 }

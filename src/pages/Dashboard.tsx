@@ -215,7 +215,7 @@ export default function Dashboard() {
               {userTeam ? (
                 <Card className="bg-gradient-to-r from-accent/10 to-primary/10 border-accent/30">
                   <CardContent className="py-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center">
                           <Users className="w-6 h-6 text-accent" />
@@ -227,7 +227,7 @@ export default function Dashboard() {
                           </p>
                         </div>
                       </div>
-                      <Button variant="outline" asChild>
+                      <Button variant="outline" className="w-full sm:w-auto" asChild>
                         <Link to="/ladders">View Ladders</Link>
                       </Button>
                     </div>
@@ -236,7 +236,7 @@ export default function Dashboard() {
               ) : (
                 <Card className="border-dashed border-2 border-accent/50 bg-accent/5">
                   <CardContent className="py-6">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center">
                           <Plus className="w-6 h-6 text-accent" />
@@ -248,7 +248,7 @@ export default function Dashboard() {
                           </p>
                         </div>
                       </div>
-                      <Button asChild>
+                      <Button className="w-full sm:w-auto" asChild>
                         <Link to="/teams/create">
                           <Plus className="w-4 h-4 mr-2" />
                           Create Team
@@ -262,7 +262,7 @@ export default function Dashboard() {
           )}
 
           {/* Quick Stats */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Current Rank</CardTitle>
@@ -318,11 +318,12 @@ export default function Dashboard() {
                 const total = ms.wins + ms.losses;
                 if (total === 0) return null;
                 const wr = Math.round((ms.wins / total) * 100);
-                const icons = { ladder: "🪜", tournament: "🏆", americano: "🔀" };
+                const IconMap = { ladder: Layers, tournament: Trophy, americano: Shuffle };
+                const Icon = IconMap[m];
                 return (
                   <Link to="/stats" key={m}>
                     <Badge variant="secondary" className="px-3 py-1.5 text-sm gap-1.5 cursor-pointer hover:bg-muted transition-colors">
-                      <span>{icons[m]}</span>
+                      <Icon className="w-3.5 h-3.5" />
                       <span className="capitalize font-medium">{m}</span>
                       <span className="text-muted-foreground">{total} matches</span>
                       <span className="text-foreground font-semibold">{wr}%</span>
@@ -334,7 +335,7 @@ export default function Dashboard() {
           )}
 
           {/* Quick Actions */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Link to="/ladders">
               <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
                 <CardHeader>
