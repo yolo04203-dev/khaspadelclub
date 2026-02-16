@@ -1,30 +1,28 @@
 
 
-# Fix: Show Full Team Names on Mobile in Ladder Rankings
+# Change: Dashboard FAB Links to Ladders
 
 ## Problem
-Team names are truncated to "K..." on mobile in the ladder detail page because of the CSS `truncate` class combined with limited horizontal space (the "Your Team" badge, avatar stack, and points column all compete for width).
+The floating "Challenge" button on the Dashboard currently navigates to `/challenges`. The user wants it to go to `/ladders` instead so users can find opponents through the ladder system.
 
 ## Solution
-Remove the `truncate` class from the team name and allow it to wrap to two lines naturally. Also reduce the font size slightly on mobile to give more room.
+Update the FAB's `Link` destination in `src/pages/Dashboard.tsx` from `/challenges` to `/ladders`.
 
-### File: `src/components/ladder/VirtualizedRankingsList.tsx`
+### File: `src/pages/Dashboard.tsx`
 
-**Line 89 -- Change the team name heading from:**
+**Change line 193 from:**
 ```tsx
-<h3 className="font-semibold text-foreground truncate">{ranking.team?.name || "Unknown Team"}</h3>
+<Link to="/challenges" />
 ```
 
 **To:**
 ```tsx
-<h3 className="font-semibold text-foreground text-sm sm:text-base break-words">{ranking.team?.name || "Unknown Team"}</h3>
+<Link to="/ladders" />
 ```
-
-This removes `truncate`, uses `break-words` to allow wrapping onto a second line, and reduces font size to `text-sm` on mobile (normal `text-base` on desktop).
 
 ## Files Modified
 
 | File | Change |
 |---|---|
-| `src/components/ladder/VirtualizedRankingsList.tsx` | Remove `truncate`, add `text-sm sm:text-base break-words` on team name |
+| `src/pages/Dashboard.tsx` | Change FAB link from `/challenges` to `/ladders` |
 
