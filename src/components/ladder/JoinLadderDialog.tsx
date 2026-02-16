@@ -19,7 +19,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "@/hooks/use-toast";
 
 interface Category {
@@ -32,7 +34,7 @@ interface JoinLadderDialogProps {
   categories: Category[];
   teamId: string;
   teamName: string;
-  existingRequests: Set<string>; // category IDs with pending requests
+  existingRequests: Set<string>; // category IDs with pending requests or already ranked
   onRequestSubmitted: () => void;
 }
 
@@ -46,6 +48,9 @@ export function JoinLadderDialog({
   const [open, setOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [message, setMessage] = useState("");
+  const [joinType, setJoinType] = useState<"existing" | "custom">("existing");
+  const [player1Name, setPlayer1Name] = useState("");
+  const [player2Name, setPlayer2Name] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const availableCategories = categories.filter(
@@ -62,6 +67,15 @@ export function JoinLadderDialog({
       return;
     }
 
+    if (joinType === "custom" && (!player1Name.trim() || !player2Name.trim())) {
+      toast({
+        title: "Enter player names",
+        description: "Please provide both Player 1 and Player 2 names.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -69,7 +83,9 @@ export function JoinLadderDialog({
         team_id: teamId,
         ladder_category_id: selectedCategory,
         message: message.trim() || null,
-      });
+        player1_name: joinType === "custom" ? player1Name.trim() : null,
+        player2_name: joinType === "custom" ? player2Name.trim() : null,
+      } as any);
 
       if (error) {
         if (error.code === "23505") {
@@ -88,6 +104,9 @@ export function JoinLadderDialog({
       setOpen(false);
       setSelectedCategory("");
       setMessage("");
+      setJoinType("existing");
+      setPlayer1Name("");
+      setPlayer2Name("");
       onRequestSubmitted();
     } catch (error: any) {
       toast({
@@ -116,8 +135,7 @@ export function JoinLadderDialog({
         <DialogHeader>
           <DialogTitle>Request to Join Ladder</DialogTitle>
           <DialogDescription>
-            Submit a request to join a category with your team "{teamName}". An
-            admin will review and approve your request.
+            Submit a request to join a category. An admin will review and approve your request.
           </DialogDescription>
         </DialogHeader>
 
@@ -142,6 +160,51 @@ export function JoinLadderDialog({
               </SelectContent>
             </Select>
           </div>
+
+          <div className="space-y-3">
+            <Label>Join as</Label>
+            <RadioGroup
+              value={joinType}
+              onValueChange={(val) => setJoinType(val as "existing" | "custom")}
+              className="space-y-2"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="existing" id="join-existing" />
+                <Label htmlFor="join-existing" className="font-normal cursor-pointer">
+                  Join with existing team "{teamName}"
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="custom" id="join-custom" />
+                <Label htmlFor="join-custom" className="font-normal cursor-pointer">
+                  Join with different players
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {joinType === "custom" && (
+            <div className="space-y-3 pl-6 border-l-2 border-muted">
+              <div className="space-y-2">
+                <Label htmlFor="player1">Player 1 name</Label>
+                <Input
+                  id="player1"
+                  placeholder="Enter player 1 name"
+                  value={player1Name}
+                  onChange={(e) => setPlayer1Name(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="player2">Player 2 name</Label>
+                <Input
+                  id="player2"
+                  placeholder="Enter player 2 name"
+                  value={player2Name}
+                  onChange={(e) => setPlayer2Name(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="message">Message (optional)</Label>

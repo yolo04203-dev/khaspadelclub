@@ -444,6 +444,8 @@ export type Database = {
           id: string
           ladder_category_id: string
           message: string | null
+          player1_name: string | null
+          player2_name: string | null
           responded_at: string | null
           responded_by: string | null
           status: Database["public"]["Enums"]["ladder_request_status"]
@@ -455,6 +457,8 @@ export type Database = {
           id?: string
           ladder_category_id: string
           message?: string | null
+          player1_name?: string | null
+          player2_name?: string | null
           responded_at?: string | null
           responded_by?: string | null
           status?: Database["public"]["Enums"]["ladder_request_status"]
@@ -466,6 +470,8 @@ export type Database = {
           id?: string
           ladder_category_id?: string
           message?: string | null
+          player1_name?: string | null
+          player2_name?: string | null
           responded_at?: string | null
           responded_by?: string | null
           status?: Database["public"]["Enums"]["ladder_request_status"]
