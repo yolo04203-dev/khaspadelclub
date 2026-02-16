@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/react";
+import { analytics } from "@/lib/analytics/posthog";
 
 declare const __APP_VERSION__: string;
 declare const __GIT_COMMIT_SHA__: string;
@@ -6,7 +7,7 @@ declare const __GIT_COMMIT_SHA__: string;
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 const IS_DEV = import.meta.env.DEV;
 
-const SENSITIVE_KEYS = /authorization|cookie|token|password|secret|credential|api[_-]?key/i;
+const SENSITIVE_KEYS = /authorization|cookie|set-cookie|session|token|password|secret|credential|api[_-]?key/i;
 const PII_KEYS = /email|phone|ssn|address|birth/i;
 const BOT_UA = /bot|crawl|spider|slurp|facebookexternalhit|baiduspider|yandex/i;
 
@@ -41,8 +42,8 @@ function redactQueryParams(url: string): string {
 
 // Environment-conditional sampling rates
 const TRACES_SAMPLE_RATE = IS_DEV ? 1.0 : 0.1;
-const REPLAYS_SESSION_RATE = IS_DEV ? 1.0 : 0.05;
-const REPLAYS_ERROR_RATE = 1.0; // Always capture replays on error
+const REPLAYS_SESSION_RATE = 0; // PostHog owns UX session replay
+const REPLAYS_ERROR_RATE = IS_DEV ? 1.0 : 0.5; // Moderate crash-only sampling
 
 export function initErrorReporting() {
   if (!SENTRY_DSN) {
@@ -77,6 +78,22 @@ export function initErrorReporting() {
         )
       ) {
         return null;
+      }
+
+      // Cross-link with PostHog
+      const phSessionId = analytics.getSessionId();
+      const phDistinctId = analytics.getDistinctId();
+      if (phSessionId || phDistinctId) {
+        event.tags = {
+          ...event.tags,
+          ...(phSessionId && { posthog_session_id: phSessionId }),
+        };
+        if (phDistinctId) {
+          event.contexts = {
+            ...event.contexts,
+            posthog: { distinct_id: phDistinctId },
+          };
+        }
       }
 
       // Scrub request headers
@@ -152,8 +169,8 @@ export function reportError(error: unknown, context?: Record<string, unknown>) {
   Sentry.captureException(err, { extra: context });
 }
 
-export function setErrorReportingUser(user: { id: string; email?: string }) {
-  Sentry.setUser({ id: user.id, email: user.email });
+export function setErrorReportingUser(user: { id: string }) {
+  Sentry.setUser({ id: user.id });
 }
 
 export function clearErrorReportingUser() {
