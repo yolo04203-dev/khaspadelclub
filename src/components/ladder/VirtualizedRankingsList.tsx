@@ -95,7 +95,7 @@ function RankingRow({ index, style, rankings, catId, uTeamId, uObj, frozenCheck,
               <RankBadge rank={ranking.rank} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-foreground truncate">{ranking.team?.name || "Unknown Team"}</h3>
+                  <h3 className="font-semibold text-foreground text-sm sm:text-base break-words">{ranking.team?.name || "Unknown Team"}</h3>
                   {isUserTeam && <Badge variant="secondary" className="text-xs">Your Team</Badge>}
                 </div>
                 <div className="flex items-center gap-3 mt-1">
