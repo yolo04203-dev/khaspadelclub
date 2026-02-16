@@ -46,7 +46,7 @@ const FAB = React.forwardRef<HTMLButtonElement, FABProps>(
         transition={{ type: "spring", stiffness: 260, damping: 20 }}
         className={cn(
           "fixed z-50",
-          "bottom-[calc(5.5rem+env(safe-area-inset-bottom))] sm:bottom-6",
+          "bottom-[calc(7rem+env(safe-area-inset-bottom))] sm:bottom-6",
           positionClasses[position]
         )}
       >
