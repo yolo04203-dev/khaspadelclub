@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import { Trophy, Plus, Users, Layers } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -114,11 +113,7 @@ function LaddersContent() {
       />
 
       <main className="container py-8 pb-safe-nav sm:pb-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.15 }}
-        >
+          <div className="hero-animate">
           {/* Page Header */}
           <div className="mb-8 text-center">
             <h1 className="text-4xl font-bold text-foreground mb-2">Ladders</h1>
@@ -223,7 +218,7 @@ function LaddersContent() {
               ))}
             </div>
           )}
-        </motion.div>
+        </div>
       </main>
     </div>
   );

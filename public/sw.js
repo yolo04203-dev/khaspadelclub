@@ -1,5 +1,6 @@
-// Service Worker v2
-const CACHE_NAME = 'khas-padel-v2';
+// Service Worker v3
+const CACHE_NAME = 'khas-padel-v3';
+const FONT_CACHE = 'khas-fonts-v1';
 
 const PRECACHE_ASSETS = [
   '/',
@@ -22,13 +23,17 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(
+        keys
+          .filter((k) => k !== CACHE_NAME && k !== FONT_CACHE)
+          .map((k) => caches.delete(k))
+      )
     )
   );
   self.clients.claim();
 });
 
-// Fetch: network-first, skip API & auth routes
+// Fetch: network-first for pages, cache-first for fonts/static
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
@@ -38,6 +43,25 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('supabase') ||
     event.request.method !== 'GET'
   ) {
+    return;
+  }
+
+  // Cache-first for Google Fonts
+  if (
+    url.hostname === 'fonts.googleapis.com' ||
+    url.hostname === 'fonts.gstatic.com'
+  ) {
+    event.respondWith(
+      caches.open(FONT_CACHE).then((cache) =>
+        cache.match(event.request).then((cached) => {
+          if (cached) return cached;
+          return fetch(event.request).then((response) => {
+            cache.put(event.request, response.clone());
+            return response;
+          });
+        })
+      )
+    );
     return;
   }
 

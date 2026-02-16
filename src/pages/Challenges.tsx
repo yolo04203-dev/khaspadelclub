@@ -638,11 +638,7 @@ export default function Challenges() {
       {/* Main Content */}
       <PullToRefresh onRefresh={handleRefresh} className="min-h-[calc(100vh-4rem)]">
         <main className="container py-6 sm:py-8 max-w-2xl pb-safe-nav sm:pb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15 }}
-          >
+          <div className="hero-animate">
             <div className="mb-6 sm:mb-8 text-center">
               <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Challenges</h1>
               <p className="text-sm sm:text-base text-muted-foreground">
@@ -682,7 +678,7 @@ export default function Challenges() {
             </Card>
           ) : (
             <Tabs defaultValue="incoming" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 mb-6">
+              <TabsList className="flex w-full overflow-x-auto mb-6">
                 <TabsTrigger value="incoming" className="relative">
                   <Inbox className="w-4 h-4 mr-1 sm:mr-2" />
                   <span className="hidden sm:inline">Incoming</span>
@@ -1010,7 +1006,7 @@ export default function Challenges() {
               </TabsContent>
             </Tabs>
           )}
-        </motion.div>
+        </div>
       </main>
     </PullToRefresh>
 

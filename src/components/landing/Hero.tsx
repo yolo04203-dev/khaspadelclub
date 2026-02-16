@@ -73,7 +73,7 @@ export function Hero() {
                 className={`text-center sm:text-left hero-animate hero-animate-delay-${i + 2}`}>
 
                   <stat.icon className="w-5 h-5 text-accent mb-2 mx-auto sm:mx-0" />
-                  <div className="font-display text-2xl font-bold">{stat.value}</div>
+                  <div className="font-display text-xl sm:text-2xl font-bold">{stat.value}</div>
                   <div className="text-sm text-primary-foreground/60">{stat.label}</div>
                 </div>
               )}
