@@ -622,18 +622,6 @@ export default function Challenges() {
         }
       />
 
-      {/* Mobile FAB for finding opponents */}
-      <FABContainer show={!!userTeam}>
-        <FAB
-          icon={<Search />}
-          label="Find Opponents"
-          showLabel
-          position="bottom-right"
-          asChild
-        >
-          <Link to="/find-opponents" />
-        </FAB>
-      </FABContainer>
 
       {/* Main Content */}
       <PullToRefresh onRefresh={handleRefresh} className="min-h-[calc(100vh-4rem)]">
