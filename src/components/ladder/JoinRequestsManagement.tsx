@@ -18,6 +18,8 @@ interface JoinRequest {
   category_name: string;
   status: string;
   message: string | null;
+  player1_name: string | null;
+  player2_name: string | null;
   created_at: string;
 }
 
@@ -73,6 +75,8 @@ export function JoinRequestsManagement({
           category_name: (r.category as any)?.name || "Unknown Category",
           status: r.status,
           message: r.message,
+          player1_name: (r as any).player1_name || null,
+          player2_name: (r as any).player2_name || null,
           created_at: r.created_at,
         }))
       );
@@ -91,15 +95,6 @@ export function JoinRequestsManagement({
     setProcessingId(request.id);
 
     try {
-      // Check how many ladders the team is already in
-      const { count: existingMemberships } = await supabase
-        .from("ladder_rankings")
-        .select("*", { count: "exact", head: true })
-        .eq("team_id", request.team_id);
-
-      if (existingMemberships && existingMemberships >= 2) {
-        throw new Error("This team is already participating in 2 ladders. Teams can only be in up to 2 ladders simultaneously.");
-      }
 
       // Check if team is already in this specific category
       const { data: existingInCategory } = await supabase
@@ -139,9 +134,6 @@ export function JoinRequestsManagement({
       if (rankingError) {
         if (rankingError.code === "23505") {
           throw new Error("This team is already in this ladder category.");
-        }
-        if (rankingError.message?.includes("maximum of 2 ladders")) {
-          throw new Error("This team is already participating in 2 ladders.");
         }
         throw rankingError;
       }
@@ -266,6 +258,17 @@ export function JoinRequestsManagement({
                           Message
                         </div>
                         <p className="text-sm">{request.message}</p>
+                      </div>
+                    )}
+
+                    {request.player1_name && request.player2_name && (
+                      <div className="bg-accent/50 rounded-lg p-3">
+                        <div className="text-xs text-muted-foreground mb-1">
+                          Custom Players
+                        </div>
+                        <p className="text-sm font-medium">
+                          {request.player1_name} &amp; {request.player2_name}
+                        </p>
                       </div>
                     )}
 

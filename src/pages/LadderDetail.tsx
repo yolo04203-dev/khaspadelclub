@@ -305,7 +305,12 @@ export default function LadderDetail() {
             .eq("status", "pending")
             .in("ladder_category_id", categoryIds);
 
-          setPendingJoinRequests(new Set(joinRequests?.map((r) => r.ladder_category_id) || []));
+          // Combine pending requests with already-ranked categories
+          const rankedCategoryIds = (rankingsData || [])
+            .filter((r) => (r.team as any)?.id === teamId)
+            .map((r) => r.ladder_category_id);
+          const pendingRequestIds = joinRequests?.map((r) => r.ladder_category_id) || [];
+          setPendingJoinRequests(new Set([...pendingRequestIds, ...rankedCategoryIds]));
         } else {
           setIsInLadder(false);
           setUserTeamName(null);
@@ -453,24 +458,15 @@ export default function LadderDetail() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Join Ladder Button - show if user has a team but is not in any category of this ladder */}
-            {user && userTeamId && !isInLadder && categories.length > 0 && (
-              <>
-                {pendingJoinRequests.size > 0 ? (
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    Request Pending
-                  </Badge>
-                ) : (
-                  <JoinLadderDialog
-                    categories={categories}
-                    teamId={userTeamId}
-                    teamName={userTeamName || "Your Team"}
-                    existingRequests={pendingJoinRequests}
-                    onRequestSubmitted={fetchLadderData}
-                  />
-                )}
-              </>
+            {/* Join Ladder Button - show if user has a team and there are available categories */}
+            {user && userTeamId && categories.length > 0 && (
+              <JoinLadderDialog
+                categories={categories}
+                teamId={userTeamId}
+                teamName={userTeamName || "Your Team"}
+                existingRequests={pendingJoinRequests}
+                onRequestSubmitted={fetchLadderData}
+              />
             )}
 
             {role === "admin" && (
