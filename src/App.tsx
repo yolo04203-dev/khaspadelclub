@@ -82,6 +82,7 @@ const lazyImports = {
   Privacy: () => import("./pages/Privacy"),
   Terms: () => import("./pages/Terms"),
   Contact: () => import("./pages/Contact"),
+  GenerateIcons: () => import("./pages/GenerateIcons"),
 };
 
 // Export for prefetching in AppHeader
@@ -109,6 +110,7 @@ const Admin = lazyWithRetry(lazyImports.Admin);
 const Privacy = lazyWithRetry(lazyImports.Privacy);
 const Terms = lazyWithRetry(lazyImports.Terms);
 const Contact = lazyWithRetry(lazyImports.Contact);
+const GenerateIcons = lazyWithRetry(lazyImports.GenerateIcons);
 
 // Network status wrapper component
 function NetworkStatusProvider({ children }: { children: React.ReactNode }) {
@@ -160,6 +162,7 @@ function AnimatedRoutes() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/generate-icons" element={<GenerateIcons />} />
             {/* Catch-all 404 route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
