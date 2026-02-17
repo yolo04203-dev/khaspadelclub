@@ -42,7 +42,7 @@ export function Hero() {
 
             <h1 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
               Elevate Your{" "}
-              <span className="text-accent">Paddle</span>{" "}
+              <span className="text-accent">Padel</span>{" "}
               Game
             </h1>
             
