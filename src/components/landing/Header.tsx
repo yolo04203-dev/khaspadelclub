@@ -57,9 +57,6 @@ export function Header() {
 
           {/* CTA buttons */}
           <div className="hidden md:flex items-center gap-4">
-            <Button variant="ghost" onClick={handleNavigateToAuth}>
-              Sign In
-            </Button>
             <Button 
               className="bg-accent text-accent-foreground hover:bg-accent/90" 
               onClick={handleNavigateToAuth}
@@ -100,9 +97,6 @@ export function Header() {
             </a>
           ))}
           <div className="pt-4 space-y-2 border-t border-border">
-            <Button variant="outline" className="w-full" onClick={handleNavigateToAuth}>
-              Sign In
-            </Button>
             <Button 
               className="w-full bg-accent text-accent-foreground hover:bg-accent/90" 
               onClick={handleNavigateToAuth}
