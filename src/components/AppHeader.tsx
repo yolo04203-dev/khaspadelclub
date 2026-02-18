@@ -108,7 +108,7 @@ export const AppHeader = React.memo(function AppHeader({ showBack = false, backT
 
       {/* Mobile Navigation - Fixed bottom bar */}
       {user && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border bg-card py-2 px-2 safe-bottom">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border bg-card py-1.5 px-1 safe-bottom">
           {navLinks.map(({ to, label, icon: Icon }) => {
             const isActive = location.pathname === to || 
               (to !== "/dashboard" && location.pathname.startsWith(to));
@@ -118,14 +118,14 @@ export const AppHeader = React.memo(function AppHeader({ showBack = false, backT
                 to={to}
                 onTouchStart={() => handlePrefetch(to)}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 px-2 py-1 text-xs rounded-md transition-colors",
+                  "flex flex-col items-center justify-center min-w-0 flex-1 gap-0.5 py-1 text-[10px] leading-tight rounded-md transition-colors",
                   isActive
                     ? "text-accent"
                     : "text-muted-foreground"
                 )}
               >
-                <Icon className="w-5 h-5" />
-                <span>{label}</span>
+                <Icon className="w-5 h-5 shrink-0" />
+                <span className="truncate max-w-full">{label}</span>
               </Link>
             );
           })}
