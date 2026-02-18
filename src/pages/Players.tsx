@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { List } from "react-window";
-import { Search, Users, Filter, User, Loader2, Clock } from "lucide-react";
+import { Search, Users, Filter, User, Loader2, Clock, UserPlus } from "lucide-react";
 import { PlayerCardSkeleton } from "@/components/ui/skeleton-card";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { logger } from "@/lib/logger";
+import { InvitePartnerDialog } from "@/components/team/InvitePartnerDialog";
+import { toast } from "@/hooks/use-toast";
 
 interface Player {
   user_id: string;
@@ -38,7 +40,7 @@ interface Player {
 const PAGE_SIZE = 30;
 const SKILL_LEVELS = ["Beginner", "Intermediate", "Advanced", "Pro"];
 
-const PlayerCard = React.memo(function PlayerCard({ player }: { player: Player }) {
+const PlayerCard = React.memo(function PlayerCard({ player, onInvite, canInvite }: { player: Player; onInvite?: (player: Player) => void; canInvite?: boolean }) {
   return (
     <Card className="hover:border-primary/30 transition-colors">
       <CardContent className="p-4">
@@ -77,9 +79,16 @@ const PlayerCard = React.memo(function PlayerCard({ player }: { player: Player }
               </div>
             )}
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link to={`/players/${player.user_id}`}><User className="w-4 h-4 mr-2" />View</Link>
-          </Button>
+          <div className="flex flex-col gap-2">
+            {canInvite && onInvite && (
+              <Button variant="default" size="sm" onClick={() => onInvite(player)}>
+                <UserPlus className="w-4 h-4 mr-2" />Invite
+              </Button>
+            )}
+            <Button asChild variant="outline" size="sm">
+              <Link to={`/players/${player.user_id}`}><User className="w-4 h-4 mr-2" />View</Link>
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -106,6 +115,30 @@ export default function Players() {
   const [skillFilter, setSkillFilter] = useState<string>("all");
   const [lookingForTeamFilter, setLookingForTeamFilter] = useState<string>("all");
   const [recruitingFilter, setRecruitingFilter] = useState<string>("all");
+  const [myTeam, setMyTeam] = useState<{ id: string; name: string } | null>(null);
+  const [inviteTarget, setInviteTarget] = useState<Player | null>(null);
+
+  // Fetch current user's team (as captain)
+  useEffect(() => {
+    if (!user) return;
+    const fetchMyTeam = async () => {
+      const { data } = await supabase
+        .from("team_members")
+        .select("team_id, is_captain")
+        .eq("user_id", user.id)
+        .eq("is_captain", true)
+        .limit(1);
+      if (data && data.length > 0) {
+        const { data: team } = await supabase
+          .from("teams")
+          .select("id, name")
+          .eq("id", data[0].team_id)
+          .single();
+        if (team) setMyTeam(team);
+      }
+    };
+    fetchMyTeam();
+  }, [user]);
 
   const fetchPlayers = useCallback(async (offset: number, append: boolean) => {
     try {
@@ -303,7 +336,7 @@ export default function Players() {
               ) : (
                 <div className="space-y-3">
                   {players.map((player) => (
-                    <PlayerCard key={player.user_id} player={player} />
+                    <PlayerCard key={player.user_id} player={player} canInvite={!!myTeam} onInvite={setInviteTarget} />
                   ))}
                 </div>
               )}
@@ -327,6 +360,17 @@ export default function Players() {
           )}
         </div>
       </main>
+
+      {myTeam && inviteTarget && (
+        <InvitePartnerDialog
+          open={!!inviteTarget}
+          onOpenChange={(open) => { if (!open) setInviteTarget(null); }}
+          teamId={myTeam.id}
+          teamName={myTeam.name}
+          initialSearchQuery={inviteTarget.display_name || ""}
+          onInviteSent={() => setInviteTarget(null)}
+        />
+      )}
     </div>
   );
 }
