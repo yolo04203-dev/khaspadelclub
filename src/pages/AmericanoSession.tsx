@@ -321,6 +321,10 @@ export default function AmericanoSession() {
       toast({ title: "Invalid scores", description: "Please enter valid numbers", variant: "destructive" });
       return;
     }
+    if (team1Score + team2Score !== session!.points_per_round) {
+      toast({ title: "Invalid score total", description: `Scores must add up to ${session!.points_per_round}`, variant: "destructive" });
+      return;
+    }
     try {
       const { error: matchError } = await supabase
         .from("americano_team_matches")
@@ -364,6 +368,10 @@ export default function AmericanoSession() {
     const team2Score = parseInt(scoreData.team2);
     if (isNaN(team1Score) || isNaN(team2Score)) {
       toast({ title: "Invalid scores", description: "Please enter valid numbers", variant: "destructive" });
+      return;
+    }
+    if (team1Score + team2Score !== session!.points_per_round) {
+      toast({ title: "Invalid score total", description: `Scores must add up to ${session!.points_per_round}`, variant: "destructive" });
       return;
     }
     try {
@@ -759,17 +767,20 @@ export default function AmericanoSession() {
                                     </div>
                                   </div>
                                   {isOwner ? (
-                                    <div className="flex items-center gap-2">
-                                      <Input type="number" className="w-16" placeholder="0"
-                                        value={scores[match.id]?.team1 || ""}
-                                        onChange={(e) => setScores({ ...scores, [match.id]: { ...scores[match.id], team1: e.target.value } })}
-                                      />
-                                      <span className="text-muted-foreground">-</span>
-                                      <Input type="number" className="w-16" placeholder="0"
-                                        value={scores[match.id]?.team2 || ""}
-                                        onChange={(e) => setScores({ ...scores, [match.id]: { ...scores[match.id], team2: e.target.value } })}
-                                      />
-                                      <Button size="sm" onClick={() => submitTeamScore(match)}>Save</Button>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <Input type="number" className="w-16" placeholder="0"
+                                          value={scores[match.id]?.team1 || ""}
+                                          onChange={(e) => setScores({ ...scores, [match.id]: { ...scores[match.id], team1: e.target.value } })}
+                                        />
+                                        <span className="text-muted-foreground">-</span>
+                                        <Input type="number" className="w-16" placeholder="0"
+                                          value={scores[match.id]?.team2 || ""}
+                                          onChange={(e) => setScores({ ...scores, [match.id]: { ...scores[match.id], team2: e.target.value } })}
+                                        />
+                                        <Button size="sm" onClick={() => submitTeamScore(match)}>Save</Button>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground mt-1 text-right">Total must equal {session.points_per_round}</p>
                                     </div>
                                   ) : (
                                     <span className="text-muted-foreground">Pending</span>
@@ -846,17 +857,20 @@ export default function AmericanoSession() {
                                           <CheckCircle className="w-5 h-5 text-emerald-500 ml-2" />
                                         </div>
                                       ) : isOwner ? (
-                                        <div className="flex items-center gap-2">
-                                          <Input type="number" className="w-16" placeholder="0"
-                                            value={scores[round.id]?.team1 || ""}
-                                            onChange={(e) => setScores({ ...scores, [round.id]: { ...scores[round.id], team1: e.target.value } })}
-                                          />
-                                          <span className="text-muted-foreground">-</span>
-                                          <Input type="number" className="w-16" placeholder="0"
-                                            value={scores[round.id]?.team2 || ""}
-                                            onChange={(e) => setScores({ ...scores, [round.id]: { ...scores[round.id], team2: e.target.value } })}
-                                          />
-                                          <Button size="sm" onClick={() => submitScore(round)}>Save</Button>
+                                        <div>
+                                          <div className="flex items-center gap-2">
+                                            <Input type="number" className="w-16" placeholder="0"
+                                              value={scores[round.id]?.team1 || ""}
+                                              onChange={(e) => setScores({ ...scores, [round.id]: { ...scores[round.id], team1: e.target.value } })}
+                                            />
+                                            <span className="text-muted-foreground">-</span>
+                                            <Input type="number" className="w-16" placeholder="0"
+                                              value={scores[round.id]?.team2 || ""}
+                                              onChange={(e) => setScores({ ...scores, [round.id]: { ...scores[round.id], team2: e.target.value } })}
+                                            />
+                                            <Button size="sm" onClick={() => submitScore(round)}>Save</Button>
+                                          </div>
+                                          <p className="text-xs text-muted-foreground mt-1 text-right">Total must equal {session.points_per_round}</p>
                                         </div>
                                       ) : (
                                         <span className="text-muted-foreground">Pending</span>
