@@ -1,40 +1,35 @@
 
 
-# Add Manual Partner Name Option to Team Creation
+# Add "Change Partner" Option to Dashboard
 
 ## What Changes
 
-After creating a team, instead of only showing the invite partner dialog, the player will see a choice:
+When a captain views their team on the dashboard, they will see a "Change Partner" button that opens the same `AddPartnerDialog` used during team creation. This allows them to update the partner name (manual entry) or invite a different registered player at any time -- not just during initial team creation.
 
-1. **Invite a registered player** (existing behavior) -- search and send an invitation
-2. **Add partner name manually** -- just type the partner's name to complete the team name immediately
+## Where It Appears
 
-If the player chooses option 2, the team name will be updated to "Player 1 & Player 2" right away, and they can proceed to ladders. The team will still have only 1 registered member, but the team name will reflect both players. This is consistent with how tournament registration and ladder join requests already allow custom player names.
+The "Change Partner" button will appear on the dashboard team card for captains whose team has only 1 registered member (i.e., the partner was added manually via name only). For teams with 2 registered members, the button will not appear since changing a partner would require removing an actual user from the team, which is a different flow.
 
-## How It Works for the User
-
-1. Player enters their name and clicks "Create Team"
-2. A dialog appears with two tabs/options:
-   - **Invite Partner** -- the existing search-and-invite flow
-   - **Add Name Manually** -- a simple text input for the partner's name
-3. If they choose manual entry, the team is renamed to "Ahmed & Ali" format immediately and they navigate to ladders
-4. They can skip and do it later from the dashboard
+Additionally, for solo captains (no partner at all), the existing "Invite Partner" button will be replaced with the same `AddPartnerDialog` so they also get the manual name option from the dashboard.
 
 ## Technical Details
 
-### File: `src/pages/CreateTeam.tsx`
+### File: `src/pages/Dashboard.tsx`
 
-- After team creation, instead of directly opening `InvitePartnerDialog`, show a new `AddPartnerDialog` component that presents both options
-- When "manual name" is chosen: update the team name via `supabase.from("teams").update({ name: "Player1 & Player2" })` and navigate to ladders
+- Import `AddPartnerDialog` and the `UserRoundCog` (or `RefreshCw`) icon
+- Add state for `showChangePartnerDialog`
+- In the team card actions area (lines 281-293):
+  - For solo teams (memberNames.length < 2): change the "Invite Partner" button to open `AddPartnerDialog` instead of navigating to `/players`
+  - For teams where memberNames.length is 1 but team name contains " & " (manual partner was set): show a "Change Partner" button that opens `AddPartnerDialog`
+- Render `AddPartnerDialog` at the bottom of the component, passing the current captain name from `userTeam.memberNames[0]`
+- On dialog close, call `fetchDashboardData()` to refresh the team card
 
-### New Component: `src/components/team/AddPartnerDialog.tsx`
+### File: `src/components/team/AddPartnerDialog.tsx`
 
-- A dialog with two options presented as radio cards:
-  - "Invite a registered player" -- opens the existing `InvitePartnerDialog`
-  - "Enter partner name manually" -- shows an input field for the partner's name
-- Manual flow: validates name (min 2, max 50 chars), updates team name to "{captain} & {partner}" format, shows success toast, navigates to ladders
-- Skip option at the bottom: "I'll do this later" closes dialog and navigates to dashboard
+- Make the navigation optional: add an `onComplete` callback prop as an alternative to the hardcoded `navigate("/ladders")` and `navigate("/dashboard")`
+- When `onComplete` is provided, call it instead of navigating -- this lets the dashboard refresh in place without navigating away
+- The skip button should just close the dialog when used from the dashboard (no navigation needed)
 
 ### No Database Changes Required
 
-The team name is simply updated via the existing `teams` table. No new columns or functions needed. The team remains a 1-member team, but with a proper display name showing both players -- exactly how it works when admins or the auto-name function sets names.
+Same `teams.update({ name })` call already works via existing RLS policies (captains can update their team).
