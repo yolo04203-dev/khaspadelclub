@@ -4,6 +4,7 @@
  */
 
 import * as Sentry from "@sentry/react";
+import { logger } from "@/lib/logger";
 
 interface VitalMetric {
   name: string;
@@ -26,8 +27,7 @@ function rate(name: string, value: number): VitalMetric['rating'] {
 }
 
 function report(metric: VitalMetric) {
-  const icon = metric.rating === 'good' ? '✅' : metric.rating === 'needs-improvement' ? '⚠️' : '❌';
-  console.log(`${icon} [WebVital] ${metric.name}: ${metric.value.toFixed(1)}ms (${metric.rating})`);
+  logger.info(`[WebVital] ${metric.name}: ${metric.value.toFixed(1)}ms (${metric.rating})`);
 
   Sentry.addBreadcrumb({
     category: "web-vital",

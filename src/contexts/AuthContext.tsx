@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq("user_id", userId);
 
       if (error) {
-        logger.error("Error fetching user role", error, { userId });
+        logger.error("Error fetching user role", error instanceof Error ? error : new Error(JSON.stringify(error)), { userId });
         return null;
       }
 
@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Otherwise return the first role or default to player
       return (data?.[0]?.role as UserRole) || "player";
     } catch (error) {
-      logger.error("Error fetching user role", error, { userId });
+      logger.error("Error fetching user role", error instanceof Error ? error : new Error(JSON.stringify(error)), { userId });
       return null;
     }
   }, []);

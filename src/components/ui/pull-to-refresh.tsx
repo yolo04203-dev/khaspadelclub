@@ -13,12 +13,12 @@ interface PullToRefreshProps {
 const PULL_THRESHOLD = 80;
 const MAX_PULL = 120;
 
-export function PullToRefresh({
+export const PullToRefresh = React.forwardRef<HTMLDivElement, PullToRefreshProps>(function PullToRefresh({
   children,
   onRefresh,
   className,
   disabled = false,
-}: PullToRefreshProps) {
+}, ref) {
   const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [isPulling, setIsPulling] = React.useState(false);
 
@@ -156,5 +156,5 @@ export function PullToRefresh({
       <motion.div style={{ y: contentY }}>{children}</motion.div>
     </div>
   );
-}
+});
 
