@@ -32,6 +32,7 @@ interface Player {
   team_name: string | null;
   team_is_recruiting: boolean;
   team_recruitment_message: string | null;
+  is_solo_captain: boolean;
 }
 
 const PAGE_SIZE = 30;
@@ -53,6 +54,7 @@ const PlayerCard = React.memo(function PlayerCard({ player }: { player: Player }
               <h3 className="font-semibold text-foreground">{player.display_name || "Unknown Player"}</h3>
               {player.skill_level && <Badge variant="secondary" className="text-xs">{player.skill_level}</Badge>}
               {player.is_looking_for_team && <Badge className="text-xs bg-accent text-accent-foreground">Looking for team</Badge>}
+              {player.is_solo_captain && <Badge variant="outline" className="text-xs border-primary text-primary">Needs Partner</Badge>}
             </div>
             {player.team_name && (
               <div className="mt-0.5">
@@ -137,10 +139,17 @@ export default function Players() {
         return;
       }
 
-      const [{ data: teamMembers }, { data: teamsRaw }] = await Promise.all([
+      const [{ data: teamMembers }, { data: teamsRaw }, { data: allTeamMembers }] = await Promise.all([
         supabase.from("team_members").select("user_id, team_id").in("user_id", userIds),
         supabase.from("teams").select("id, name, is_recruiting, recruitment_message"),
+        supabase.from("team_members").select("team_id"),
       ]);
+
+      // Count members per team to identify solo captains
+      const teamMemberCounts = new Map<string, number>();
+      allTeamMembers?.forEach(m => {
+        teamMemberCounts.set(m.team_id, (teamMemberCounts.get(m.team_id) || 0) + 1);
+      });
 
       const teamMemberMap = new Map(teamMembers?.map(m => [m.user_id, m.team_id]) || []);
       const teamIds = [...new Set(teamMembers?.map(m => m.team_id) || [])];
@@ -150,6 +159,7 @@ export default function Players() {
       let playersData = (profiles || []).map(p => {
         const teamId = teamMemberMap.get(p.user_id) || null;
         const teamInfo = teamId ? teamsMap.get(teamId) : null;
+        const memberCount = teamId ? (teamMemberCounts.get(teamId) || 0) : 0;
         return {
           ...p,
           preferred_play_times: p.preferred_play_times || null,
@@ -157,11 +167,16 @@ export default function Players() {
           team_name: teamInfo?.name || null,
           team_is_recruiting: teamInfo?.is_recruiting || false,
           team_recruitment_message: teamInfo?.recruitment_message || null,
+          is_solo_captain: memberCount === 1,
         };
       });
 
       if (recruitingFilter === "yes") {
         playersData = playersData.filter(p => p.team_is_recruiting);
+      }
+
+      if (lookingForTeamFilter === "needs_partner") {
+        playersData = playersData.filter(p => p.is_solo_captain || !p.team_id);
       }
 
       setHasMore((profiles?.length || 0) >= PAGE_SIZE);
@@ -239,6 +254,7 @@ export default function Players() {
                   <SelectItem value="all">All Players</SelectItem>
                   <SelectItem value="yes">Looking for Team</SelectItem>
                   <SelectItem value="no">Has Team</SelectItem>
+                  <SelectItem value="needs_partner">Needs Partner</SelectItem>
                 </SelectContent>
               </Select>
 
