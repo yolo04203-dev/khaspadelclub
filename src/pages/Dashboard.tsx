@@ -14,6 +14,7 @@ import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { FAB, FABContainer } from "@/components/ui/fab";
 import { logger } from "@/lib/logger";
 import { safeCount, safeString } from "@/lib/safeData";
+import { PendingInvitations } from "@/components/team/PendingInvitations";
 interface UserTeam {
   id: string;
   name: string;
@@ -320,6 +321,11 @@ export default function Dashboard() {
               )}
             </div>
           )}
+
+          {/* Pending Team Invitations */}
+          <div className="mb-8">
+            <PendingInvitations onAccepted={fetchDashboardData} />
+          </div>
 
           {/* Quick Stats */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 mb-8">

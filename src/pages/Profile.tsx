@@ -389,10 +389,8 @@ export default function ProfilePage() {
           </div>
 
           <div className="space-y-6">
-            {/* Team Invitations (for users without a team) */}
-            {!userTeam && (
-              <PendingInvitations onAccepted={fetchData} />
-            )}
+            {/* Team Invitations */}
+            <PendingInvitations onAccepted={fetchData} />
 
             {/* Avatar & Account Info */}
             <Card>
