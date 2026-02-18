@@ -39,11 +39,6 @@ Track, compete, and grow together.
                   Sports Modes
                 </button>
               </li>
-              <li>
-                <Link to="/leaderboard" className="hover:text-primary-foreground transition-colors">
-                  Live Demo
-                </Link>
-              </li>
             </ul>
           </div>
 
