@@ -56,7 +56,7 @@ export const AppHeader = React.memo(function AppHeader({ showBack = false, backT
               </Button>
             )}
             <Link to={user ? "/dashboard" : "/"}>
-              <Logo size="sm" showText={!actions} className="sm:[&>span:last-child]:inline [&>span:last-child]:hidden" />
+              <Logo size="md" showText={!actions} className="sm:[&>span:last-child]:inline [&>span:last-child]:hidden" />
             </Link>
 
             {/* Navigation Links - Desktop */}
