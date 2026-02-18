@@ -93,38 +93,43 @@ export default function Dashboard() {
           logger.error("Dashboard: team info failed", err);
         }
 
-        // Section 2: Stats + challenges (non-critical — degrade to defaults)
-        try {
-          const [matchesResult, pendingResult, incomingResult, unifiedResult] = await Promise.all([
-            supabase.from("matches").select("*", { count: "exact", head: true })
-              .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
-              .eq("status", "completed"),
-            supabase.from("challenges").select("*", { count: "exact", head: true })
-              .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
-              .eq("status", "pending"),
-            supabase.from("challenges").select("*", { count: "exact", head: true })
-              .eq("challenged_team_id", teamId)
-              .eq("status", "pending"),
-            supabase.rpc("get_player_unified_stats", { p_user_id: user.id, p_days: 0 }),
-          ]);
+      // Section 2: Stats + challenges — deferred to avoid blocking first paint
+        // Use requestIdleCallback (or setTimeout fallback) so team card renders first
+        const loadStats = async () => {
+          try {
+            const [pendingResult, incomingResult, unifiedResult] = await Promise.all([
+              supabase.from("challenges").select("*", { count: "exact", head: true })
+                .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+                .eq("status", "pending"),
+              supabase.from("challenges").select("*", { count: "exact", head: true })
+                .eq("challenged_team_id", teamId)
+                .eq("status", "pending"),
+              supabase.rpc("get_player_unified_stats", { p_user_id: user.id, p_days: 0 }),
+            ]);
 
-          setIncomingChallenges(safeCount(incomingResult.count));
+            setIncomingChallenges(safeCount(incomingResult.count));
 
-          const unified = unifiedResult.data as any;
-          if (unified?.by_mode) setModeBreakdown(unified.by_mode);
+            const unified = unifiedResult.data as any;
+            if (unified?.by_mode) setModeBreakdown(unified.by_mode);
 
-          const totalWins = unified?.overall?.wins ?? 0;
-          const totalLosses = unified?.overall?.losses ?? 0;
+            const totalWins = unified?.overall?.wins ?? 0;
+            const totalLosses = unified?.overall?.losses ?? 0;
 
-          setStats({
-            matchesPlayed: totalWins + totalLosses,
-            wins: totalWins,
-            losses: totalLosses,
-            pendingChallenges: safeCount(pendingResult.count),
-          });
-        } catch (err) {
-          logger.warn("Dashboard: stats section failed, using defaults", err);
-          // Stats keep their default zero values — UI still renders
+            setStats({
+              matchesPlayed: totalWins + totalLosses,
+              wins: totalWins,
+              losses: totalLosses,
+              pendingChallenges: safeCount(pendingResult.count),
+            });
+          } catch (err) {
+            logger.warn("Dashboard: stats section failed, using defaults", err);
+          }
+        };
+
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(() => { loadStats(); });
+        } else {
+          setTimeout(loadStats, 100);
         }
       }
       

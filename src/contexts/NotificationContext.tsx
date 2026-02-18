@@ -123,11 +123,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   useEffect(() => {
-    fetchCounts();
+    // Defer initial fetch so it doesn't compete with critical page data
+    const initialDelay = setTimeout(fetchCounts, 1500);
 
-    // Poll every 60s instead of realtime on 3 tables (which triggered on ANY row change globally)
+    // Poll every 60s
     const interval = setInterval(fetchCounts, 60000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initialDelay);
+      clearInterval(interval);
+    };
   }, [fetchCounts]);
 
   return (
