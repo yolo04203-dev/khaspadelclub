@@ -1,61 +1,86 @@
 
 
-## Enforce 2-Member Teams for Tournaments and Ladders
+## Make App Export-Ready: Remove Dev/Test Artifacts and Clean Database
 
-Currently, a team can be created with just 1 person (the captain) and immediately join ladders or tournaments. This plan adds validation so teams must have 2 participants before they can compete.
+### Part 1: Clean Up Admin Panel Dev Buttons
 
-### Changes
+Remove the developer-only testing buttons from the Admin page that are not meant for the client. These include:
 
-#### 1. Dashboard -- Show team completeness status
-When a team only has 1 member, show a warning/prompt to invite a partner before competing.
+- "Seed 500 Users" button
+- "Clear & Re-seed" button  
+- "Run Perf Test" button
+- "Test Error" button
+- "Unhandled Rejection" button
+- "Send Breadcrumb" button
+- "Capture Message" button
+- "Test Analytics" button
+- The performance results display card
 
-**File:** `src/pages/Dashboard.tsx`
-- Check `memberNames.length` on the team card
-- If only 1 member, show an "Invite Partner" prompt with a link/button
-- Disable/hide the "View Ladders" action until team is complete
+Also remove the associated state variables (`isSeeding`, `perfResult`, `isRunningPerf`) and handler functions (`handleSeedData`, `handlePerfTest`).
 
-#### 2. Ladder Join Dialog -- Block incomplete teams
-Prevent teams with only 1 member from submitting a join request.
+**File:** `src/pages/Admin.tsx`
 
-**File:** `src/components/ladder/JoinLadderDialog.tsx`
-- Accept a new prop `teamMemberCount: number`
-- If `teamMemberCount < 2`, show a message like "Your team needs 2 players before joining. Invite a partner from your dashboard." and disable the submit button
+### Part 2: Remove Dev-Only Pages and Routes
 
-**File:** `src/pages/LadderDetail.tsx`
-- Fetch the team member count for the user's team
-- Pass `teamMemberCount` to `JoinLadderDialog`
+Remove the `GenerateIcons` page (an iOS icon generator utility, not needed by users).
 
-#### 3. Tournament Registration Dialog -- Block incomplete teams for "existing team" option
-When registering with an existing team (not custom), validate that the team has 2 members.
+**Files:**
+- Delete `src/pages/GenerateIcons.tsx`
+- Remove route from `src/components/AuthenticatedRoutes.tsx`
+- Remove lazy import from `src/App.tsx`
 
-**File:** `src/components/tournament/RegistrationDialog.tsx`
-- Accept a new optional prop `teamMemberCount?: number`
-- When `registrationType === "existing"` and `teamMemberCount < 2`, show a warning and disable the Register button
-- Custom teams already require both player names, so they're fine
+### Part 3: Remove Dev Test Files
 
-**File:** `src/pages/TournamentDetail.tsx`
-- Fetch member count for the user's team
-- Pass it to `RegistrationDialog`
+Remove load testing and performance benchmark files that are developer tools, not client features.
 
-#### 4. Challenge creation -- Block incomplete teams
-Prevent 1-member teams from issuing challenges on the ladder.
+**Files to delete:**
+- `src/test/load-test.ts`
+- `src/test/performance-benchmarks.test.ts`
 
-**File:** `src/pages/LadderDetail.tsx`
-- If team has fewer than 2 members, disable the "Challenge" button and show a tooltip explaining why
+### Part 4: Clean Database of All Test Data
 
-### Technical Details
+Run SQL to delete all existing test/dummy data so the client starts fresh. Order matters due to foreign key dependencies:
 
-- Member count is fetched via a simple query: `SELECT count(*) FROM team_members WHERE team_id = ?`
-- This data is already partially available in the dashboard (we fetch `team_members` for the team); just need to reuse the count
-- No database changes needed -- this is purely frontend validation
-- The "custom team" flow in tournaments is unaffected since it already requires 2 player names
+1. `americano_rounds` and `americano_team_matches`
+2. `americano_players` and `americano_teams`
+3. `americano_sessions`
+4. `tournament_matches`
+5. `tournament_participants`
+6. `tournament_groups`
+7. `tournament_categories`
+8. `tournaments`
+9. `challenges`
+10. `matches`
+11. `ladder_join_requests`
+12. `ladder_rankings`
+13. `ladder_categories`
+14. `ladders`
+15. `team_invitations`
+16. `team_members`
+17. `teams`
+18. `client_errors`
+19. `user_permissions`
+20. `user_roles` (except keep any real admin accounts)
+21. `profiles` (except keep any real admin accounts)
+
+This will be done via SQL DELETE statements against the test environment.
+
+### Part 5: Keep What Stays
+
+These items are fine and should remain:
+- Landing page mock rankings in `Hero.tsx` (static UI illustration, not real data)
+- `PerfOverlay` component (already gated behind `import.meta.env.DEV`, invisible in production)
+- `ErrorsTab` in admin (useful for the client to monitor real errors)
+- Sentry + PostHog integration (production monitoring)
+- `sendTestError` in `errorReporting.ts` (library function, harmless)
 
 ### Summary
 
-| Area | Current | After |
-|------|---------|-------|
-| Dashboard team card | Shows team regardless | Shows "Invite Partner" warning if only 1 member |
-| Ladder join request | Allows 1-member teams | Blocks with message, requires 2 members |
-| Tournament registration (existing team) | Allows 1-member teams | Blocks with message, requires 2 members |
-| Tournament registration (custom team) | Already requires 2 names | No change |
-| Ladder challenges | Allows 1-member teams | Blocks with tooltip, requires 2 members |
+| Action | What |
+|--------|------|
+| Remove from Admin | 8 dev-only buttons, seed/perf handlers, perf results card |
+| Delete files | `GenerateIcons.tsx`, `load-test.ts`, `performance-benchmarks.test.ts` |
+| Remove route | `/generate-icons` |
+| Clean database | All test data from all tables (keep admin user accounts) |
+| Keep as-is | Hero mock UI, PerfOverlay (dev-only), Sentry/PostHog, ErrorsTab |
+
