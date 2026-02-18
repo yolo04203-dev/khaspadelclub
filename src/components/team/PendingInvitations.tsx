@@ -99,17 +99,36 @@ export function PendingInvitations({ onAccepted }: PendingInvitationsProps) {
         // Check if user is already on a team
         const { data: existingMember } = await supabase
           .from("team_members")
-          .select("id")
+          .select("id, team_id, is_captain")
           .eq("user_id", user.id)
           .maybeSingle();
 
         if (existingMember) {
-          toast({
-            title: "Already on a team",
-            description: "You must leave your current team before joining another.",
-            variant: "destructive",
-          });
-          return;
+          // Check if this is a solo team (only 1 member)
+          const { count } = await supabase
+            .from("team_members")
+            .select("id", { count: "exact", head: true })
+            .eq("team_id", existingMember.team_id);
+
+          if (count && count > 1) {
+            toast({
+              title: "Already on a team",
+              description: "You must leave your current team before joining another.",
+              variant: "destructive",
+            });
+            return;
+          }
+
+          // Solo team — auto-remove and delete
+          const oldTeamId = existingMember.team_id;
+          await supabase
+            .from("team_members")
+            .delete()
+            .eq("id", existingMember.id);
+          await supabase
+            .from("teams")
+            .delete()
+            .eq("id", oldTeamId);
         }
 
         // Add user to team
