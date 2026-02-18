@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { ArrowLeft, LogOut, Users, BarChart3, Swords, Layers, Home } from "lucide-react";
+import { ArrowLeft, LogOut, Users, BarChart3, Swords, Layers, Home, LayoutGrid } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ const prefetchMap: Record<string, string> = {
   "/ladders": "Ladders",
   "/challenges": "Challenges",
   "/players": "Players",
+  "/tournaments": "Tournaments",
   "/stats": "Stats",
 };
 
@@ -26,6 +27,7 @@ const navLinks = [
   { to: "/ladders", label: "Ladders", icon: Layers },
   { to: "/challenges", label: "Challenges", icon: Swords },
   { to: "/players", label: "Players", icon: Users },
+  { to: "/tournaments", label: "Tournaments", icon: LayoutGrid },
   { to: "/stats", label: "Stats", icon: BarChart3 },
 ];
 
