@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+
 import { Plus, Trophy, Calendar, MapPin } from "lucide-react";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { useAuth } from "@/contexts/AuthContext";
@@ -125,12 +125,8 @@ export default function Tournaments() {
       <AppHeader showBack />
 
       <PullToRefresh onRefresh={async () => { await fetchTournaments(); }} className="flex-1 overflow-auto">
-        <main className="container py-6 pb-safe-nav sm:pb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15 }}
-          >
+        <main className="container py-4 sm:py-8 pb-safe-nav sm:pb-8">
+          <div className="hero-animate">
             {/* Header */}
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
@@ -190,7 +186,7 @@ export default function Tournaments() {
 
                   return (
                     <Link key={tournament.id} to={`/tournaments/${tournament.id}`}>
-                      <Card className="relative overflow-hidden hover:border-primary/30 transition-colors cursor-pointer">
+                      <Card className="relative overflow-hidden hover:border-primary/30 transition-colors cursor-pointer press-scale">
                         {/* Diagonal Ribbon */}
                         <div className="absolute top-0 right-0 w-28 h-28 overflow-hidden pointer-events-none">
                           <div
@@ -226,7 +222,7 @@ export default function Tournaments() {
                 })}
               </div>
             )}
-          </motion.div>
+          </div>
         </main>
       </PullToRefresh>
 

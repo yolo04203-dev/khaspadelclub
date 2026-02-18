@@ -112,11 +112,11 @@ function LaddersContent() {
         }
       />
 
-      <main className="container py-8 pb-safe-nav sm:pb-8">
+      <main className="container py-4 sm:py-8 pb-safe-nav sm:pb-8">
           <div className="hero-animate">
           {/* Page Header */}
-          <div className="mb-8 text-center">
-            <h1 className="text-4xl font-bold text-foreground mb-2">Ladders</h1>
+          <div className="mb-5 sm:mb-8 text-center">
+            <h1 className="text-2xl sm:text-4xl font-bold text-foreground mb-2">Ladders</h1>
             <p className="text-muted-foreground">
               Compete in skill-based divisions and climb the rankings
             </p>
@@ -172,7 +172,7 @@ function LaddersContent() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {ladders.map((ladder) => (
                 <Link key={ladder.id} to={`/ladders/${ladder.id}`}>
-                  <Card className="hover:border-primary/50 transition-all cursor-pointer h-full">
+                  <Card className="hover:border-primary/50 transition-all cursor-pointer h-full press-scale">
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div>

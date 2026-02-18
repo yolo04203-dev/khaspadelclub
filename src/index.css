@@ -206,6 +206,12 @@
     padding-right: 1rem;
   }
 }
+@media (max-width: 374px) {
+  .container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
 
 /* === Native Mobile (Capacitor) Optimizations === */
 

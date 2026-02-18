@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { motion } from "framer-motion";
+
 import { Trophy, TrendingUp, Calendar, Users, Loader2, Target, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -93,9 +93,9 @@ export default function Stats() {
     return (
       <div className="min-h-screen bg-background">
         <AppHeader showBack />
-        <main className="container py-8 max-w-4xl pb-safe-nav sm:pb-8">
+        <main className="container py-4 sm:py-8 max-w-4xl pb-safe-nav sm:pb-8">
           <div className="h-8 bg-muted rounded w-48 mb-2 animate-pulse" />
-          <div className="h-4 bg-muted rounded w-64 mb-8 animate-pulse" />
+          <div className="h-4 bg-muted rounded w-64 mb-5 sm:mb-8 animate-pulse" />
           <div className="grid gap-4 md:grid-cols-4 mb-6">
             {[1, 2, 3, 4].map(i => (
               <Card key={i} className="animate-pulse">
@@ -158,15 +158,11 @@ export default function Stats() {
     <div className="min-h-screen bg-background">
       <AppHeader showBack />
 
-      <main className="container py-8 max-w-4xl pb-safe-nav sm:pb-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.15 }}
-        >
-          <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
+      <main className="container py-4 sm:py-8 max-w-4xl pb-safe-nav sm:pb-8">
+        <div className="hero-animate">
+          <div className="flex items-center justify-between mb-5 sm:mb-8 flex-wrap gap-3">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
                 {stats.player_name}'s Stats
               </h1>
               <p className="text-muted-foreground mt-1">
@@ -386,7 +382,7 @@ export default function Stats() {
               </CardContent>
             </Card>
           </div>
-        </motion.div>
+        </div>
       </main>
     </div>
   );
