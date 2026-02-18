@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { UserMinus, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { UserMinus, Loader2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { logger } from "@/lib/logger";
@@ -23,6 +23,12 @@ interface RemovePartnerDialogProps {
   onRemoved: () => void;
 }
 
+interface ActiveData {
+  ladderRankings: { categoryName: string; rank: number }[];
+  pendingChallenges: number;
+  acceptedChallenges: number;
+}
+
 export function RemovePartnerDialog({
   open,
   onOpenChange,
@@ -32,11 +38,62 @@ export function RemovePartnerDialog({
   onRemoved,
 }: RemovePartnerDialogProps) {
   const [isRemoving, setIsRemoving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeData, setActiveData] = useState<ActiveData | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setActiveData(null);
+      return;
+    }
+
+    const fetchActiveData = async () => {
+      setIsLoading(true);
+      try {
+        const [{ data: rankings }, { count: pendingCount }, { count: acceptedCount }] = await Promise.all([
+          supabase
+            .from("ladder_rankings")
+            .select("rank, ladder_category_id, ladder_categories(name)")
+            .eq("team_id", teamId),
+          supabase
+            .from("challenges")
+            .select("*", { count: "exact", head: true })
+            .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+            .eq("status", "pending"),
+          supabase
+            .from("challenges")
+            .select("*", { count: "exact", head: true })
+            .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
+            .eq("status", "accepted"),
+        ]);
+
+        setActiveData({
+          ladderRankings: (rankings || []).map((r: any) => ({
+            categoryName: r.ladder_categories?.name || "Unknown",
+            rank: r.rank,
+          })),
+          pendingChallenges: pendingCount || 0,
+          acceptedChallenges: acceptedCount || 0,
+        });
+      } catch (error) {
+        logger.apiError("fetchActiveData", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchActiveData();
+  }, [open, teamId]);
+
+  const hasWarnings = activeData && (
+    activeData.ladderRankings.length > 0 ||
+    activeData.pendingChallenges > 0 ||
+    activeData.acceptedChallenges > 0
+  );
 
   const handleRemove = async () => {
     setIsRemoving(true);
     try {
-      // Find the non-captain member
       const { data: members, error: fetchError } = await supabase
         .from("team_members")
         .select("id, user_id, is_captain")
@@ -54,7 +111,6 @@ export function RemovePartnerDialog({
         return;
       }
 
-      // Remove the partner from team_members
       const { error: deleteError } = await supabase
         .from("team_members")
         .delete()
@@ -62,7 +118,6 @@ export function RemovePartnerDialog({
 
       if (deleteError) throw deleteError;
 
-      // Update team name back to captain-only format
       const newName = `${captainName}'s Team`;
       await supabase
         .from("teams")
@@ -96,17 +151,58 @@ export function RemovePartnerDialog({
             <UserMinus className="w-5 h-5 text-destructive" />
             Remove Partner
           </AlertDialogTitle>
-          <AlertDialogDescription>
-            Are you sure you want to remove <strong>{partnerName}</strong> from
-            the team? They will no longer be part of your team and any future
-            ladder matches will require a new partner.
+          <AlertDialogDescription asChild>
+            <div className="space-y-3">
+              <p>
+                Are you sure you want to remove <strong>{partnerName}</strong> from
+                the team?
+              </p>
+
+              {isLoading && (
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Checking active competitions...
+                </div>
+              )}
+
+              {hasWarnings && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+                  <div className="flex items-center gap-2 font-medium text-destructive text-sm">
+                    <AlertTriangle className="w-4 h-4" />
+                    Warning: Active competitions detected
+                  </div>
+                  <ul className="text-sm space-y-1 ml-6 list-disc text-foreground">
+                    {activeData!.ladderRankings.map((r, i) => (
+                      <li key={i}>
+                        Ranked #{r.rank} in <strong>{r.categoryName}</strong>
+                      </li>
+                    ))}
+                    {activeData!.pendingChallenges > 0 && (
+                      <li>{activeData!.pendingChallenges} pending challenge(s)</li>
+                    )}
+                    {activeData!.acceptedChallenges > 0 && (
+                      <li>{activeData!.acceptedChallenges} accepted challenge(s) in progress</li>
+                    )}
+                  </ul>
+                  <p className="text-sm text-muted-foreground">
+                    Removing the partner will affect your team's eligibility for these competitions.
+                  </p>
+                </div>
+              )}
+
+              {!isLoading && !hasWarnings && activeData && (
+                <p className="text-sm text-muted-foreground">
+                  No active competitions found for this team.
+                </p>
+              )}
+            </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isRemoving}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleRemove}
-            disabled={isRemoving}
+            disabled={isRemoving || isLoading}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {isRemoving ? (
