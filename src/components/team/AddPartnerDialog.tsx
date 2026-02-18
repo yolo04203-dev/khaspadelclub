@@ -41,6 +41,7 @@ interface AddPartnerDialogProps {
   teamId: string;
   teamName: string;
   captainName: string;
+  onComplete?: () => void;
 }
 
 export function AddPartnerDialog({
@@ -49,6 +50,7 @@ export function AddPartnerDialog({
   teamId,
   teamName,
   captainName,
+  onComplete,
 }: AddPartnerDialogProps) {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"choose" | "manual" | "invite">("choose");
@@ -75,7 +77,11 @@ export function AddPartnerDialog({
         description: `Your team is now "${newName}"`,
       });
       onOpenChange(false);
-      navigate("/ladders");
+      if (onComplete) {
+        onComplete();
+      } else {
+        navigate("/ladders");
+      }
     } catch (error: any) {
       logger.apiError("updateTeamName", error);
       toast({
@@ -90,7 +96,11 @@ export function AddPartnerDialog({
 
   const handleSkip = () => {
     onOpenChange(false);
-    navigate("/dashboard");
+    if (onComplete) {
+      onComplete();
+    } else {
+      navigate("/dashboard");
+    }
   };
 
   const handleClose = (openState: boolean) => {
@@ -108,13 +118,23 @@ export function AddPartnerDialog({
         onOpenChange={(openState) => {
           if (!openState) {
             setMode("choose");
-            navigate("/ladders");
+            if (onComplete) {
+              onComplete();
+            } else {
+              navigate("/ladders");
+            }
           }
           onOpenChange(openState);
         }}
         teamId={teamId}
         teamName={teamName}
-        onInviteSent={() => navigate("/ladders")}
+        onInviteSent={() => {
+          if (onComplete) {
+            onComplete();
+          } else {
+            navigate("/ladders");
+          }
+        }}
       />
     );
   }

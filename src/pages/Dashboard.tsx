@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { Navigate, Link } from "react-router-dom";
 
-import { User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers, Pencil, AlertTriangle, UserPlus } from "lucide-react";
+import { User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers, Pencil, AlertTriangle, UserPlus, RefreshCw } from "lucide-react";
 import { RenameTeamDialog } from "@/components/team/RenameTeamDialog";
+import { AddPartnerDialog } from "@/components/team/AddPartnerDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
@@ -40,6 +41,7 @@ export default function Dashboard() {
   const [userTeam, setUserTeam] = useState<UserTeam | null>(null);
   const [isCaptain, setIsCaptain] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [showPartnerDialog, setShowPartnerDialog] = useState(false);
   const [teamLoading, setTeamLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
     matchesPlayed: 0,
@@ -280,12 +282,12 @@ export default function Dashboard() {
                       </div>
                       <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                         {userTeam.memberNames.length < 2 && isCaptain && (
-                          <Button variant="default" className="w-full sm:w-auto" asChild>
-                            <Link to="/players">
+                          <>
+                            <Button variant="default" className="w-full sm:w-auto" onClick={() => setShowPartnerDialog(true)}>
                               <UserPlus className="w-4 h-4 mr-2" />
-                              Invite Partner
-                            </Link>
-                          </Button>
+                              {userTeam.name.includes(" & ") ? "Change Partner" : "Add Partner"}
+                            </Button>
+                          </>
                         )}
                         <Button variant="outline" className="w-full sm:w-auto" asChild>
                           <Link to="/ladders">View Ladders</Link>
@@ -510,13 +512,23 @@ export default function Dashboard() {
      </PullToRefresh>
 
       {userTeam && isCaptain && (
-        <RenameTeamDialog
-          open={showRenameDialog}
-          onOpenChange={setShowRenameDialog}
-          teamId={userTeam.id}
-          currentName={userTeam.name}
-          onRenamed={(newName) => setUserTeam({ ...userTeam, name: newName })}
-        />
+        <>
+          <RenameTeamDialog
+            open={showRenameDialog}
+            onOpenChange={setShowRenameDialog}
+            teamId={userTeam.id}
+            currentName={userTeam.name}
+            onRenamed={(newName) => setUserTeam({ ...userTeam, name: newName })}
+          />
+          <AddPartnerDialog
+            open={showPartnerDialog}
+            onOpenChange={setShowPartnerDialog}
+            teamId={userTeam.id}
+            teamName={userTeam.name}
+            captainName={userTeam.memberNames[0] || "Captain"}
+            onComplete={fetchDashboardData}
+          />
+        </>
       )}
     </div>
   );
