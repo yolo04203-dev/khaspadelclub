@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigate, Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
@@ -14,7 +14,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -25,19 +24,10 @@ import { InvitePartnerDialog } from "@/components/team/InvitePartnerDialog";
 import { logger } from "@/lib/logger";
 
 const teamSchema = z.object({
-  name: z
-    .string()
-    .min(2, "Team name must be at least 2 characters")
-    .max(50, "Team name is too long")
-    .regex(/^[a-zA-Z0-9\s\-_]+$/, "Team name can only contain letters, numbers, spaces, hyphens, and underscores"),
   player1Name: z
     .string()
-    .min(2, "Player 1 name must be at least 2 characters")
-    .max(50, "Player 1 name is too long"),
-  player2Name: z
-    .string()
-    .min(2, "Player 2 name must be at least 2 characters")
-    .max(50, "Player 2 name is too long"),
+    .min(2, "Your name must be at least 2 characters")
+    .max(50, "Name is too long"),
 });
 
 type TeamFormData = z.infer<typeof teamSchema>;
@@ -54,11 +44,29 @@ export default function CreateTeam() {
   const form = useForm<TeamFormData>({
     resolver: zodResolver(teamSchema),
     defaultValues: {
-      name: "",
       player1Name: "",
-      player2Name: "",
     },
   });
+
+  // Pre-fill player name from profile
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user) return;
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("display_name")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (data?.display_name) {
+          form.setValue("player1Name", data.display_name);
+        }
+      } catch (error) {
+        logger.apiError("loadProfile", error);
+      }
+    };
+    loadProfile();
+  }, [user]);
 
   // Check if user already has a team
   useState(() => {
@@ -101,9 +109,11 @@ export default function CreateTeam() {
 
     setIsSubmitting(true);
     try {
+      const tempName = `${data.player1Name.trim()}'s Team`;
+
       // Call the database function to create team with captain
       const { data: teamId, error } = await supabase.rpc("create_team_with_captain", {
-        _name: data.name.trim(),
+        _name: tempName,
         _avatar_url: null,
       });
 
@@ -117,11 +127,11 @@ export default function CreateTeam() {
 
       toast({
         title: "Team created!",
-        description: `"${data.name}" has been registered with ${data.player1Name} and ${data.player2Name}.`,
+        description: "Now invite your partner to complete the team.",
       });
 
       // Store created team info and open invite dialog
-      setCreatedTeam({ id: teamId, name: data.name.trim() });
+      setCreatedTeam({ id: teamId, name: tempName });
       setShowInviteDialog(true);
     } catch (error: any) {
       logger.apiError("createTeam", error);
@@ -206,7 +216,7 @@ export default function CreateTeam() {
                 </div>
                 <CardTitle className="text-2xl">Create Your Team</CardTitle>
                 <CardDescription>
-                  Register your team to join the ladder and start competing
+                  Enter your name to create a team. The team name will be set automatically once your partner joins.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -214,31 +224,10 @@ export default function CreateTeam() {
                   <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                     <FormField
                       control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Team Name</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="Enter your team name"
-                              autoComplete="off"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Choose a unique name for your team (2-50 characters)
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
                       name="player1Name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Player 1 Name (You)</FormLabel>
+                          <FormLabel>Your Name</FormLabel>
                           <FormControl>
                             <Input
                               placeholder="Enter your name"
@@ -246,27 +235,6 @@ export default function CreateTeam() {
                               {...field}
                             />
                           </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="player2Name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Player 2 Name (Partner)</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="Enter your partner's name"
-                              autoComplete="off"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            You can invite your partner to join the app later
-                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -281,11 +249,15 @@ export default function CreateTeam() {
                         </li>
                         <li className="flex items-center gap-2">
                           <span className="w-1.5 h-1.5 rounded-full bg-accent" />
-                          Choose a ladder and request to join
+                          Invite your partner to join
                         </li>
                         <li className="flex items-center gap-2">
                           <span className="w-1.5 h-1.5 rounded-full bg-accent" />
-                          Start competing once admin approves
+                          Team name is set automatically (e.g. "Ahmed & Ali")
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+                          Choose a ladder and start competing
                         </li>
                       </ul>
                     </div>
@@ -327,7 +299,6 @@ export default function CreateTeam() {
             onInviteSent={() => {
               navigate("/ladders");
             }}
-            initialSearchQuery={form.getValues("player2Name")}
           />
         )}
       </main>
