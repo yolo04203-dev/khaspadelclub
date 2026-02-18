@@ -24,12 +24,22 @@ function escapeHtml(str: string): string {
     .replace(/'/g, "&#039;");
 }
 
+const MAX_BODY_SIZE = 10_000; // 10KB
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Body size validation
+    const contentLength = req.headers.get("content-length");
+    if (contentLength && parseInt(contentLength) > MAX_BODY_SIZE) {
+      return new Response(JSON.stringify({ success: false, error: "Payload too large" }), {
+        status: 413,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -112,25 +122,12 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Get user emails from auth.users
+    // Get user emails by looking up each user individually (efficient)
     const userIds = teamMembers.map(m => m.user_id);
-    const { data: users, error: usersError } = await supabase.auth.admin.listUsers();
-    
-    if (usersError) {
-      console.error("Error fetching users:", usersError);
-      throw new Error("Failed to fetch user emails");
-    }
-
-    const emails = users.users
-      .filter(u => userIds.includes(u.id) && u.email)
-      .map(u => u.email!);
-
-    if (emails.length === 0) {
-      console.log("No valid emails found for team members");
-      return new Response(JSON.stringify({ success: true, message: "No valid emails to send to" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
+    const emails: string[] = [];
+    for (const uid of userIds) {
+      const { data } = await supabase.auth.admin.getUserById(uid);
+      if (data?.user?.email) emails.push(data.user.email);
     }
 
     // Format the email content based on action
@@ -181,6 +178,8 @@ const handler = async (req: Request): Promise<Response> => {
     // Send email to all team members using Resend REST API
     console.log(`Sending ${action} notification to:`, emails);
     
+    const fromEmail = Deno.env.get("RESEND_FROM_EMAIL") || "onboarding@resend.dev";
+    
     const emailResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -188,7 +187,7 @@ const handler = async (req: Request): Promise<Response> => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "onboarding@resend.dev", // Test mode sender
+        from: fromEmail,
         to: emails,
         subject,
         html: htmlContent,
