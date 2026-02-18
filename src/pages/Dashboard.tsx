@@ -18,6 +18,7 @@ interface UserTeam {
   id: string;
   name: string;
   rank: number | null;
+  memberNames: string[];
 }
 
 interface DashboardStats {
@@ -76,17 +77,36 @@ export default function Dashboard() {
 
         // Section 1: Team info (critical — if this fails, show error)
         try {
-          const [teamResult, rankResult] = await Promise.all([
+          const [teamResult, rankResult, membersResult] = await Promise.all([
             supabase.from("teams").select("id, name").eq("id", teamId).maybeSingle(),
             supabase.from("ladder_rankings").select("rank, wins, losses").eq("team_id", teamId).order("rank", { ascending: true }).limit(1).maybeSingle(),
+            supabase.from("team_members").select("user_id").eq("team_id", teamId).order("joined_at"),
           ]);
 
           if (teamResult.error) throw teamResult.error;
+          
+          // Fetch member display names
+          let memberNames: string[] = [];
+          if (membersResult.data && membersResult.data.length > 0) {
+            const userIds = membersResult.data.map(m => m.user_id);
+            const { data: profiles } = await supabase
+              .from("public_profiles")
+              .select("user_id, display_name")
+              .in("user_id", userIds);
+            if (profiles) {
+              memberNames = userIds.map(uid => {
+                const p = profiles.find(pr => pr.user_id === uid);
+                return p?.display_name || "Player";
+              });
+            }
+          }
+
           if (teamResult.data) {
             setUserTeam({
               id: teamResult.data.id,
               name: safeString(teamResult.data.name, "Unknown Team"),
               rank: rankResult.data?.rank ?? null,
+              memberNames,
             });
           }
         } catch (err) {
@@ -242,6 +262,11 @@ export default function Dashboard() {
                               </button>
                             )}
                           </div>
+                          {userTeam.memberNames.length === 2 && (
+                            <p className="text-xs text-muted-foreground">
+                              {userTeam.memberNames[0]} & {userTeam.memberNames[1]}
+                            </p>
+                          )}
                           <p className="text-sm text-muted-foreground">
                             {userTeam.rank ? `Rank #${userTeam.rank}` : "Unranked"}
                           </p>

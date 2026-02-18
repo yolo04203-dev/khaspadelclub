@@ -10,6 +10,8 @@ interface TeamStanding {
   losses: number;
   points_for: number;
   points_against: number;
+  player1_name?: string;
+  player2_name?: string;
 }
 
 interface GroupStandingsProps {
@@ -68,7 +70,14 @@ export function GroupStandings({ groupName, teams, highlightTeamId }: GroupStand
                     )}
                   </TableCell>
                   <TableCell className={isHighlighted ? "font-semibold" : ""}>
-                    {team.team_name}
+                    <div>
+                      {team.team_name}
+                      {team.player1_name && team.player2_name && (
+                        <p className="text-[11px] text-muted-foreground font-normal">
+                          {team.player1_name} & {team.player2_name}
+                        </p>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-center font-medium text-success">{team.wins}</TableCell>
                   <TableCell className="text-center text-muted-foreground">{team.losses}</TableCell>

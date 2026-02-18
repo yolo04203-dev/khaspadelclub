@@ -13,6 +13,8 @@ interface KnockoutMatch {
   team2_id: string | null;
   team1_name: string;
   team2_name: string;
+  team1_players?: string;
+  team2_players?: string;
   team1_score: number | null;
   team2_score: number | null;
   winner_team_id: string | null;
@@ -107,17 +109,19 @@ export function KnockoutBracket({ matches, isAdmin, onSubmitScore, winnerTeamId,
                       <CardContent className="py-3">
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className={`flex-1 ${match.winner_team_id === match.team1_id ? "font-bold text-success" : ""}`}>
+                            <div className={`flex-1 ${match.winner_team_id === match.team1_id ? "font-bold text-success" : ""}`}>
                               {match.team1_name || "TBD"}
-                            </span>
+                              {match.team1_players && <p className="text-[11px] text-muted-foreground font-normal">{match.team1_players}</p>}
+                            </div>
                             {match.team1_score !== null && (
                               <span className="font-mono font-semibold">{match.team1_score}</span>
                             )}
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className={`flex-1 ${match.winner_team_id === match.team2_id ? "font-bold text-success" : ""}`}>
+                            <div className={`flex-1 ${match.winner_team_id === match.team2_id ? "font-bold text-success" : ""}`}>
                               {match.team2_name || "TBD"}
-                            </span>
+                              {match.team2_players && <p className="text-[11px] text-muted-foreground font-normal">{match.team2_players}</p>}
+                            </div>
                             {match.team2_score !== null && (
                               <span className="font-mono font-semibold">{match.team2_score}</span>
                             )}
