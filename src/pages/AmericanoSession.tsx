@@ -83,6 +83,92 @@ export default function AmericanoSession() {
     if (id) fetchSessionData();
   }, [id]);
 
+  // Realtime subscription for live standings updates
+  useEffect(() => {
+    if (!id || !session) return;
+
+    const channels: ReturnType<typeof supabase.channel>[] = [];
+
+    if (session.mode === "team") {
+      // Subscribe to team stats changes
+      const teamsChannel = supabase
+        .channel(`americano-teams-${id}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'americano_teams',
+          filter: `session_id=eq.${id}`,
+        }, () => {
+          // Re-fetch teams for updated standings
+          supabase.from("americano_teams").select("*").eq("session_id", id).order("total_points", { ascending: false })
+            .then(({ data }) => { if (data) setTeams(data); });
+        })
+        .subscribe();
+      channels.push(teamsChannel);
+
+      const matchesChannel = supabase
+        .channel(`americano-team-matches-${id}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'americano_team_matches',
+          filter: `session_id=eq.${id}`,
+        }, () => {
+          supabase.from("americano_team_matches").select("*").eq("session_id", id).order("round_number").order("court_number")
+            .then(({ data }) => { if (data) setTeamMatches(data); });
+        })
+        .subscribe();
+      channels.push(matchesChannel);
+    } else {
+      // Subscribe to player stats changes
+      const playersChannel = supabase
+        .channel(`americano-players-${id}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'americano_players',
+          filter: `session_id=eq.${id}`,
+        }, () => {
+          supabase.from("americano_players").select("*").eq("session_id", id).order("total_points", { ascending: false })
+            .then(({ data }) => { if (data) setPlayers(data); });
+        })
+        .subscribe();
+      channels.push(playersChannel);
+
+      const roundsChannel = supabase
+        .channel(`americano-rounds-${id}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'americano_rounds',
+          filter: `session_id=eq.${id}`,
+        }, () => {
+          supabase.from("americano_rounds").select("*").eq("session_id", id).order("round_number").order("court_number")
+            .then(({ data }) => { if (data) setRounds(data); });
+        })
+        .subscribe();
+      channels.push(roundsChannel);
+    }
+
+    // Subscribe to session status changes
+    const sessionChannel = supabase
+      .channel(`americano-session-${id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'americano_sessions',
+        filter: `id=eq.${id}`,
+      }, (payload) => {
+        setSession(payload.new as Session);
+      })
+      .subscribe();
+    channels.push(sessionChannel);
+
+    return () => {
+      channels.forEach((ch) => supabase.removeChannel(ch));
+    };
+  }, [id, session?.mode]);
+
   const fetchSessionData = async () => {
     try {
       const sessionRes = await supabase
