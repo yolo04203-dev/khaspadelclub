@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { Navigate, Link } from "react-router-dom";
 
-import { User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers } from "lucide-react";
+import { User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers, Pencil } from "lucide-react";
+import { RenameTeamDialog } from "@/components/team/RenameTeamDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
@@ -35,6 +36,8 @@ interface ModeBreakdown {
 export default function Dashboard() {
   const { user, role, isLoading, signOut } = useAuth();
   const [userTeam, setUserTeam] = useState<UserTeam | null>(null);
+  const [isCaptain, setIsCaptain] = useState(false);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [teamLoading, setTeamLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
     matchesPlayed: 0,
@@ -56,19 +59,20 @@ export default function Dashboard() {
       setFetchError(null);
       
       // Fetch team membership first — independent sections below degrade gracefully
-      const { data: memberData, error: memberError } = await supabase
-        .from("team_members")
-        .select("team_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+        const { data: memberData, error: memberError } = await supabase
+          .from("team_members")
+          .select("team_id, is_captain")
+          .eq("user_id", user.id)
+          .maybeSingle();
 
       if (memberError) {
         logger.apiError("fetchTeamMember", memberError, { userId: user.id });
         throw memberError;
       }
 
-      if (memberData?.team_id) {
-        const teamId = memberData.team_id;
+        if (memberData?.team_id) {
+          const teamId = memberData.team_id;
+          setIsCaptain(!!memberData.is_captain);
 
         // Section 1: Team info (critical — if this fails, show error)
         try {
@@ -221,7 +225,18 @@ export default function Dashboard() {
                           <Users className="w-6 h-6 text-accent" />
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground">{userTeam.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-foreground">{userTeam.name}</p>
+                            {isCaptain && (
+                              <button
+                                onClick={() => setShowRenameDialog(true)}
+                                className="text-muted-foreground hover:text-foreground transition-colors"
+                                aria-label="Rename team"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                           <p className="text-sm text-muted-foreground">
                             {userTeam.rank ? `Rank #${userTeam.rank}` : "Unranked"}
                           </p>
@@ -441,7 +456,17 @@ export default function Dashboard() {
           </div>
         </div>
       </main>
-    </PullToRefresh>
+     </PullToRefresh>
+
+      {userTeam && isCaptain && (
+        <RenameTeamDialog
+          open={showRenameDialog}
+          onOpenChange={setShowRenameDialog}
+          teamId={userTeam.id}
+          currentName={userTeam.name}
+          onRenamed={(newName) => setUserTeam({ ...userTeam, name: newName })}
+        />
+      )}
     </div>
   );
 }
