@@ -1,24 +1,28 @@
 
 
-## Add Custom Favicon
+## Replace Favicon with Custom Khas Padel Club Logo
 
 ### What changes
 
-Add an explicit `<link rel="icon">` tag in `index.html` pointing to your existing `/public/favicon.ico` file, ensuring browsers use your custom icon instead of any default.
+1. Copy the uploaded logo image to `public/favicon.png`
+2. Update `index.html` to reference the new PNG favicon instead of the old `.ico` file
+3. Also update the `apple-touch-icon` to use this new logo for consistency
 
 ### Implementation
 
-**File: `index.html`**
+**Step 1:** Copy `user-uploads://ChatGPT_Image_Feb_18_2026_02_41_55_PM.png` to `public/favicon.png`
 
-Add the following line after the `<meta charset>` tag (around line 4), before the title:
-
+**Step 2: `index.html`** -- Change the favicon link from:
 ```html
 <link rel="icon" type="image/x-icon" href="/favicon.ico" />
 ```
-
-This is the only change needed. The file `public/favicon.ico` already exists in your project, and adding this explicit reference ensures all browsers pick it up and no default/Lovable branding favicon is used.
+to:
+```html
+<link rel="icon" type="image/png" href="/favicon.png" />
+```
 
 ### Files changed
 
-- `index.html` -- add one `<link rel="icon">` tag
+- `public/favicon.png` -- new file (copied from upload)
+- `index.html` -- update favicon link to point to the new PNG
 
