@@ -1,0 +1,1 @@
+ALTER TABLE public.americano_sessions ADD COLUMN number_of_courts integer NOT NULL DEFAULT 1;

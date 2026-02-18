@@ -36,6 +36,7 @@ export default function AmericanoCreate() {
     { teamName: "", player1: "", player2: "" },
     { teamName: "", player1: "", player2: "" },
   ]);
+  const [numberOfCourts, setNumberOfCourts] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const addPlayer = () => {
@@ -119,6 +120,7 @@ export default function AmericanoCreate() {
             points_per_round: pointsPerRound,
             total_rounds: totalRounds,
             mode: "individual",
+            number_of_courts: numberOfCourts,
           })
           .select()
           .single();
@@ -179,8 +181,9 @@ export default function AmericanoCreate() {
             name: sessionName.trim(),
             created_by: user!.id,
             points_per_round: pointsPerRound,
-            total_rounds: totalMatches, // Each match is like a "round" in team mode
+            total_rounds: totalMatches,
             mode: "team",
+            number_of_courts: numberOfCourts,
           })
           .select()
           .single();
@@ -352,6 +355,19 @@ export default function AmericanoCreate() {
                     placeholder="e.g., Friday Night Americano"
                     value={sessionName}
                     onChange={(e) => setSessionName(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="courts">Number of Courts</Label>
+                  <Input
+                    id="courts"
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={numberOfCourts}
+                    onChange={(e) => setNumberOfCourts(parseInt(e.target.value) || 1)}
                     required
                   />
                 </div>

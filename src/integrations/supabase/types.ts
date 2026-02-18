@@ -143,6 +143,7 @@ export type Database = {
           id: string
           mode: string
           name: string
+          number_of_courts: number
           points_per_round: number
           started_at: string | null
           status: Database["public"]["Enums"]["americano_status"]
@@ -158,6 +159,7 @@ export type Database = {
           id?: string
           mode?: string
           name: string
+          number_of_courts?: number
           points_per_round?: number
           started_at?: string | null
           status?: Database["public"]["Enums"]["americano_status"]
@@ -173,6 +175,7 @@ export type Database = {
           id?: string
           mode?: string
           name?: string
+          number_of_courts?: number
           points_per_round?: number
           started_at?: string | null
           status?: Database["public"]["Enums"]["americano_status"]
