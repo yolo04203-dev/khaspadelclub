@@ -1,3 +1,4 @@
+import React from "react";
 import { Bell, Swords, Calendar, CheckCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useNotifications } from "@/contexts/NotificationContext";
@@ -13,7 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-export function NotificationBell() {
+export const NotificationBell = React.memo(function NotificationBell() {
   const { counts, isLoading } = useNotifications();
 
   return (
@@ -97,4 +98,4 @@ export function NotificationBell() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
+});

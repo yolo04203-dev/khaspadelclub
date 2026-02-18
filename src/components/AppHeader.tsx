@@ -5,7 +5,7 @@ import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
-import { useCallback } from "react";
+import React, { useCallback } from "react";
 
 interface AppHeaderProps {
   showBack?: boolean;
@@ -29,7 +29,7 @@ const navLinks = [
   { to: "/stats", label: "Stats", icon: BarChart3 },
 ];
 
-export function AppHeader({ showBack = false, backTo = "/dashboard", actions }: AppHeaderProps) {
+export const AppHeader = React.memo(function AppHeader({ showBack = false, backTo = "/dashboard", actions }: AppHeaderProps) {
   const { user, role, signOut } = useAuth();
   const location = useLocation();
 
@@ -133,4 +133,4 @@ export function AppHeader({ showBack = false, backTo = "/dashboard", actions }: 
       )}
     </>
   );
-}
+});

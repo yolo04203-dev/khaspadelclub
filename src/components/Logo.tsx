@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import logoImg from "@/assets/logo.png";
 
 interface LogoProps {
@@ -26,16 +25,14 @@ export function Logo({
 }: LogoProps) {
   return (
     <div className={`flex items-center gap-3 ${className}`}>
-      <motion.img
+      <img
         src={logoImg}
         alt="Khas Padel Club"
-        loading="lazy"
         decoding="async"
+        fetchPriority="high"
         width={size === "lg" ? 56 : size === "md" ? 40 : 32}
         height={size === "lg" ? 56 : size === "md" ? 40 : 32}
-        className={`${sizeClasses[size]} object-contain`}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+        className={`${sizeClasses[size]} object-contain transition-transform duration-150 hover:scale-105 active:scale-95`}
       />
 
       {showText && (

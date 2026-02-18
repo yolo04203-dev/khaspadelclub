@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { List } from "react-window";
 import { Search, Users, Filter, User, Loader2, Clock } from "lucide-react";
@@ -37,7 +37,7 @@ interface Player {
 const PAGE_SIZE = 30;
 const SKILL_LEVELS = ["Beginner", "Intermediate", "Advanced", "Pro"];
 
-function PlayerCard({ player }: { player: Player }) {
+const PlayerCard = React.memo(function PlayerCard({ player }: { player: Player }) {
   return (
     <Card className="hover:border-primary/30 transition-colors">
       <CardContent className="p-4">
@@ -82,7 +82,7 @@ function PlayerCard({ player }: { player: Player }) {
       </CardContent>
     </Card>
   );
-}
+});
 
 function PlayerRow({ index, style, players }: { index: number; style: React.CSSProperties; ariaAttributes: any; players: Player[] }) {
   const player = players[index];
