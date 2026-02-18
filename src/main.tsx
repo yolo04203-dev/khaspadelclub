@@ -1,12 +1,16 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { initWebVitals } from "@/lib/webVitals";
 import { logger } from "@/lib/logger";
-import { analytics } from "@/lib/analytics/posthog";
 
-initWebVitals();
-analytics.init();
+// Render first, then initialize non-critical services
+const deferInit = (fn: () => void) => {
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(fn);
+  } else {
+    setTimeout(fn, 2000);
+  }
+};
 
 // Defer Sentry to after first render to remove ~30KB from critical path
 if ('requestIdleCallback' in window) {
@@ -33,6 +37,10 @@ window.addEventListener("unhandledrejection", (event) => {
 });
 
 createRoot(document.getElementById("root")!).render(<App />);
+
+// Defer analytics and web-vitals to after first paint
+deferInit(() => import("@/lib/webVitals").then(m => m.initWebVitals()));
+deferInit(() => import("@/lib/analytics/posthog").then(m => m.analytics.init()));
 
 // Register service worker for PWA support
 if ("serviceWorker" in navigator) {

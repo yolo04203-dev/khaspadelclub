@@ -1,13 +1,10 @@
-import { useEffect, Suspense, lazy, ComponentType } from "react";
+import { useEffect, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-import { AnimatePresence } from "framer-motion";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { NotificationProvider } from "@/contexts/NotificationContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { OfflineBanner, SlowConnectionBanner } from "@/components/ui/error-state";
@@ -15,51 +12,23 @@ import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useStatusBar } from "@/hooks/useStatusBar";
 import { logger } from "@/lib/logger";
 import { PerfOverlay } from "@/components/dev/PerfOverlay";
-import { PageTransition } from "@/components/PageTransition";
-import { useScreenTracking } from "@/hooks/useScreenTracking";
 import { useCapacitorAnalytics } from "@/hooks/useCapacitorAnalytics";
-import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
 
-// Eager load critical pages
+// Eager load only the landing page — everything else is lazy
 import Index from "./pages/Index";
-import Auth from "./pages/Auth";
 
-import NotFound from "./pages/NotFound";
+// Public pages that don't need auth (lazy)
+const Auth = lazyWithRetry(() => import("./pages/Auth"));
+const Privacy = lazyWithRetry(() => import("./pages/Privacy"));
+const Terms = lazyWithRetry(() => import("./pages/Terms"));
+const Contact = lazyWithRetry(() => import("./pages/Contact"));
 
-// Chunk-load error fallback
-function ChunkErrorFallback() {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 p-6 text-center">
-      <h2 className="text-lg font-semibold text-foreground">Failed to load page</h2>
-      <p className="text-sm text-muted-foreground max-w-sm">
-        This can happen on slow connections or after an app update. Please reload to try again.
-      </p>
-      <Button onClick={() => window.location.reload()} variant="outline">
-        <RefreshCw className="w-4 h-4 mr-2" />
-        Reload
-      </Button>
-    </div>
-  );
-}
+// Authenticated shell (AuthProvider + NotificationProvider + all protected routes)
+const AuthenticatedRoutes = lazyWithRetry(() => import("./components/AuthenticatedRoutes"));
 
-// Lazy loader with one retry before showing fallback
-function lazyWithRetry(importFn: () => Promise<{ default: ComponentType<any> }>) {
-  return lazy(() =>
-    importFn().catch(() =>
-      new Promise<{ default: ComponentType<any> }>((resolve) =>
-        setTimeout(() => {
-          importFn()
-            .then(resolve)
-            .catch(() => resolve({ default: ChunkErrorFallback }));
-        }, 1500)
-      )
-    )
-  );
-}
-
-// Lazy load non-critical pages for better performance
-const lazyImports = {
+// Lazy imports map for prefetching in AppHeader
+export const lazyImports = {
   Dashboard: () => import("./pages/Dashboard"),
   Ladders: () => import("./pages/Ladders"),
   LadderDetail: () => import("./pages/LadderDetail"),
@@ -85,33 +54,6 @@ const lazyImports = {
   GenerateIcons: () => import("./pages/GenerateIcons"),
 };
 
-// Export for prefetching in AppHeader
-export { lazyImports };
-
-const Dashboard = lazyWithRetry(lazyImports.Dashboard);
-const Ladders = lazyWithRetry(lazyImports.Ladders);
-const LadderDetail = lazyWithRetry(lazyImports.LadderDetail);
-const LadderCreate = lazyWithRetry(lazyImports.LadderCreate);
-const LadderManage = lazyWithRetry(lazyImports.LadderManage);
-const CreateTeam = lazyWithRetry(lazyImports.CreateTeam);
-const Challenges = lazyWithRetry(lazyImports.Challenges);
-const FindOpponents = lazyWithRetry(lazyImports.FindOpponents);
-const Americano = lazyWithRetry(lazyImports.Americano);
-const AmericanoCreate = lazyWithRetry(lazyImports.AmericanoCreate);
-const AmericanoSession = lazyWithRetry(lazyImports.AmericanoSession);
-const Tournaments = lazyWithRetry(lazyImports.Tournaments);
-const TournamentCreate = lazyWithRetry(lazyImports.TournamentCreate);
-const TournamentDetail = lazyWithRetry(lazyImports.TournamentDetail);
-const Profile = lazyWithRetry(lazyImports.Profile);
-const Players = lazyWithRetry(lazyImports.Players);
-const PlayerProfile = lazyWithRetry(lazyImports.PlayerProfile);
-const Stats = lazyWithRetry(lazyImports.Stats);
-const Admin = lazyWithRetry(lazyImports.Admin);
-const Privacy = lazyWithRetry(lazyImports.Privacy);
-const Terms = lazyWithRetry(lazyImports.Terms);
-const Contact = lazyWithRetry(lazyImports.Contact);
-const GenerateIcons = lazyWithRetry(lazyImports.GenerateIcons);
-
 // Network status wrapper component
 function NetworkStatusProvider({ children }: { children: React.ReactNode }) {
   const { isOnline, isSlowConnection } = useNetworkStatus();
@@ -124,51 +66,6 @@ function NetworkStatusProvider({ children }: { children: React.ReactNode }) {
         {children}
       </div>
     </>
-  );
-}
-
-/** Animated routes with page transitions */
-function AnimatedRoutes() {
-  const location = useLocation();
-  useScreenTracking();
-  return (
-    <Suspense fallback={<LoadingScreen message="Loading page..." />}>
-      <AnimatePresence mode="wait" initial={false}>
-        <PageTransition key={location.pathname}>
-          <Routes location={location}>
-            {/* Critical routes - eagerly loaded */}
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            {/* Lazy loaded routes */}
-            <Route path="/ladders" element={<Ladders />} />
-            <Route path="/ladders/create" element={<LadderCreate />} />
-            <Route path="/ladders/:id" element={<LadderDetail />} />
-            <Route path="/ladders/:id/manage" element={<LadderManage />} />
-            <Route path="/teams/create" element={<CreateTeam />} />
-            <Route path="/challenges" element={<Challenges />} />
-            <Route path="/find-opponents" element={<FindOpponents />} />
-            <Route path="/americano" element={<Americano />} />
-            <Route path="/americano/create" element={<AmericanoCreate />} />
-            <Route path="/americano/:id" element={<AmericanoSession />} />
-            <Route path="/tournaments" element={<Tournaments />} />
-            <Route path="/tournaments/create" element={<TournamentCreate />} />
-            <Route path="/tournaments/:id" element={<TournamentDetail />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/players" element={<Players />} />
-            <Route path="/players/:id" element={<PlayerProfile />} />
-            <Route path="/stats" element={<Stats />} />
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/generate-icons" element={<GenerateIcons />} />
-            {/* Catch-all 404 route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </PageTransition>
-      </AnimatePresence>
-    </Suspense>
   );
 }
 
@@ -189,7 +86,6 @@ function NativeLifecycleManager() {
       try {
         const { App: CapApp } = await import("@capacitor/app");
 
-        // Deep link handler
         appListener = await CapApp.addListener("appUrlOpen", (event) => {
           try {
             const url = new URL(event.url);
@@ -203,7 +99,6 @@ function NativeLifecycleManager() {
           }
         });
 
-        // Foreground resume — refetch active queries
         resumeListener = await CapApp.addListener("appStateChange", (state) => {
           if (state.isActive) {
             logger.debug("App resumed — refetching active queries");
@@ -211,7 +106,6 @@ function NativeLifecycleManager() {
           }
         });
 
-        // Android hardware back button
         backListener = await CapApp.addListener("backButton", ({ canGoBack }) => {
           if (canGoBack) {
             navigate(-1);
@@ -240,18 +134,13 @@ function NativeLifecycleManager() {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Retry failed queries 3 times with exponential backoff
       retry: 3,
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      // Stale time: data is fresh for 2 minutes (navigations reuse cache)
       staleTime: 2 * 60 * 1000,
-      // Cache time: keep unused data for 10 minutes
       gcTime: 10 * 60 * 1000,
-      // Don't refetch on window focus in production for stability
       refetchOnWindowFocus: false,
     },
     mutations: {
-      // Log mutation errors
       onError: (error) => {
         logger.error("Mutation failed", error);
       },
@@ -260,7 +149,6 @@ const queryClient = new QueryClient({
 });
 
 const App = () => {
-  // Storage availability check (global error handlers are in main.tsx)
   useEffect(() => {
     try {
       const testKey = "__storage_test__";
@@ -274,20 +162,27 @@ const App = () => {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <NotificationProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <NativeLifecycleManager />
-                <NetworkStatusProvider>
-                  <AnimatedRoutes />
-                </NetworkStatusProvider>
-              </BrowserRouter>
-            </TooltipProvider>
-          </NotificationProvider>
-        </AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <NativeLifecycleManager />
+            <NetworkStatusProvider>
+              <Suspense fallback={<LoadingScreen message="Loading..." />}>
+                <Routes>
+                  {/* Public routes — no AuthProvider, no NotificationProvider */}
+                  <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/privacy" element={<Privacy />} />
+                  <Route path="/terms" element={<Terms />} />
+                  <Route path="/contact" element={<Contact />} />
+                  {/* All other routes go through AuthProvider + NotificationProvider */}
+                  <Route path="/*" element={<AuthenticatedRoutes />} />
+                </Routes>
+              </Suspense>
+            </NetworkStatusProvider>
+          </BrowserRouter>
+        </TooltipProvider>
       </QueryClientProvider>
       {import.meta.env.DEV && <PerfOverlay />}
     </ErrorBoundary>
