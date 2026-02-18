@@ -286,13 +286,14 @@ export default function TournamentCreate() {
                 <div className="space-y-2">
                   <Label htmlFor="venue" className="flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
-                    Venue (optional)
+                    Venue
                   </Label>
                   <Input
                     id="venue"
                     placeholder="e.g., City Sports Club, Main Court"
                     value={venue}
                     onChange={(e) => setVenue(e.target.value)}
+                    required
                   />
                 </div>
               </CardContent>
