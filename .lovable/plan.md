@@ -1,35 +1,48 @@
 
 
-# Add "Change Partner" Option to Dashboard
+# Block Partner Removal When Team Has Active Competitions
 
 ## What Changes
 
-When a captain views their team on the dashboard, they will see a "Change Partner" button that opens the same `AddPartnerDialog` used during team creation. This allows them to update the partner name (manual entry) or invite a different registered player at any time -- not just during initial team creation.
+Currently, the "Remove Partner" dialog shows a **warning** about active ladder rankings, pending challenges, and accepted challenges -- but still allows removal. This needs to change:
 
-## Where It Appears
+- If the team is **enrolled in any ladder** (has entries in `ladder_rankings`) or has **active tournament registrations** (entries in `tournament_participants` for non-completed tournaments), the "Remove Partner" button should be **disabled** with a clear explanation.
+- Pending/accepted challenges should also block removal.
+- The message should explain that the partner can only be changed for **future** ladders and tournaments, not ones they're already enrolled in.
 
-The "Change Partner" button will appear on the dashboard team card for captains whose team has only 1 registered member (i.e., the partner was added manually via name only). For teams with 2 registered members, the button will not appear since changing a partner would require removing an actual user from the team, which is a different flow.
+## How It Works for the User
 
-Additionally, for solo captains (no partner at all), the existing "Invite Partner" button will be replaced with the same `AddPartnerDialog` so they also get the manual name option from the dashboard.
+1. Captain clicks "Remove Partner"
+2. Dialog opens and checks for active competitions
+3. **If active competitions exist**: The "Remove Partner" button is disabled. A message explains:
+   - Which ladders the team is ranked in
+   - Which tournaments the team is registered for
+   - Any pending/accepted challenges
+   - "You must withdraw from all active competitions before changing your partner. Partner changes only apply to future ladders and tournaments."
+4. **If no active competitions**: Removal proceeds as before
 
 ## Technical Details
 
+### File: `src/components/team/RemovePartnerDialog.tsx`
+
+- Add a query for active tournament registrations:
+  ```
+  supabase
+    .from("tournament_participants")
+    .select("tournament_id, tournaments(name, status)")
+    .eq("team_id", teamId)
+  ```
+  Then filter for tournaments where status is not `completed`.
+- Update the `ActiveData` interface to include `activeTournaments: { name: string }[]`
+- Change `hasWarnings` to a `isBlocked` boolean -- when any active data exists, the action is **blocked**, not just warned
+- Disable the "Remove Partner" button when `isBlocked` is true
+- Update the warning text to explain that the team must first withdraw from ladders/tournaments before the partner can be removed
+- Change the warning box color/style to indicate a hard block (not just a warning)
+
 ### File: `src/pages/Dashboard.tsx`
 
-- Import `AddPartnerDialog` and the `UserRoundCog` (or `RefreshCw`) icon
-- Add state for `showChangePartnerDialog`
-- In the team card actions area (lines 281-293):
-  - For solo teams (memberNames.length < 2): change the "Invite Partner" button to open `AddPartnerDialog` instead of navigating to `/players`
-  - For teams where memberNames.length is 1 but team name contains " & " (manual partner was set): show a "Change Partner" button that opens `AddPartnerDialog`
-- Render `AddPartnerDialog` at the bottom of the component, passing the current captain name from `userTeam.memberNames[0]`
-- On dialog close, call `fetchDashboardData()` to refresh the team card
+- Also add a "Change Partner" button for 2-member teams (alongside "Remove Partner") that opens `AddPartnerDialog` -- but **only when the team has no active competitions**
+- Alternatively, keep it simple: the captain must remove the partner first (which requires withdrawing from competitions), then add a new one
 
-### File: `src/components/team/AddPartnerDialog.tsx`
+No database changes needed.
 
-- Make the navigation optional: add an `onComplete` callback prop as an alternative to the hardcoded `navigate("/ladders")` and `navigate("/dashboard")`
-- When `onComplete` is provided, call it instead of navigating -- this lets the dashboard refresh in place without navigating away
-- The skip button should just close the dialog when used from the dashboard (no navigation needed)
-
-### No Database Changes Required
-
-Same `teams.update({ name })` call already works via existing RLS policies (captains can update their team).
