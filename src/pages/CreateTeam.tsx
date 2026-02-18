@@ -20,7 +20,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { toast } from "@/hooks/use-toast";
-import { InvitePartnerDialog } from "@/components/team/InvitePartnerDialog";
+import { AddPartnerDialog } from "@/components/team/AddPartnerDialog";
 import { logger } from "@/lib/logger";
 
 const teamSchema = z.object({
@@ -288,17 +288,14 @@ export default function CreateTeam() {
         </motion.div>
 
         {createdTeam && (
-          <InvitePartnerDialog
+          <AddPartnerDialog
             open={showInviteDialog}
             onOpenChange={(open) => {
               setShowInviteDialog(open);
-              if (!open) navigate("/ladders");
             }}
             teamId={createdTeam.id}
             teamName={createdTeam.name}
-            onInviteSent={() => {
-              navigate("/ladders");
-            }}
+            captainName={form.getValues("player1Name").trim()}
           />
         )}
       </main>
