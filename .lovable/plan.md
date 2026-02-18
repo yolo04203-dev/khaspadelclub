@@ -1,34 +1,55 @@
 
 
-## Add Score Validation for Americano Matches
+# Fix Team Invitation Flow
 
-In Americano, the total points in each match are fixed (e.g., 21). Both teams' scores must add up to exactly the `points_per_round` value. For example, valid scores include 20-1, 16-5, 11-10, etc.
+## Problem
+Two issues prevent testing the invitation acceptance and auto-rename flow:
 
-### Changes
+1. **Invitations are invisible (403 error)**: The RLS policy "Anyone can view their invitations" on `team_invitations` contains a subquery against `auth.users` to match by email. The `authenticated` role does not have SELECT access to `auth.users`, causing a "permission denied for table users" error.
 
-**File: `src/pages/AmericanoSession.tsx`**
+2. **Acceptance is blocked**: Ahmed already has his own team ("Ahmed's Team"), so the `PendingInvitations` component rejects acceptance with "Already on a team." To accept an invitation, the user would need to leave their current team first -- or the app should handle this automatically.
 
-1. **Individual mode (`submitScore` function)** -- Add a validation check after parsing scores:
-   - If `team1Score + team2Score !== session.points_per_round`, show an error toast like "Scores must add up to {points_per_round}" and return early.
+## Plan
 
-2. **Team mode (`submitTeamScore` function)** -- Same validation:
-   - If `team1Score + team2Score !== session.points_per_round`, show the same error toast and return early.
+### Step 1: Fix the RLS policy on `team_invitations`
+Create a migration that replaces the broken SELECT policies. Instead of querying `auth.users.email`, use `invited_user_id = auth.uid()` for the user-id based check, and remove or replace the email-based check (since invitations are already resolved to `invited_user_id` at creation time).
 
-3. **Score input hint** -- Add a helper text below each match's score inputs showing the required total, e.g., "Total must equal 21", so users know the constraint before submitting.
+Updated policies:
+- **"Anyone can view their invitations"**: `invited_user_id = auth.uid()`
+- **"Invited users can update invitation status"**: `invited_user_id = auth.uid()`
 
-### Technical Details
+The email-based fallback (`invited_email`) is no longer needed since the `InvitePartnerDialog` already resolves the user by display name and stores `invited_user_id`.
 
-Both `submitScore` (line ~360) and `submitTeamScore` (line ~315) will get a new check right after the `isNaN` validation:
+### Step 2: Handle "already on a team" scenario
+Update `PendingInvitations` component so that when a user who is already a captain of a solo team (no partner) accepts an invitation:
+- Automatically remove them from their old solo team (and optionally delete the empty team)
+- Then proceed with joining the new team
 
-```typescript
-if (team1Score + team2Score !== session!.points_per_round) {
-  toast({
-    title: "Invalid score total",
-    description: `Scores must add up to ${session!.points_per_round}`,
-    variant: "destructive",
-  });
-  return;
-}
+This makes the flow seamless: a solo captain can accept an invitation without manually leaving their team first.
+
+### Step 3: Verify auto-rename
+After acceptance, the existing `auto_name_team` database function is already called in the `handleRespond` function. This will rename the team to "Player1 & Player2" format once the second member joins.
+
+## Technical Details
+
+### Migration SQL (Step 1)
+```sql
+-- Drop and recreate the broken SELECT/UPDATE policies
+DROP POLICY IF EXISTS "Anyone can view their invitations" ON team_invitations;
+DROP POLICY IF EXISTS "Invited users can update invitation status" ON team_invitations;
+
+CREATE POLICY "Anyone can view their invitations"
+  ON team_invitations FOR SELECT
+  USING (invited_user_id = auth.uid());
+
+CREATE POLICY "Invited users can update invitation status"
+  ON team_invitations FOR UPDATE
+  USING (invited_user_id = auth.uid());
 ```
 
-A small muted text label will be added near the score inputs in the Rounds tab to display the constraint visually.
+### Component Changes (Step 2)
+In `src/components/team/PendingInvitations.tsx`, update the `handleRespond` function:
+- When accepting, check if the user is on a solo team (team with only 1 member)
+- If so, remove them from that team and delete the empty team before joining the new one
+- If the user is on a team with 2 members, keep the existing "Already on a team" error
+
