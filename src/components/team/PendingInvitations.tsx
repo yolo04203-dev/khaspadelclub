@@ -104,13 +104,15 @@ export function PendingInvitations({ onAccepted }: PendingInvitationsProps) {
           .maybeSingle();
 
         if (existingMember) {
-          // Check if this is a solo team (only 1 member)
-          const { count } = await supabase
+          // Count team members to check if solo team
+          const { data: teammates } = await supabase
             .from("team_members")
-            .select("id", { count: "exact", head: true })
+            .select("id")
             .eq("team_id", existingMember.team_id);
 
-          if (count && count > 1) {
+          const memberCount = teammates?.length ?? 0;
+
+          if (memberCount > 1) {
             toast({
               title: "Already on a team",
               description: "You must leave your current team before joining another.",
@@ -119,12 +121,17 @@ export function PendingInvitations({ onAccepted }: PendingInvitationsProps) {
             return;
           }
 
-          // Solo team — auto-remove and delete
+          // Solo team — auto-remove and delete the empty team
           const oldTeamId = existingMember.team_id;
+
+          // Remove self from old team (use team_id + user_id for RLS compatibility)
           await supabase
             .from("team_members")
             .delete()
-            .eq("id", existingMember.id);
+            .eq("team_id", oldTeamId)
+            .eq("user_id", user.id);
+
+          // Delete the now-empty team
           await supabase
             .from("teams")
             .delete()
