@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Navigate, Link } from "react-router-dom";
 
-import { User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers, Pencil } from "lucide-react";
+import { User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers, Pencil, AlertTriangle, UserPlus } from "lucide-react";
 import { RenameTeamDialog } from "@/components/team/RenameTeamDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -262,19 +262,34 @@ export default function Dashboard() {
                               </button>
                             )}
                           </div>
-                          {userTeam.memberNames.length === 2 && (
+                          {userTeam.memberNames.length === 2 ? (
                             <p className="text-xs text-muted-foreground">
                               {userTeam.memberNames[0]} & {userTeam.memberNames[1]}
                             </p>
+                          ) : (
+                            <div className="flex items-center gap-1.5 text-warning">
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                              <p className="text-xs font-medium">Team needs a partner to compete</p>
+                            </div>
                           )}
                           <p className="text-sm text-muted-foreground">
                             {userTeam.rank ? `Rank #${userTeam.rank}` : "Unranked"}
                           </p>
                         </div>
                       </div>
-                      <Button variant="outline" className="w-full sm:w-auto" asChild>
-                        <Link to="/ladders">View Ladders</Link>
-                      </Button>
+                      <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                        {userTeam.memberNames.length < 2 && isCaptain && (
+                          <Button variant="default" className="w-full sm:w-auto" asChild>
+                            <Link to="/players">
+                              <UserPlus className="w-4 h-4 mr-2" />
+                              Invite Partner
+                            </Link>
+                          </Button>
+                        )}
+                        <Button variant="outline" className="w-full sm:w-auto" asChild>
+                          <Link to="/ladders">View Ladders</Link>
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

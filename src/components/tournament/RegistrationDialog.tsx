@@ -31,6 +31,7 @@ interface RegistrationDialogProps {
   isFull: boolean;
   userTeam: UserTeam | null;
   categories?: TournamentCategory[];
+  teamMemberCount?: number;
   onRegister: (teamId: string | null, customTeamName: string | null, player1Name?: string, player2Name?: string, categoryId?: string) => Promise<void>;
 }
 
@@ -44,6 +45,7 @@ export function RegistrationDialog({
   isFull,
   userTeam,
   categories = [],
+  teamMemberCount = 2,
   onRegister,
 }: RegistrationDialogProps) {
   const [registrationType, setRegistrationType] = useState<"existing" | "custom">(
@@ -82,6 +84,8 @@ export function RegistrationDialog({
   const isCategoryFull = selectedCategory 
     ? selectedCategory.participantCount >= selectedCategory.max_teams 
     : isFull;
+
+  const isExistingTeamIncomplete = registrationType === "existing" && teamMemberCount < 2;
 
   // Determine which fee to display - category-specific or tournament default
   const displayedFee = selectedCategory && (selectedCategory.entry_fee ?? 0) > 0
@@ -213,6 +217,19 @@ export function RegistrationDialog({
             )}
           </div>
 
+          {/* Incomplete Team Warning */}
+          {isExistingTeamIncomplete && (
+            <div className="rounded-lg border border-warning/30 bg-warning/10 p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-warning mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium text-foreground">Team incomplete</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Your team needs 2 players before registering. Invite a partner from the Find Players page.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Entry Fee Information */}
           {displayedFee > 0 && (
             <div className="rounded-lg border border-warning/30 bg-warning/5 p-4 space-y-3">
@@ -266,7 +283,7 @@ export function RegistrationDialog({
           </Button>
           <Button 
             onClick={handleSubmit} 
-            disabled={isSubmitting || (registrationType === "custom" && !isCustomFormValid) || !isCategoryValid}
+            disabled={isSubmitting || (registrationType === "custom" && !isCustomFormValid) || !isCategoryValid || isExistingTeamIncomplete}
           >
             {isSubmitting ? (
               <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin mr-2" />

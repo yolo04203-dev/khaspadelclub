@@ -130,6 +130,7 @@ export default function LadderDetail() {
   const [userTeamName, setUserTeamName] = useState<string | null>(null);
   const [pendingJoinRequests, setPendingJoinRequests] = useState<Set<string>>(new Set());
   const [isInLadder, setIsInLadder] = useState(false);
+  const [userTeamMemberCount, setUserTeamMemberCount] = useState(0);
 
   const fetchLadderData = async () => {
     if (!id) return;
@@ -283,6 +284,13 @@ export default function LadderDetail() {
         setUserTeamName(((userMembership as any)?.team as any)?.name || null);
 
         if (teamId) {
+          // Fetch team member count
+          const { count: memberCount } = await supabase
+            .from("team_members")
+            .select("*", { count: "exact", head: true })
+            .eq("team_id", teamId);
+          setUserTeamMemberCount(memberCount || 0);
+
           const userRanking = rankingsData?.find((r) => (r.team as any)?.id === teamId);
           setUserTeamRank(userRanking?.rank || null);
           setUserCategoryId(userRanking?.ladder_category_id || null);
@@ -342,6 +350,7 @@ export default function LadderDetail() {
     if (targetTeamId === userTeamId) return false;
     if (pendingChallenges.has(targetTeamId)) return false;
     if (isTeamFrozen(team)) return false;
+    if (userTeamMemberCount < 2) return false;
     const challengeRange = activeCategoryData?.challenge_range || 5;
     return targetRank < userTeamRank && userTeamRank - targetRank <= challengeRange;
   };
@@ -466,6 +475,7 @@ export default function LadderDetail() {
                 teamName={userTeamName || "Your Team"}
                 existingRequests={pendingJoinRequests}
                 onRequestSubmitted={fetchLadderData}
+                teamMemberCount={userTeamMemberCount}
               />
             )}
 
