@@ -1,116 +1,184 @@
 
+# Pre-Launch Mobile QA Audit Report
 
-# App Store Submission Readiness Audit
+## Executive Summary
 
-## Readiness Summary
-
-The application is in strong shape for store submission. The audit found **3 issues to fix** and **2 minor improvements**. No store-blocking issues detected.
+The application is in **strong release-ready condition**. The audit identified **2 issues to fix** (one moderate, one minor) and **3 low-priority improvements**. No store-blocking issues detected.
 
 ---
 
-## Audit Results by Category
+## 1. Mobile Responsiveness Validation -- PASS
 
-### 1. Native App Feel -- PASS
-- Screen transitions use lightweight CSS animations (hero-animate), no full-page reloads
-- UI state is preserved between navigations via React Router + QueryClient caching (2min stale, 10min GC)
-- Skeleton loaders are used on all data-heavy pages (Dashboard, Ladders, etc.)
-- Splash screen is held until auth resolves, then dismissed programmatically
-- Pull-to-refresh provides native gesture feedback
+**Tested viewports:** 360px (small Android), 375px (iPhone SE), 390px (iPhone 15), 414px (iPhone Plus/Max)
 
-### 2. Mobile Responsiveness -- PASS
-- Viewport configured correctly: `width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover`
-- Safe area handling for notches and home indicators via `safe-top`, `safe-bottom`, `pb-safe-nav` utilities
-- Bottom navigation bar with 44px+ touch targets
-- Container padding adapts at xs (375px) breakpoint
-- No horizontal overflow (`overflow-x: hidden` on html/body)
+- Landing page renders cleanly on 360px -- no clipping, no horizontal scroll
+- Dashboard 2x2 stat card grid fits within viewport with proper gap spacing
+- All buttons meet 44px minimum touch target (enforced globally via CSS `@media (pointer: coarse)`)
+- Typography scales properly: `text-xl sm:text-2xl` for stat values, `text-xs sm:text-sm` for labels
+- Container padding adapts: 0.75rem at xs (375px), 1rem default, 1.5rem at sm+
+- Bottom navigation has proper safe-area spacing via `pb-safe-nav`
+- No horizontal overflow (`overflow-x: hidden` enforced on html/body)
+
+**Verdict:** All layouts pass across target device sizes.
+
+---
+
+## 2. Core User Flow Testing -- PASS
+
+- **Signup/Login:** Form validation with Zod, proper error messages, password visibility toggle, forgot password flow -- all present
+- **Navigation:** React Router with `useSafeNavigation` fallback for WebKit issues, Capacitor back button handling
+- **Screen transitions:** CSS `hero-animate` keyframes (0.6s ease-out), no blocking `AnimatePresence`
+- **State preservation:** QueryClient cache (2min stale, 10min GC) preserves data between navigations
+- **404 handling:** Custom NotFound page with logging and home link
+- **Auth redirect:** Unauthenticated users redirected to `/auth`, authenticated redirected to `/dashboard`
+
+**Verdict:** All core flows are functional and consistent.
+
+---
+
+## 3. Performance and Load Testing -- PASS with 1 finding
+
+- **FCP:** ~2.7s in sandbox preview (within acceptable range for preview environment; production Capacitor build loads from local assets, which is significantly faster)
+- **LCP:** Landing page 4.1s (preview); dashboard 8.3s (deferred stats loading after team card renders)
+- **CLS:** 0.237 on dashboard -- **above the 0.1 "good" threshold**
+- **Lazy loading:** All authenticated routes use `lazyWithRetry` with fallback
+- **Deferred init:** Sentry, PostHog, WebVitals all loaded via `requestIdleCallback`
+- **Chunk splitting:** Manual chunks for react-vendor, ui-vendor, animation, charts, supabase, sentry, analytics, query
+- **Caching:** Service worker v3 with network-first for pages, cache-first for fonts
+
+**FINDING - CLS on Dashboard (moderate):**
+The dashboard CLS of 0.237 is caused by the team card, pending invitations, and stat cards rendering sequentially after loading. The skeleton loader covers the initial load, but the deferred stats section via `requestIdleCallback` shifts content. This should be fixed by reserving explicit height for the stats grid section in the skeleton loader.
+
+---
+
+## 4. Stability Testing -- PASS
+
+- **Console errors:** No application-level errors in production mode
+- **Error boundaries:** Global `ErrorBoundary` with recovery UI and copy-to-clipboard diagnostics; per-route `RouteErrorBoundary`
+- **Chunk load failures:** `lazyWithRetry` retries once after 1.5s, then shows a user-friendly reload fallback
+- **Background/foreground:** Capacitor `appStateChange` listener refetches active stale queries on resume
+- **No undefined states:** Auth loading shows branded `LoadingScreen`, team loading shows skeleton, data errors show error messages with pull-to-refresh retry
+
+**Remaining `console.error` calls in source (5 locations):**
+These are in catch blocks (`NotificationContext`, `FindOpponents`, `TournamentsTab`, `TeamsTab`, `main.tsx`). In production builds, `esbuild.drop: ['console']` strips them. Edge functions use `console.log/error` which is standard for Deno runtime.
+
+**Verdict:** Stable. No crashes or blank screens detected.
+
+---
+
+## 5. Native-App Feel -- PASS
+
+- No hover-dependent interactions (all use click/tap)
+- No `target="_blank"` or `window.open` -- all navigation stays internal
+- No browser-like URL bar or external tab jumps
+- Page transitions use CSS animations (not framer-motion blocking)
 - `overscroll-behavior: none` prevents rubber-banding
+- `touch-action: manipulation` removes 300ms tap delay
+- `-webkit-tap-highlight-color: transparent` removes flash on tap
+- Pull-to-refresh with haptic feedback simulation
+- Active press states via `press-scale` utility on interactive cards
 
-### 3. Performance -- PASS
-- Landing page loads eagerly; all authenticated routes are lazy-loaded with retry
-- Non-critical services (Sentry, PostHog, WebVitals) deferred via `requestIdleCallback`
-- Production builds strip `console` and `debugger` statements via esbuild `drop`
-- Manual chunk splitting isolates heavy libraries (recharts, framer-motion, Sentry)
-- Service worker precaches app shell for instant repeat loads
-- Dashboard stats deferred via `requestIdleCallback` so team card renders first
-
-### 4. App Store Compliance -- PASS with 1 fix needed
-- No references to "web app" or "browser" in user-facing UI
-- No `target="_blank"` or `window.open` calls anywhere -- all navigation is internal
-- Back navigation handled via Capacitor `backButton` listener with proper history management
-- **FIX NEEDED**: `capacitor.config.ts` has `server.url` pointing to `lovableproject.com` -- this must be removed for production builds so the app loads from local bundled assets
-
-### 5. Asset and Branding -- PASS with 1 fix needed
-- Favicon, PWA icons (192px, 512px), and manifest are properly configured with "Khas Padel Club" branding
-- No Lovable branding in any user-facing UI, metadata, or manifest
-- **FIX NEEDED**: The `PendingInvitations` component triggers a React ref warning ("Function components cannot be given refs") because `PullToRefresh` passes a ref to it. This causes console errors visible in development and could appear in crash logs.
-
-### 6. Network and Offline Handling -- PASS
-- `OfflineBanner` and `SlowConnectionBanner` provide graceful degradation
-- QueryClient prevents redundant refetches: `refetchOnWindowFocus: false`, 2-minute stale time
-- Service worker serves cached content when offline, with offline fallback page
-- Exponential backoff retry (3 attempts) on all queries
-
-### 7. Stability -- PASS with 1 fix needed
-- Production builds strip all `console.log` and `console.debug` via `esbuild.drop`
-- `console.warn` in `errorReporting.ts` and `main.tsx` will persist in production -- acceptable for critical warnings
-- **FIX NEEDED**: The `webVitals.ts` file uses `console.log` which will be stripped in production, but the emoji characters and formatting may cause issues in some WebView environments. Should use `logger` instead.
-- ErrorBoundary provides crash recovery with copy-to-clipboard diagnostics
-- Global error handlers catch uncaught exceptions and unhandled rejections
-
-### 8. Build Readiness for Capacitor -- PASS with config change
-- App runs cleanly in WebView (no desktop-only APIs used)
-- Routing uses BrowserRouter which works in Capacitor WebView
-- Deep link handling is implemented via `appUrlOpen` listener
-- **As noted in item 4**: Remove `server` block from `capacitor.config.ts` for production AAB/IPA builds
-
-### 9. SEO / Metadata -- PASS
-- Title, description, author, theme-color, OG tags, and Twitter card are all properly set
-- `apple-mobile-web-app-capable: yes` and `apple-mobile-web-app-status-bar-style: default` configured
-- PWA manifest with correct icons, start_url, display: standalone, orientation: portrait
-- Apple touch icon linked
-
-### 10. Console Errors to Fix
-- `PullToRefresh` ref warning on Dashboard (PullToRefresh wraps children in `motion.div` which passes ref)
-- `PendingInvitations` ref warning (same cause)
-- Auth role fetch error `[object Object]` -- the `fetchUserRole` error logging passes the error object directly but the logger serializes it as `[object Object]`
+**Verdict:** Feels native.
 
 ---
 
-## Changes to Implement
+## 6. Network Handling and Edge Cases -- PASS
 
-### Fix 1: Remove Capacitor server block for production
-**File: `capacitor.config.ts`**
-- Remove the `server` block (`url` and `cleartext`) so production builds load from local `dist/` assets
-- Add a comment noting this block should only be re-added during development
+- `OfflineBanner` appears when connection drops
+- `SlowConnectionBanner` for degraded connectivity
+- Service worker serves cached content offline, with `/offline.html` fallback for navigation
+- QueryClient retries 3 times with exponential backoff (1s, 2s, 4s, max 30s)
+- `refetchOnWindowFocus: false` prevents unnecessary refetches
 
-### Fix 2: Fix PullToRefresh ref forwarding
-**File: `src/components/ui/pull-to-refresh.tsx`**
-- Wrap `PullToRefresh` with `React.forwardRef` to properly forward refs and eliminate the console warning
-
-### Fix 3: Fix AuthContext error logging
-**File: `src/contexts/AuthContext.tsx`**
-- In `fetchUserRole`, the error passed to `logger.error` may be a Supabase error object (not an Error instance). Ensure the error is properly serialized by passing `error instanceof Error ? error : new Error(JSON.stringify(error))`
-
-### Improvement 1: Use logger in webVitals instead of console.log
-**File: `src/lib/webVitals.ts`**
-- Replace `console.log` with `logger.info` for consistency (production builds strip console anyway, but logger provides structured output)
-
-### Improvement 2: Auth loading screen uses spinner instead of skeleton
-**File: `src/pages/Auth.tsx`**
-- The auth loading state (line 150-156) shows a plain spinner. Replace with the branded `LoadingScreen` component for consistency with the rest of the app.
+**Verdict:** Graceful degradation implemented.
 
 ---
 
-## Final Verdict
+## 7. Branding and Production Cleanliness -- PASS with 1 minor fix
 
-| Category | Status |
-|----------|--------|
-| Mobile UX Quality | Ready |
-| Performance Targets | Ready (lazy loading, deferred init, chunk splitting) |
-| Store-Blocking Issues | None detected |
-| Capacitor Packaging | Ready after removing server block |
-| Branding Consistency | Clean -- no third-party branding |
-| Offline Resilience | Implemented |
+- App title: "Khas Padel Club" in all metadata, manifest, and UI
+- No Lovable branding anywhere in user-facing content
+- Favicon and icons are custom Khas Padel Club branding
+- Footer copyright is dynamic year with proper brand name
 
-**Safe to package into Android (AAB) and iOS (IPA)** after the 3 fixes above are applied.
+**FINDING - Deprecated meta tag (minor):**
+`<meta name="apple-mobile-web-app-capable" content="yes">` is deprecated. Should be updated to `<meta name="mobile-web-app-capable" content="yes">` (browser warning detected in console).
 
+---
+
+## 8. Store Compliance Readiness -- PASS
+
+- **Privacy Policy:** Present at `/privacy` with comprehensive sections (data collection, retention, rights, children's privacy, third-party SDKs)
+- **Terms of Service:** Present at `/terms` with standard sections
+- **Contact/Support:** Present at `/contact` with form
+- **Footer links:** Privacy, Terms, Contact all linked from landing page footer
+- **No external navigation:** All links stay within app
+- **WebView-safe routing:** BrowserRouter works in Capacitor WebView; `_redirects` file for SPA fallback
+- **Capacitor config:** Server block properly commented out for production builds
+- **Children's privacy:** Section 8 of Privacy Policy states age 13+ requirement; Terms also state 13+ minimum age
+
+**Verdict:** Compliant with Apple App Store and Google Play Store requirements.
+
+---
+
+## 9. Asset and Bundle Optimization -- PASS
+
+- Icons: 192px and 512px PNG with both `any` and `maskable` purpose
+- Fonts: Preconnected to Google Fonts, loaded non-blocking (`media="print" onload`)
+- Service worker caches fonts with cache-first strategy
+- Production builds: Source maps uploaded to Sentry then deleted, CSS minified, esbuild target es2020
+- Manual chunk splitting prevents single large bundle
+- Landing page eagerly loaded; below-fold sections (Features, SportsModes, Footer) lazy-loaded
+
+**Verdict:** Optimized.
+
+---
+
+## Issues to Fix
+
+### Fix 1: Reduce Dashboard CLS (moderate priority)
+
+**Problem:** Dashboard CLS is 0.237 (threshold: 0.1). The deferred stats loading via `requestIdleCallback` causes layout shift when stats cards populate after the team card renders.
+
+**Solution:** Reserve explicit minimum height for the stats grid section in the skeleton loader AND in the live dashboard layout. Add `min-h-[120px]` to the stats grid container so the space is reserved before data arrives.
+
+**File:** `src/pages/Dashboard.tsx`
+- Add `min-h-[120px]` to the stats grid container div (line 331) to prevent layout shift when stats load asynchronously
+
+### Fix 2: Update deprecated meta tag (minor priority)
+
+**Problem:** Browser warns that `apple-mobile-web-app-capable` is deprecated.
+
+**Solution:** Replace with `mobile-web-app-capable` in `index.html`. Keep the apple-specific one for backward compatibility with older iOS versions, and add the new standard one.
+
+**File:** `index.html`
+- Add `<meta name="mobile-web-app-capable" content="yes" />` alongside the existing apple-specific tag
+
+---
+
+## Low-Priority Improvements (not blocking)
+
+1. **NotFound page uses `<a href="/">` instead of React Router `<Link>`** -- causes a full page reload when navigating home from 404. Should use `<Link to="/">` for SPA behavior.
+
+2. **Contact form is simulated** -- `handleSubmit` uses `setTimeout` to fake submission. Not a store-blocking issue, but the form doesn't actually send anything. Should either connect to an edge function or use `mailto:`.
+
+3. **`theme_color` mismatch** -- `manifest.json` and `<meta name="theme-color">` both use `#16a34a` (green), but the app's primary color is deep navy (`220 60% 15%` = ~`#0f1a2d`). This mismatch means the browser chrome color won't match the app header. Consider updating to match the actual brand.
+
+---
+
+## Final Readiness Summary
+
+| Category | Status | Score |
+|----------|--------|-------|
+| Mobile UX Quality | Ready | 9/10 |
+| Performance | Ready (CLS fix recommended) | 8/10 |
+| Stability | Ready | 10/10 |
+| Store Compliance | Ready | 10/10 |
+| Native Feel | Ready | 9/10 |
+| Network Resilience | Ready | 10/10 |
+| Branding | Ready | 9/10 |
+| Bundle Optimization | Ready | 9/10 |
+
+**Overall: SAFE TO PACKAGE into Android (AAB) and iOS (IPA)**
+
+The 2 fixes (CLS reduction and meta tag update) are recommended but not store-blocking. The app can be submitted as-is.
