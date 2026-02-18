@@ -14,6 +14,7 @@ import { logger } from "@/lib/logger";
 import { PerfOverlay } from "@/components/dev/PerfOverlay";
 import { useCapacitorAnalytics } from "@/hooks/useCapacitorAnalytics";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 // Eager load only the landing page — everything else is lazy
 import Index from "./pages/Index";
@@ -172,7 +173,7 @@ const App = () => {
                 <Routes>
                   {/* Public routes — no AuthProvider, no NotificationProvider */}
                   <Route path="/" element={<Index />} />
-                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth" element={<AuthProvider><Auth /></AuthProvider>} />
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/terms" element={<Terms />} />
                   <Route path="/contact" element={<Contact />} />
