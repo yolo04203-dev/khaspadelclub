@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2, UserPlus } from "lucide-react";
+import { AlertCircle, Loader2, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +36,7 @@ interface JoinLadderDialogProps {
   teamName: string;
   existingRequests: Set<string>; // category IDs with pending requests or already ranked
   onRequestSubmitted: () => void;
+  teamMemberCount?: number;
 }
 
 export function JoinLadderDialog({
@@ -44,6 +45,7 @@ export function JoinLadderDialog({
   teamName,
   existingRequests,
   onRequestSubmitted,
+  teamMemberCount = 2,
 }: JoinLadderDialogProps) {
   const [open, setOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -139,6 +141,19 @@ export function JoinLadderDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {teamMemberCount < 2 ? (
+          <div className="py-4">
+            <div className="rounded-lg border border-warning/30 bg-warning/10 p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-warning mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium text-foreground">Team incomplete</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Your team needs 2 players before joining a ladder. Invite a partner from the Find Players page.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="category">Category</Label>
@@ -218,20 +233,24 @@ export function JoinLadderDialog({
           </div>
         </div>
 
+        )}
+
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
+            {teamMemberCount < 2 ? "Close" : "Cancel"}
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting || !selectedCategory}>
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              "Submit Request"
-            )}
-          </Button>
+          {teamMemberCount >= 2 && (
+            <Button onClick={handleSubmit} disabled={isSubmitting || !selectedCategory}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                "Submit Request"
+              )}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

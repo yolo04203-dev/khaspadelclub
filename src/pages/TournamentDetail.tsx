@@ -105,6 +105,7 @@ export default function TournamentDetail() {
   const [loading, setLoading] = useState(true);
   const [teamMembersMap, setTeamMembersMap] = useState<Map<string, { player1: string; player2: string }>>(new Map());
   const [registrationDialogOpen, setRegistrationDialogOpen] = useState(false);
+  const [userTeamMemberCount, setUserTeamMemberCount] = useState(0);
   const [paymentParticipants, setPaymentParticipants] = useState<Array<{
     id: string; team_id: string; team_name: string; registered_at: string;
     payment_status: string; payment_notes: string | null; custom_team_name: string | null;
@@ -236,8 +237,12 @@ export default function TournamentDetail() {
       .maybeSingle();
 
     if (member) {
-      const { data: team } = await supabase.from("teams").select("id, name").eq("id", member.team_id).single();
-      if (team) setUserTeam(team);
+      const [teamResult, countResult] = await Promise.all([
+        supabase.from("teams").select("id, name").eq("id", member.team_id).single(),
+        supabase.from("team_members").select("*", { count: "exact", head: true }).eq("team_id", member.team_id),
+      ]);
+      if (teamResult.data) setUserTeam(teamResult.data);
+      setUserTeamMemberCount(countResult.count || 0);
     }
   }, [user]);
 
@@ -996,6 +1001,7 @@ export default function TournamentDetail() {
               entry_fee: c.entry_fee,
             }))}
             onRegister={registerTeam}
+            teamMemberCount={userTeamMemberCount}
           />
 
           {/* Winner Banner */}
