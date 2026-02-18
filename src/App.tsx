@@ -52,7 +52,6 @@ export const lazyImports = {
   Privacy: () => import("./pages/Privacy"),
   Terms: () => import("./pages/Terms"),
   Contact: () => import("./pages/Contact"),
-  GenerateIcons: () => import("./pages/GenerateIcons"),
 };
 
 // Network status wrapper component

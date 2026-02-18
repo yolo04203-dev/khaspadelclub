@@ -1,14 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap, Shuffle, Shield, Database, Activity, Bug } from "lucide-react";
-import { toast } from "sonner";
+import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap, Shuffle, Shield, Bug } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { AdminStats } from "@/components/admin/AdminStats";
 import { PlayersTab } from "@/components/admin/PlayersTab";
@@ -21,10 +18,6 @@ import { AmericanoTab } from "@/components/admin/AmericanoTab";
 import { PermissionsTab } from "@/components/admin/PermissionsTab";
 import { ErrorsTab } from "@/components/admin/ErrorsTab";
 import { logger } from "@/lib/logger";
-import { sendTestError } from "@/lib/errorReporting";
-import { analytics } from "@/lib/analytics/posthog";
-import { AlertTriangle } from "lucide-react";
-import * as Sentry from "@sentry/react";
 
 interface Player {
   id: string;
@@ -92,47 +85,7 @@ export default function Admin() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [isSeeding, setIsSeeding] = useState(false);
-  const [perfResult, setPerfResult] = useState<any>(null);
-  const [isRunningPerf, setIsRunningPerf] = useState(false);
   const [unresolvedErrorCount, setUnresolvedErrorCount] = useState(0);
-  const handleSeedData = async (clearExisting = false) => {
-    setIsSeeding(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { toast.error("Not authenticated"); return; }
-
-      const res = await supabase.functions.invoke("seed-test-data", {
-        body: { teamCount: 250, teamsPerLadder: 100, clearExisting },
-      });
-
-      if (res.error) {
-        toast.error(`Seed failed: ${res.error.message}`);
-      } else {
-        const r = res.data;
-        toast.success(`Seeded ${r.totalRecords} records! (${r.results.teams} teams, ${r.results.ladderRankings} rankings, ${r.results.matches} matches)`);
-        fetchAdminData();
-      }
-    } catch (e: any) {
-      toast.error(`Seed error: ${e.message}`);
-    } finally {
-      setIsSeeding(false);
-    }
-  };
-
-  const handlePerfTest = async () => {
-    setIsRunningPerf(true);
-    setPerfResult(null);
-    try {
-      const { smokeTest } = await import("@/test/load-test");
-      const result = await smokeTest();
-      setPerfResult(result);
-    } catch (e: any) {
-      toast.error(`Perf test error: ${e.message}`);
-    } finally {
-      setIsRunningPerf(false);
-    }
-  };
 
   // Debounce search input
   useEffect(() => {
@@ -314,116 +267,6 @@ export default function Admin() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">Admin Portal</h1>
             <p className="text-muted-foreground mb-4">Manage players, teams, ladders, and tournaments</p>
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                onClick={() => handleSeedData(false)}
-                disabled={isSeeding}
-                variant="outline"
-                size="sm"
-              >
-                {isSeeding ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Database className="w-4 h-4 mr-2" />}
-                Seed 500 Users
-              </Button>
-              <Button
-                onClick={() => handleSeedData(true)}
-                disabled={isSeeding}
-                variant="destructive"
-                size="sm"
-              >
-                {isSeeding ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Database className="w-4 h-4 mr-2" />}
-                Clear &amp; Re-seed
-              </Button>
-              <Button
-                onClick={handlePerfTest}
-                disabled={isRunningPerf}
-                variant="outline"
-                size="sm"
-              >
-                {isRunningPerf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Activity className="w-4 h-4 mr-2" />}
-                Run Perf Test
-              </Button>
-              <Button
-                onClick={() => {
-                  logger.error("Test error from admin panel", new Error("Admin test error"));
-                  sendTestError();
-                  toast.success("Test error sent to Sentry + DB");
-                }}
-                variant="outline"
-                size="sm"
-              >
-                <AlertTriangle className="w-4 h-4 mr-2" />
-                Test Error
-              </Button>
-              <Button
-                onClick={() => {
-                  Promise.reject(new Error("Test unhandled rejection from admin"));
-                  toast.success("Unhandled rejection fired");
-                }}
-                variant="outline"
-                size="sm"
-              >
-                <Bug className="w-4 h-4 mr-2" />
-                Unhandled Rejection
-              </Button>
-              <Button
-                onClick={() => {
-                  Sentry.addBreadcrumb({ category: "test", message: "Manual breadcrumb from admin", level: "info" });
-                  toast.success("Breadcrumb added to Sentry");
-                }}
-                variant="outline"
-                size="sm"
-              >
-                <Layers className="w-4 h-4 mr-2" />
-                Send Breadcrumb
-              </Button>
-              <Button
-                onClick={() => {
-                  Sentry.captureMessage("Test message from admin panel");
-                  toast.success("Message captured in Sentry");
-                }}
-                variant="outline"
-                size="sm"
-              >
-                <Zap className="w-4 h-4 mr-2" />
-                Capture Message
-              </Button>
-              <Button
-                onClick={() => {
-                  analytics.track("Analytics Test", { source: "admin" });
-                  toast.success("Test event sent to PostHog");
-                }}
-                variant="outline"
-                size="sm"
-              >
-                <LayoutGrid className="w-4 h-4 mr-2" />
-                Test Analytics
-              </Button>
-            </div>
-
-            {perfResult && (
-              <Card className="mt-4">
-                <CardContent className="p-4">
-                  <h3 className="font-semibold text-foreground mb-2">📊 Performance Results</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                    <div><div className="text-muted-foreground">Total Requests</div><div className="font-semibold">{perfResult.totalRequests}</div></div>
-                    <div><div className="text-muted-foreground">Avg Response</div><div className="font-semibold">{perfResult.averageResponseTime?.toFixed(0)}ms</div></div>
-                    <div><div className="text-muted-foreground">P95 Response</div><div className="font-semibold">{perfResult.p95ResponseTime?.toFixed(0)}ms</div></div>
-                    <div><div className="text-muted-foreground">Error Rate</div><div className="font-semibold">{perfResult.errorRate?.toFixed(2)}%</div></div>
-                  </div>
-                  {perfResult.endpointStats?.length > 0 && (
-                    <div className="mt-3 border-t border-border pt-3">
-                      <p className="text-xs text-muted-foreground mb-2">Endpoint Breakdown:</p>
-                      {perfResult.endpointStats.map((s: any) => (
-                        <div key={s.name} className="flex justify-between text-xs py-1">
-                          <span>{s.name}</span>
-                          <span className="text-muted-foreground">{s.averageResponseTime?.toFixed(0)}ms avg, p95={s.p95ResponseTime?.toFixed(0)}ms</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
           </div>
 
           <AdminStats 
