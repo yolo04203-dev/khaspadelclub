@@ -29,7 +29,6 @@ const Players = lazyWithRetry(() => import("@/pages/Players"));
 const PlayerProfile = lazyWithRetry(() => import("@/pages/PlayerProfile"));
 const Stats = lazyWithRetry(() => import("@/pages/Stats"));
 const Admin = lazyWithRetry(() => import("@/pages/Admin"));
-const GenerateIcons = lazyWithRetry(() => import("@/pages/GenerateIcons"));
 
 function AuthenticatedAnimatedRoutes() {
   const location = useLocation();
@@ -58,7 +57,6 @@ function AuthenticatedAnimatedRoutes() {
             <Route path="/players/:id" element={<PlayerProfile />} />
             <Route path="/stats" element={<Stats />} />
             <Route path="/admin" element={<Admin />} />
-            <Route path="/generate-icons" element={<GenerateIcons />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </PageTransition>
