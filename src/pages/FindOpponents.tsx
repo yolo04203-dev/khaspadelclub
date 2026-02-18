@@ -247,6 +247,19 @@ export default function FindOpponents() {
 
       if (error) throw error;
 
+      // Send email notification to challenged team (non-blocking)
+      supabase.functions.invoke("send-challenge-notification", {
+        body: {
+          type: "new_challenge",
+          challengerTeamId: userTeam.id,
+          challengerTeamName: userTeam.name,
+          challengedTeamId: challengingTeam.team_id,
+          challengedTeamName: challengingTeam.team_name,
+        },
+      }).then(({ error }) => {
+        if (error) console.error("Failed to send challenge notification email:", error);
+      });
+
       toast({
         title: "Challenge sent!",
         description: `Challenge sent to ${challengingTeam.team_name}`,
