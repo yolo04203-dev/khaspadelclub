@@ -1,55 +1,77 @@
 
 
-# Fix Team Invitation Flow
+# Mobile-First UX and Performance Refinement
 
-## Problem
-Two issues prevent testing the invitation acceptance and auto-rename flow:
+## Current State Assessment
 
-1. **Invitations are invisible (403 error)**: The RLS policy "Anyone can view their invitations" on `team_invitations` contains a subquery against `auth.users` to match by email. The `authenticated` role does not have SELECT access to `auth.users`, causing a "permission denied for table users" error.
+The app already has strong mobile foundations: safe-area handling, 44px touch targets, bottom navigation, pull-to-refresh, lazy loading, skeleton loaders, service worker caching, and Capacitor integration. This plan focuses on the gaps and refinements still needed.
 
-2. **Acceptance is blocked**: Ahmed already has his own team ("Ahmed's Team"), so the `PendingInvitations` component rejects acceptance with "Already on a team." To accept an invitation, the user would need to leave their current team first -- or the app should handle this automatically.
+## Changes Grouped by Impact
 
-## Plan
+### 1. CSS and Layout Tightening (index.css, tailwind.config.ts)
 
-### Step 1: Fix the RLS policy on `team_invitations`
-Create a migration that replaces the broken SELECT policies. Instead of querying `auth.users.email`, use `invited_user_id = auth.uid()` for the user-id based check, and remove or replace the email-based check (since invitations are already resolved to `invited_user_id` at creation time).
+- Reduce `container` default padding from `1rem` to `0.75rem` on screens under 375px for narrow devices
+- Add a `xs` breakpoint at `375px` in Tailwind config for fine-grained mobile control
+- Replace the leftover `App.css` file entirely (it contains unused Vite boilerplate: `max-width: 1280px`, centered text, logo spin animation) -- either delete it or clear its contents since it conflicts with the mobile layout
 
-Updated policies:
-- **"Anyone can view their invitations"**: `invited_user_id = auth.uid()`
-- **"Invited users can update invitation status"**: `invited_user_id = auth.uid()`
+### 2. Page-Level Spacing Adjustments (Dashboard, Ladders, Challenges, Stats, Tournaments, Profile)
 
-The email-based fallback (`invited_email`) is no longer needed since the `InvitePartnerDialog` already resolves the user by display name and stores `invited_user_id`.
+- Reduce `py-6` to `py-4` on mobile for all page `<main>` containers (keep `sm:py-8` for larger screens)
+- Reduce section `mb-8` gaps to `mb-5` on mobile using responsive classes
+- Ensure page titles use `text-xl` on mobile instead of `text-2xl`/`text-4xl` (Ladders page uses `text-4xl` which is oversized on phones)
 
-### Step 2: Handle "already on a team" scenario
-Update `PendingInvitations` component so that when a user who is already a captain of a solo team (no partner) accepts an invitation:
-- Automatically remove them from their old solo team (and optionally delete the empty team)
-- Then proceed with joining the new team
+### 3. Remove Heavy framer-motion from Challenge Cards
 
-This makes the flow seamless: a solo captain can accept an invitation without manually leaving their team first.
+- Replace `<motion.div>` wrappers on individual challenge cards with CSS `hero-animate` classes already defined in the codebase
+- This eliminates per-card JS animation overhead on the Challenges page (which can have 10-20+ cards)
+- Keep `AnimatePresence` only for FAB and pull-to-refresh where it provides meaningful UX value
 
-### Step 3: Verify auto-rename
-After acceptance, the existing `auto_name_team` database function is already called in the `handleRespond` function. This will rename the team to "Player1 & Player2" format once the second member joins.
+### 4. Optimize PageTransition Component
+
+- Replace framer-motion `PageTransition` with a pure CSS approach using the existing `hero-animate` keyframe
+- This removes the `AnimatePresence mode="wait"` wrapper from `AuthenticatedRoutes`, which currently blocks rendering of the incoming page until the outgoing page animation completes (adds ~150ms delay to every navigation)
+
+### 5. Tab Navigation Touch Improvements (Challenges page)
+
+- Increase `TabsTrigger` minimum height to 44px on mobile via a wrapper class
+- Show abbreviated labels on mobile instead of hiding them completely (e.g., "In" / "Out" / "Active" / "Hist") so users don't rely solely on icons
+
+### 6. Card Touch Feedback
+
+- Add `press-scale` utility (already defined in CSS) to all tappable `Card` components that act as navigation links (Dashboard quick actions, Ladder cards, Tournament cards)
+- This gives immediate tactile feedback on tap
+
+### 7. Stat Cards Compact Layout
+
+- Dashboard stat cards: reduce `CardHeader` internal padding on mobile so the 2x2 grid fits without cramping
+- Use `text-xl` instead of `text-2xl` for stat values on very small screens
+
+### 8. Delete App.css Boilerplate
+
+- The `src/App.css` file contains Vite starter template styles (`#root { max-width: 1280px; margin: 0 auto; padding: 2rem; text-align: center; }`) that can interfere with the mobile layout. If this file is imported anywhere, it would cap the layout width and add unnecessary padding. It should be cleared or deleted.
 
 ## Technical Details
 
-### Migration SQL (Step 1)
-```sql
--- Drop and recreate the broken SELECT/UPDATE policies
-DROP POLICY IF EXISTS "Anyone can view their invitations" ON team_invitations;
-DROP POLICY IF EXISTS "Invited users can update invitation status" ON team_invitations;
+### Files to Modify
 
-CREATE POLICY "Anyone can view their invitations"
-  ON team_invitations FOR SELECT
-  USING (invited_user_id = auth.uid());
+| File | Changes |
+|------|---------|
+| `src/App.css` | Delete or empty -- unused Vite boilerplate |
+| `src/index.css` | Add xs-breakpoint container padding override |
+| `tailwind.config.ts` | Add `xs: '375px'` screen breakpoint |
+| `src/components/PageTransition.tsx` | Replace framer-motion with CSS animation |
+| `src/components/AuthenticatedRoutes.tsx` | Remove AnimatePresence mode="wait" wrapper |
+| `src/pages/Dashboard.tsx` | Tighten mobile spacing, add press-scale to action cards |
+| `src/pages/Ladders.tsx` | Reduce title from text-4xl to text-2xl on mobile, tighten padding |
+| `src/pages/Challenges.tsx` | Replace motion.div cards with CSS, fix tab label visibility, tighten spacing |
+| `src/pages/Tournaments.tsx` | Add press-scale to tournament cards, tighten spacing |
+| `src/pages/Stats.tsx` | Tighten mobile spacing |
 
-CREATE POLICY "Invited users can update invitation status"
-  ON team_invitations FOR UPDATE
-  USING (invited_user_id = auth.uid());
-```
+### What Will NOT Change
 
-### Component Changes (Step 2)
-In `src/components/team/PendingInvitations.tsx`, update the `handleRespond` function:
-- When accepting, check if the user is on a solo team (team with only 1 member)
-- If so, remove them from that team and delete the empty team before joining the new one
-- If the user is on a team with 2 members, keep the existing "Already on a team" error
+- No functionality changes
+- No database or API changes
+- No navigation structure changes (bottom nav already exists and works well)
+- No removal of existing accessibility features
+- Service worker, lazy loading, query caching, and Capacitor integration remain as-is
 
