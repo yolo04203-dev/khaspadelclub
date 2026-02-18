@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Play, Trophy, Users, CheckCircle, Shuffle, LayoutList, Clock, Target, Hash } from "lucide-react";
+import { ArrowLeft, Play, Trophy, Users, CheckCircle, Shuffle, LayoutList, Clock, Target, Hash, Pencil } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -95,6 +95,7 @@ export default function AmericanoSession() {
   const [loading, setLoading] = useState(true);
   const [scores, setScores] = useState<Record<string, { team1: string; team2: string }>>({});
   const [duration, setDuration] = useState("");
+  const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
 
   // Duration timer
   useEffect(() => {
@@ -406,6 +407,98 @@ export default function AmericanoSession() {
     } catch (error) {
       logger.apiError("submitScore", error);
       toast({ title: "Error", description: "Failed to save score", variant: "destructive" });
+    }
+  };
+
+  const startEditingMatch = (matchId: string, oldTeam1Score: number | null, oldTeam2Score: number | null) => {
+    setEditingMatchId(matchId);
+    setScores({ ...scores, [matchId]: { team1: String(oldTeam1Score ?? ""), team2: String(oldTeam2Score ?? "") } });
+  };
+
+  const editTeamScore = async (match: TeamMatch) => {
+    const scoreData = scores[match.id];
+    if (!scoreData) return;
+    const newT1 = parseInt(scoreData.team1);
+    const newT2 = parseInt(scoreData.team2);
+    if (isNaN(newT1) || isNaN(newT2)) {
+      toast({ title: "Invalid scores", description: "Please enter valid numbers", variant: "destructive" });
+      return;
+    }
+    if (newT1 + newT2 !== session!.points_per_round) {
+      toast({ title: "Invalid score total", description: `Scores must add up to ${session!.points_per_round}`, variant: "destructive" });
+      return;
+    }
+    try {
+      const oldT1 = match.team1_score ?? 0;
+      const oldT2 = match.team2_score ?? 0;
+      // Update match record
+      await supabase.from("americano_team_matches").update({ team1_score: newT1, team2_score: newT2 }).eq("id", match.id);
+      // Reverse old stats and apply new for team1
+      const team1 = teams.find((t) => t.id === match.team1_id);
+      if (team1) {
+        await supabase.from("americano_teams").update({
+          total_points: team1.total_points - oldT1 + newT1,
+          wins: team1.wins - (oldT1 > oldT2 ? 1 : 0) + (newT1 > newT2 ? 1 : 0),
+          losses: team1.losses - (oldT1 < oldT2 ? 1 : 0) + (newT1 < newT2 ? 1 : 0),
+        }).eq("id", team1.id);
+      }
+      // Reverse old stats and apply new for team2
+      const team2 = teams.find((t) => t.id === match.team2_id);
+      if (team2) {
+        await supabase.from("americano_teams").update({
+          total_points: team2.total_points - oldT2 + newT2,
+          wins: team2.wins - (oldT2 > oldT1 ? 1 : 0) + (newT2 > newT1 ? 1 : 0),
+          losses: team2.losses - (oldT2 < oldT1 ? 1 : 0) + (newT2 < newT1 ? 1 : 0),
+        }).eq("id", team2.id);
+      }
+      setEditingMatchId(null);
+      toast({ title: "Score updated!", description: "Team stats recalculated" });
+      fetchSessionData();
+    } catch (error) {
+      logger.apiError("editTeamScore", error);
+      toast({ title: "Error", description: "Failed to update score", variant: "destructive" });
+    }
+  };
+
+  const editScore = async (round: Round) => {
+    const scoreData = scores[round.id];
+    if (!scoreData) return;
+    const newT1 = parseInt(scoreData.team1);
+    const newT2 = parseInt(scoreData.team2);
+    if (isNaN(newT1) || isNaN(newT2)) {
+      toast({ title: "Invalid scores", description: "Please enter valid numbers", variant: "destructive" });
+      return;
+    }
+    if (newT1 + newT2 !== session!.points_per_round) {
+      toast({ title: "Invalid score total", description: `Scores must add up to ${session!.points_per_round}`, variant: "destructive" });
+      return;
+    }
+    try {
+      const oldT1 = round.team1_score ?? 0;
+      const oldT2 = round.team2_score ?? 0;
+      // Update round record
+      await supabase.from("americano_rounds").update({ team1_score: newT1, team2_score: newT2 }).eq("id", round.id);
+      // Reverse old points and apply new for all 4 players
+      const playerUpdates = [
+        { id: round.team1_player1_id, oldPts: oldT1, newPts: newT1 },
+        { id: round.team1_player2_id, oldPts: oldT1, newPts: newT1 },
+        { id: round.team2_player1_id, oldPts: oldT2, newPts: newT2 },
+        { id: round.team2_player2_id, oldPts: oldT2, newPts: newT2 },
+      ];
+      for (const upd of playerUpdates) {
+        const player = players.find((p) => p.id === upd.id);
+        if (player) {
+          await supabase.from("americano_players").update({
+            total_points: player.total_points - upd.oldPts + upd.newPts,
+          }).eq("id", upd.id);
+        }
+      }
+      setEditingMatchId(null);
+      toast({ title: "Score updated!", description: "Player points recalculated" });
+      fetchSessionData();
+    } catch (error) {
+      logger.apiError("editScore", error);
+      toast({ title: "Error", description: "Failed to update score", variant: "destructive" });
     }
   };
 
@@ -806,12 +899,36 @@ export default function AmericanoSession() {
                                       <span className="font-medium">{getTeamName(match.team2_id)}</span>
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-bold text-lg">{match.team1_score}</span>
-                                    <span className="text-muted-foreground">-</span>
-                                    <span className="font-bold text-lg">{match.team2_score}</span>
-                                    <CheckCircle className="w-5 h-5 text-emerald-500 ml-2" />
-                                  </div>
+                                  {editingMatchId === match.id ? (
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <Input type="number" className="w-16" placeholder="0"
+                                          value={scores[match.id]?.team1 || ""}
+                                          onChange={(e) => setScores({ ...scores, [match.id]: { ...scores[match.id], team1: e.target.value } })}
+                                        />
+                                        <span className="text-muted-foreground">-</span>
+                                        <Input type="number" className="w-16" placeholder="0"
+                                          value={scores[match.id]?.team2 || ""}
+                                          onChange={(e) => setScores({ ...scores, [match.id]: { ...scores[match.id], team2: e.target.value } })}
+                                        />
+                                        <Button size="sm" onClick={() => editTeamScore(match)}>Save</Button>
+                                        <Button size="sm" variant="ghost" onClick={() => setEditingMatchId(null)}>Cancel</Button>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground mt-1 text-right">Total must equal {session.points_per_round}</p>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-lg">{match.team1_score}</span>
+                                      <span className="text-muted-foreground">-</span>
+                                      <span className="font-bold text-lg">{match.team2_score}</span>
+                                      <CheckCircle className="w-5 h-5 text-emerald-500 ml-2" />
+                                      {isOwner && (
+                                        <Button size="icon" variant="ghost" className="h-7 w-7 ml-1" onClick={() => startEditingMatch(match.id, match.team1_score, match.team2_score)}>
+                                          <Pencil className="w-3.5 h-3.5" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </CardContent>
                             </Card>
@@ -850,12 +967,36 @@ export default function AmericanoSession() {
                                         </div>
                                       </div>
                                       {round.completed_at ? (
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-bold text-lg">{round.team1_score}</span>
-                                          <span className="text-muted-foreground">-</span>
-                                          <span className="font-bold text-lg">{round.team2_score}</span>
-                                          <CheckCircle className="w-5 h-5 text-emerald-500 ml-2" />
-                                        </div>
+                                        editingMatchId === round.id ? (
+                                          <div>
+                                            <div className="flex items-center gap-2">
+                                              <Input type="number" className="w-16" placeholder="0"
+                                                value={scores[round.id]?.team1 || ""}
+                                                onChange={(e) => setScores({ ...scores, [round.id]: { ...scores[round.id], team1: e.target.value } })}
+                                              />
+                                              <span className="text-muted-foreground">-</span>
+                                              <Input type="number" className="w-16" placeholder="0"
+                                                value={scores[round.id]?.team2 || ""}
+                                                onChange={(e) => setScores({ ...scores, [round.id]: { ...scores[round.id], team2: e.target.value } })}
+                                              />
+                                              <Button size="sm" onClick={() => editScore(round)}>Save</Button>
+                                              <Button size="sm" variant="ghost" onClick={() => setEditingMatchId(null)}>Cancel</Button>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground mt-1 text-right">Total must equal {session.points_per_round}</p>
+                                          </div>
+                                        ) : (
+                                          <div className="flex items-center gap-2">
+                                            <span className="font-bold text-lg">{round.team1_score}</span>
+                                            <span className="text-muted-foreground">-</span>
+                                            <span className="font-bold text-lg">{round.team2_score}</span>
+                                            <CheckCircle className="w-5 h-5 text-emerald-500 ml-2" />
+                                            {isOwner && (
+                                              <Button size="icon" variant="ghost" className="h-7 w-7 ml-1" onClick={() => startEditingMatch(round.id, round.team1_score, round.team2_score)}>
+                                                <Pencil className="w-3.5 h-3.5" />
+                                              </Button>
+                                            )}
+                                          </div>
+                                        )
                                       ) : isOwner ? (
                                         <div>
                                           <div className="flex items-center gap-2">
