@@ -1,8 +1,11 @@
+import { lazy, Suspense } from "react";
 import { Header } from "@/components/landing/Header";
 import { Hero } from "@/components/landing/Hero";
-import { Features } from "@/components/landing/Features";
-import { SportsModes } from "@/components/landing/SportsModes";
-import { Footer } from "@/components/landing/Footer";
+
+// Lazy-load below-the-fold sections to speed up FCP
+const Features = lazy(() => import("@/components/landing/Features").then(m => ({ default: m.Features })));
+const SportsModes = lazy(() => import("@/components/landing/SportsModes").then(m => ({ default: m.SportsModes })));
+const Footer = lazy(() => import("@/components/landing/Footer").then(m => ({ default: m.Footer })));
 
 const Index = () => {
   return (
@@ -10,14 +13,18 @@ const Index = () => {
       <Header />
       <main>
         <Hero />
-        <section id="features">
-          <Features />
-        </section>
-        <section id="sports-modes">
-          <SportsModes />
-        </section>
+        <Suspense fallback={<div className="h-96" />}>
+          <section id="features">
+            <Features />
+          </section>
+          <section id="sports-modes">
+            <SportsModes />
+          </section>
+        </Suspense>
       </main>
-      <Footer />
+      <Suspense fallback={null}>
+        <Footer />
+      </Suspense>
     </div>
   );
 };

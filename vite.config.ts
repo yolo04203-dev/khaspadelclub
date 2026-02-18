@@ -52,7 +52,10 @@ export default defineConfig(({ mode }) => ({
     dedupe: ["react", "react-dom", "react/jsx-runtime"],
   },
   build: {
-    sourcemap: true, // Required for Sentry source map uploads
+    sourcemap: true,
+    target: 'es2020',
+    minify: 'esbuild',
+    cssMinify: true,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -63,8 +66,13 @@ export default defineConfig(({ mode }) => ({
           'supabase': ['@supabase/supabase-js'],
           'sentry': ['@sentry/react'],
           'analytics': ['posthog-js'],
+          'query': ['@tanstack/react-query'],
         },
       },
     },
+  },
+  esbuild: {
+    // Strip console.log and console.debug in production builds
+    drop: mode === 'production' ? ['console', 'debugger'] : [],
   },
 }));

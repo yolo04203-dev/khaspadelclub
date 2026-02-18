@@ -171,13 +171,17 @@ class Logger {
   }
 
   info(message: string, context?: Record<string, unknown>): void {
-    const entry = this.createEntry("info", message, context);
-    console.info(this.formatLog(entry), context || "");
+    if (this.isDevelopment) {
+      const entry = this.createEntry("info", message, context);
+      console.info(this.formatLog(entry), context || "");
+    }
   }
 
   warn(message: string, context?: Record<string, unknown>): void {
-    const entry = this.createEntry("warn", message, context);
-    console.warn(this.formatLog(entry), context || "");
+    if (this.isDevelopment) {
+      const entry = this.createEntry("warn", message, context);
+      console.warn(this.formatLog(entry), context || "");
+    }
     this.enqueue(message, undefined, "warn");
 
     // Wire to Sentry breadcrumbs
@@ -191,12 +195,14 @@ class Logger {
 
   error(message: string, error?: Error | unknown, context?: Record<string, unknown>): void {
     const err = error instanceof Error ? error : new Error(String(error));
-    const entry = this.createEntry("error", message, context, err);
-    console.error(this.formatLog(entry), {
-      ...context,
-      errorMessage: err.message,
-      errorStack: err.stack,
-    });
+    if (this.isDevelopment) {
+      const entry = this.createEntry("error", message, context, err);
+      console.error(this.formatLog(entry), {
+        ...context,
+        errorMessage: err.message,
+        errorStack: err.stack,
+      });
+    }
     this.enqueue(message, err, "error");
 
     // Wire to Sentry breadcrumbs
