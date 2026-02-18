@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { Navigate, Link } from "react-router-dom";
 
-import { User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers, Pencil, AlertTriangle, UserPlus, RefreshCw } from "lucide-react";
+import { User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers, Pencil, AlertTriangle, UserPlus, UserMinus, RefreshCw } from "lucide-react";
 import { RenameTeamDialog } from "@/components/team/RenameTeamDialog";
 import { AddPartnerDialog } from "@/components/team/AddPartnerDialog";
+import { RemovePartnerDialog } from "@/components/team/RemovePartnerDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
@@ -42,6 +43,7 @@ export default function Dashboard() {
   const [isCaptain, setIsCaptain] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
   const [showPartnerDialog, setShowPartnerDialog] = useState(false);
+  const [showRemovePartnerDialog, setShowRemovePartnerDialog] = useState(false);
   const [teamLoading, setTeamLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
     matchesPlayed: 0,
@@ -282,12 +284,16 @@ export default function Dashboard() {
                       </div>
                       <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                         {userTeam.memberNames.length < 2 && isCaptain && (
-                          <>
-                            <Button variant="default" className="w-full sm:w-auto" onClick={() => setShowPartnerDialog(true)}>
-                              <UserPlus className="w-4 h-4 mr-2" />
-                              {userTeam.name.includes(" & ") ? "Change Partner" : "Add Partner"}
-                            </Button>
-                          </>
+                          <Button variant="default" className="w-full sm:w-auto" onClick={() => setShowPartnerDialog(true)}>
+                            <UserPlus className="w-4 h-4 mr-2" />
+                            {userTeam.name.includes(" & ") ? "Change Partner" : "Add Partner"}
+                          </Button>
+                        )}
+                        {userTeam.memberNames.length === 2 && isCaptain && (
+                          <Button variant="outline" className="w-full sm:w-auto text-destructive hover:text-destructive" onClick={() => setShowRemovePartnerDialog(true)}>
+                            <UserMinus className="w-4 h-4 mr-2" />
+                            Remove Partner
+                          </Button>
                         )}
                         <Button variant="outline" className="w-full sm:w-auto" asChild>
                           <Link to="/ladders">View Ladders</Link>
@@ -527,6 +533,14 @@ export default function Dashboard() {
             teamName={userTeam.name}
             captainName={userTeam.memberNames[0] || "Captain"}
             onComplete={fetchDashboardData}
+          />
+          <RemovePartnerDialog
+            open={showRemovePartnerDialog}
+            onOpenChange={setShowRemovePartnerDialog}
+            teamId={userTeam.id}
+            partnerName={userTeam.memberNames[1] || "Partner"}
+            captainName={userTeam.memberNames[0] || "Captain"}
+            onRemoved={fetchDashboardData}
           />
         </>
       )}
