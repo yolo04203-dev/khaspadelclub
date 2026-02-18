@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { ArrowLeft, LogOut, Users, BarChart3, Swords, Layers, Home, LayoutGrid } from "lucide-react";
+import { ArrowLeft, LogOut, BarChart3, Swords, Layers, Home, LayoutGrid } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,6 @@ interface AppHeaderProps {
 const prefetchMap: Record<string, string> = {
   "/ladders": "Ladders",
   "/challenges": "Challenges",
-  "/players": "Players",
   "/tournaments": "Tournaments",
   "/stats": "Stats",
 };
@@ -26,7 +25,6 @@ const navLinks = [
   { to: "/dashboard", label: "Home", icon: Home },
   { to: "/ladders", label: "Ladders", icon: Layers },
   { to: "/challenges", label: "Challenges", icon: Swords },
-  { to: "/players", label: "Players", icon: Users },
   { to: "/tournaments", label: "Tournaments", icon: LayoutGrid },
   { to: "/stats", label: "Stats", icon: BarChart3 },
 ];
