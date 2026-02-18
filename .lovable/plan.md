@@ -1,45 +1,49 @@
 
 
-## Redesign Tournaments Page to Match Reference
+## Redesign Americano Session with Standings & Rounds Tabs
 
-Redesign the Tournaments listing page to match the provided reference screenshot, featuring filter tabs, card-style tournament listings with diagonal status ribbons, and a floating action button.
+Restructure the Americano session page to match the reference design, with summary stats at the top and two tabs: "Standings" and "Rounds".
 
-### Visual Changes
+### Layout Changes
 
-**1. Filter Tabs (All / Ongoing / Upcoming / Completed)**
-- Add a horizontal tab bar below the header with four filter options
-- "All" shows everything, "Ongoing" filters `in_progress`, "Upcoming" filters `registration`/`draft`, "Completed" filters `completed`
-- Active tab gets a filled primary background; inactive tabs are plain text
+**1. Summary Header Section**
+- Keep the session name, mode badge, and status badge at the top
+- Add a 2x2 grid of stat cards showing: Players/Teams count, Courts, Duration (calculated from `started_at`), Points per round
+- Add a progress bar showing completed matches vs total matches with percentage
 
-**2. Tournament Cards (new design)**
-- Each card displays:
-  - Tournament name (bold, truncated if long)
-  - "Organizer" line showing the venue or a default label
-  - Date range using `start_date` and `end_date` fields (with calendar icon)
-- A diagonal ribbon in the top-right corner showing the status (Upcoming = green, Completed = gray, Ongoing = blue)
-- Remove the current grid layout; use a single-column vertical list of cards for mobile-first design (grid on desktop)
+**2. Two-Tab Layout (Standings / Rounds)**
+- Replace the current side-by-side grid layout with a full-width tabbed interface
+- Use the existing `Tabs` component from `@radix-ui/react-tabs`
+- **Standings tab** (default): Shows the rankings table with enhanced columns matching the reference (P+, P-, +/-, W, T, L for individual; or W, L, Pts for teams). Each row shows rank number in a circle badge
+- **Rounds tab**: Shows all matches grouped by round with score inputs (same as current matches section)
 
-**3. Floating Action Button**
-- Replace the header "New Tournament" button with a centered FAB using the existing `FAB` component
-- Only visible to admins
-- Position: bottom-center, above the mobile nav bar
-
-**4. Remove info card**
-- Remove the "Tournament Formats" explanation card to simplify the page, matching the cleaner reference design
+**3. Enhanced Standings Table (Individual Mode)**
+- Columns: #, Player, P+ (points for), P- (points against), +/- (difference), W (wins), T (ties), L (losses)
+- The +/- column uses color-coded badges (green for positive, red for negative)
+- W/T/L columns also use subtle colored backgrounds
+- Rank numbers displayed in circular badges
+- Top player row gets a subtle highlight
 
 ### Technical Details
 
-**File:** `src/pages/Tournaments.tsx`
-- Add `useState` for active filter tab (all/ongoing/upcoming/completed)
-- Add a `filteredTournaments` computed list based on the selected tab
-- Replace the header `actions` prop (remove the inline "New Tournament" button)
-- Add filter tab UI using simple buttons/pills styled with Tailwind
-- Redesign tournament cards:
-  - Single column on mobile, 2-col grid on `md:` screens
-  - Add a CSS diagonal ribbon for status using `overflow-hidden` and a rotated absolute-positioned element
-  - Show venue as "Organizer" line
-  - Format `start_date`/`end_date` with `date-fns` (e.g., "26 Feb - 09 Mar")
-- Add the FAB component at the bottom for admin users
-- Remove the "Tournament Formats" info card
-- Add `Tabs` import from UI components for the filter bar
+**File:** `src/pages/AmericanoSession.tsx`
+- Import `Tabs, TabsList, TabsTrigger, TabsContent` from UI components
+- Import `Trophy, LayoutList` icons (LayoutList for Rounds tab icon)
+- Add `activeTab` state defaulting to `"standings"`
+- Compute derived stats: `pointsAgainst` per player (requires iterating rounds data to calculate P- for each player)
+- Compute wins/ties/losses per player from completed rounds
+- Replace the `grid lg:grid-cols-3` layout with a single-column layout:
+  1. Stat cards grid (2x2)
+  2. Progress bar
+  3. Tabs component with Standings and Rounds content
+- Move the "Start Session" and "Complete Session" buttons into the header area or above the tabs
+- Calculate duration from `session.started_at` to now (or `completed_at`)
+
+**New computed data for individual standings:**
+- For each player, iterate all completed rounds to calculate:
+  - `pointsFor`: sum of scores when player was on that team
+  - `pointsAgainst`: sum of opponent scores
+  - `wins`: count of rounds where player's team scored higher
+  - `ties`: count of rounds where scores were equal  
+  - `losses`: count of rounds where player's team scored lower
 
