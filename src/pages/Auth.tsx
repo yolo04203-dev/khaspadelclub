@@ -332,7 +332,7 @@ export default function Auth() {
                     <div className="text-center">
                       <h1 className="text-2xl font-bold text-foreground">Create an account</h1>
                       <p className="text-muted-foreground mt-2">
-                        Join the academy and start competing
+                        Join the club and start competing
                       </p>
                     </div>
 

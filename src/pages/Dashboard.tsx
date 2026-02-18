@@ -204,7 +204,7 @@ export default function Dashboard() {
               </h1>
               <p className="text-sm sm:text-base text-muted-foreground mt-2">
                 {(role === "admin" || role === "super_admin")
-                  ? "Manage your academy from the admin dashboard"
+                  ? "Manage your club from the admin dashboard"
                   : "View your rankings and challenge other players"}
               </p>
             </div>
@@ -433,7 +433,7 @@ export default function Dashboard() {
                       <Settings className="w-5 h-5 text-accent" />
                       Admin Panel
                     </CardTitle>
-                    <CardDescription>Manage players, matches, and academy settings</CardDescription>
+                    <CardDescription>Manage players, matches, and club settings</CardDescription>
                   </CardHeader>
                 </Card>
               </Link>
