@@ -69,17 +69,7 @@ export function InvitePartnerDialog({
 
         if (error) throw error;
 
-        // Filter out players who are already on a team
-        const playerIds = profiles?.map(p => p.user_id) || [];
-        const { data: teamMembers } = await supabase
-          .from("team_members")
-          .select("user_id")
-          .in("user_id", playerIds);
-
-        const membersSet = new Set(teamMembers?.map(m => m.user_id) || []);
-        const availablePlayers = profiles?.filter(p => !membersSet.has(p.user_id)) || [];
-
-        setSuggestions(availablePlayers);
+        setSuggestions(profiles || []);
       } catch (error) {
         logger.apiError("searchPlayers", error);
       } finally {
