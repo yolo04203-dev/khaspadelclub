@@ -6,8 +6,5 @@ verify_jwt = false
 [functions.send-challenge-notification]
 verify_jwt = false
 
-[functions.seed-test-data]
-verify_jwt = false
-
 [functions.delete-account]
 verify_jwt = false
