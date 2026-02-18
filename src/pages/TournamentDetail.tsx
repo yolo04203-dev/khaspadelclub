@@ -103,6 +103,7 @@ export default function TournamentDetail() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
   const [userTeam, setUserTeam] = useState<UserTeam | null>(null);
   const [loading, setLoading] = useState(true);
+  const [teamMembersMap, setTeamMembersMap] = useState<Map<string, { player1: string; player2: string }>>(new Map());
   const [registrationDialogOpen, setRegistrationDialogOpen] = useState(false);
   const [paymentParticipants, setPaymentParticipants] = useState<Array<{
     id: string; team_id: string; team_name: string; registered_at: string;
@@ -149,23 +150,74 @@ export default function TournamentDetail() {
       }));
       setCategories(cats);
 
-      // Fetch team names for participants
-      const participantsWithNames = await Promise.all(
-        (participantsRes.data || []).map(async (p) => {
-          const { data: team } = await supabase.from("teams").select("name").eq("id", p.team_id).single();
-          return { 
-            ...p, 
-            team_name: team?.name || "Unknown",
-            payment_status: (p as any).payment_status || "pending",
-            payment_notes: null,
-            custom_team_name: (p as any).custom_team_name || null,
-            category_id: (p as any).category_id || null,
-            player1_name: (p as any).player1_name || null,
-            player2_name: (p as any).player2_name || null,
-            registered_at: p.registered_at,
-          };
-        })
-      );
+      // Fetch team names and member profiles for participants
+      const participantTeamIds = [...new Set((participantsRes.data || []).map(p => p.team_id).filter(Boolean) as string[])];
+      
+      // Batch fetch: team names + team members
+      const [teamsResult, membersResult] = await Promise.all([
+        participantTeamIds.length > 0 
+          ? supabase.from("teams").select("id, name").in("id", participantTeamIds)
+          : Promise.resolve({ data: [] }),
+        participantTeamIds.length > 0
+          ? supabase.from("team_members").select("team_id, user_id").in("team_id", participantTeamIds).order("joined_at")
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      const teamNameMap = new Map((teamsResult.data || []).map(t => [t.id, t.name]));
+      
+      // Fetch display names for all member user_ids
+      const allUserIds = [...new Set((membersResult.data || []).map(m => m.user_id))];
+      let profileMap = new Map<string, string>();
+      if (allUserIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("public_profiles")
+          .select("user_id, display_name")
+          .in("user_id", allUserIds);
+        profileMap = new Map((profiles || []).map(p => [p.user_id!, p.display_name || "Player"]));
+      }
+
+      // Build teamMembersMap
+      const membersMap = new Map<string, { player1: string; player2: string }>();
+      for (const teamId of participantTeamIds) {
+        const members = (membersResult.data || []).filter(m => m.team_id === teamId);
+        if (members.length >= 2) {
+          membersMap.set(teamId, {
+            player1: profileMap.get(members[0].user_id) || "Player",
+            player2: profileMap.get(members[1].user_id) || "Player",
+          });
+        } else if (members.length === 1) {
+          membersMap.set(teamId, {
+            player1: profileMap.get(members[0].user_id) || "Player",
+            player2: "",
+          });
+        }
+      }
+      setTeamMembersMap(membersMap);
+
+      const participantsWithNames = (participantsRes.data || []).map((p) => {
+        const teamName = teamNameMap.get(p.team_id!) || "Unknown";
+        // For player names: prefer custom participant names, fall back to team member profiles
+        let p1 = (p as any).player1_name || null;
+        let p2 = (p as any).player2_name || null;
+        if (!p1 && !p2 && p.team_id) {
+          const members = membersMap.get(p.team_id!);
+          if (members) {
+            p1 = members.player1;
+            p2 = members.player2;
+          }
+        }
+        return { 
+          ...p, 
+          team_name: teamName,
+          payment_status: (p as any).payment_status || "pending",
+          payment_notes: null,
+          custom_team_name: (p as any).custom_team_name || null,
+          category_id: (p as any).category_id || null,
+          player1_name: p1,
+          player2_name: p2,
+          registered_at: p.registered_at,
+        };
+      });
       setParticipants(participantsWithNames);
     } catch (error) {
       logger.apiError("fetchTournament", error);
@@ -776,6 +828,15 @@ export default function TournamentDetail() {
     return participant?.custom_team_name || participant?.team_name || "Unknown";
   };
 
+  const getTeamPlayers = (teamId: string | null): string => {
+    if (!teamId) return "";
+    const participant = participants.find((p) => p.team_id === teamId);
+    if (participant?.player1_name && participant?.player2_name) {
+      return `${participant.player1_name} & ${participant.player2_name}`;
+    }
+    return "";
+  };
+
   const isOwner = user?.id === tournament?.created_by;
   const isAdmin = role === "admin" || role === "super_admin" || isOwner;
   
@@ -1233,6 +1294,8 @@ export default function TournamentDetail() {
                         losses: p.group_losses,
                         points_for: p.group_points_for,
                         points_against: p.group_points_against,
+                        player1_name: p.player1_name || undefined,
+                        player2_name: p.player2_name || undefined,
                       }));
 
                     return (
@@ -1268,6 +1331,8 @@ export default function TournamentDetail() {
                         team2_id: m.team2_id,
                         team1_name: getTeamName(m.team1_id),
                         team2_name: getTeamName(m.team2_id),
+                        team1_players: getTeamPlayers(m.team1_id),
+                        team2_players: getTeamPlayers(m.team2_id),
                         team1_score: m.team1_score,
                         team2_score: m.team2_score,
                         winner_team_id: m.winner_team_id,
@@ -1295,6 +1360,8 @@ export default function TournamentDetail() {
                   ...m,
                   team1_name: getTeamName(m.team1_id),
                   team2_name: getTeamName(m.team2_id),
+                  team1_players: getTeamPlayers(m.team1_id),
+                  team2_players: getTeamPlayers(m.team2_id),
                 }))}
                 isAdmin={isAdmin}
                 onSubmitScore={submitKnockoutScore}
@@ -1344,7 +1411,7 @@ export default function TournamentDetail() {
                                 {groupName && (
                                   <Badge variant="outline" className="text-xs">{groupName}</Badge>
                                 )}
-                                {p.custom_team_name && p.player1_name && p.player2_name && (
+                                {p.player1_name && p.player2_name && (
                                   <span className="text-xs text-muted-foreground">
                                     ({p.player1_name} & {p.player2_name})
                                   </span>

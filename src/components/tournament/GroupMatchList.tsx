@@ -11,6 +11,8 @@ interface GroupMatch {
   team2_id: string | null;
   team1_name: string;
   team2_name: string;
+  team1_players?: string;
+  team2_players?: string;
   team1_score: number | null;
   team2_score: number | null;
   winner_team_id: string | null;
@@ -141,8 +143,15 @@ export function GroupMatchList({ groupName, matches, isAdmin, onSubmitScore, set
                     <Clock className="w-3 h-3 text-warning" />
                     <span className="text-muted-foreground">Pending</span>
                   </div>
-                  <div className="font-medium mb-3">
-                    {match.team1_name} vs {match.team2_name}
+                  <div className="mb-3">
+                    <div className="font-medium">
+                      {match.team1_name} vs {match.team2_name}
+                    </div>
+                    {(match.team1_players || match.team2_players) && (
+                      <p className="text-xs text-muted-foreground">
+                        {match.team1_players || "—"} vs {match.team2_players || "—"}
+                      </p>
+                    )}
                   </div>
                   {isAdmin && matchScores && (
                     <div className="space-y-2">
@@ -212,15 +221,17 @@ export function GroupMatchList({ groupName, matches, isAdmin, onSubmitScore, set
                       <span className="text-muted-foreground">Completed</span>
                     </div>
                     <div className="mt-1 flex items-center gap-3">
-                      <span className={match.winner_team_id === match.team1_id ? "font-bold text-success" : ""}>
+                      <div className={match.winner_team_id === match.team1_id ? "font-bold text-success" : ""}>
                         {match.team1_name}
-                      </span>
+                        {match.team1_players && <p className="text-[11px] text-muted-foreground font-normal">{match.team1_players}</p>}
+                      </div>
                       <span className="font-mono text-lg font-semibold">
                         {match.team1_score} - {match.team2_score}
                       </span>
-                      <span className={match.winner_team_id === match.team2_id ? "font-bold text-success" : ""}>
+                      <div className={match.winner_team_id === match.team2_id ? "font-bold text-success" : ""}>
                         {match.team2_name}
-                      </span>
+                        {match.team2_players && <p className="text-[11px] text-muted-foreground font-normal">{match.team2_players}</p>}
+                      </div>
                     </div>
                   </div>
                 </div>
