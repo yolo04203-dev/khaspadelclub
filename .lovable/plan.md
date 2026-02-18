@@ -1,75 +1,62 @@
 
 
-## Performance Optimization -- Remaining Improvements
+## Show 2 Player Names on Every Team
 
-Most of the 10-point performance checklist is already implemented in this codebase. The plan below targets the remaining gaps.
+Currently, player names are only partially visible: the ladder rankings show member names, but the dashboard and tournament views often only show the team name. This plan ensures every team consistently displays its 2 participant names.
 
-### What's Already Done (no changes needed)
+### Changes
 
-- All routes use lazy-loaded dynamic imports with retry fallback
-- Console/debugger stripping in production builds
-- Dashboard stats deferred via requestIdleCallback
-- Notifications deferred by 1.5s
-- Sentry, PostHog, WebVitals deferred to after first paint
-- QueryClient caching (2-min stale, 10-min GC)
-- All data fetching uses Promise.all (no sequential blocking)
-- Vite manual chunks for vendors, UI, animation, charts, etc.
-- Virtualized player list (react-window)
-- Skeleton loaders on all major pages
-- CSS-based hero animations on landing page
-- Preconnect/dns-prefetch hints in index.html
-- 0.15s page transitions
-- 300ms search debounce
+#### 1. Dashboard Team Card -- Show Member Names
+Fetch team member profiles alongside the team info and display both names under the team name.
 
-### Remaining Changes
+**File:** `src/pages/Dashboard.tsx`
+- Expand the team info fetch to also query `team_members` + `public_profiles` for the user's team
+- Store member names in state (e.g. `memberNames: string[]`)
+- Display "Player 1 & Player 2" below the team name in the team status card
 
-#### 1. Remove framer-motion from Logo component
-The Logo uses `motion.img` just for hover/tap scale effects. This forces framer-motion into the critical rendering path for every page. Replace with CSS transitions.
+#### 2. Tournament Participants -- Always Show Player Names
+Currently player names only appear for custom teams. For registered teams (non-custom), fetch member profiles and display them.
 
-**File:** `src/components/Logo.tsx`
-- Replace `motion.img` with a plain `img` tag
-- Add CSS `transition: transform 0.15s` with `hover:scale-105 active:scale-95` via Tailwind
-- Remove framer-motion import from this file
+**File:** `src/pages/TournamentDetail.tsx`
+- When fetching participants, also fetch `team_members` + `public_profiles` for each team
+- For participants without `player1_name`/`player2_name`, populate them from member profiles
+- Update `getTeamName()` to optionally include player names
+- Show "(Player 1 & Player 2)" next to team names in the participant list, group standings, match lists, and knockout bracket
 
-#### 2. Memoize PlayerCard component
-The Players page re-renders all visible cards on every filter/state change.
+#### 3. Tournament Group Standings -- Show Player Names
+The `GroupStandings` component shows team names but no player names.
 
-**File:** `src/pages/Players.tsx`
-- Wrap `PlayerCard` in `React.memo`
+**File:** `src/components/tournament/GroupStandings.tsx`
+- Add an optional `player1_name` and `player2_name` to the `TeamStanding` interface
+- Display them below the team name in the standings table
 
-#### 3. Memoize AppHeader to prevent re-renders
-AppHeader re-renders on every route change for all child components.
+#### 4. Tournament Match Components -- Show Player Names
+`GroupMatchList` and `KnockoutBracket` show team names but no player names.
 
-**File:** `src/components/AppHeader.tsx`
-- Wrap the component export in `React.memo`
+**Files:** `src/components/tournament/GroupMatchList.tsx`, `src/components/tournament/KnockoutBracket.tsx`
+- Add optional `team1_players` and `team2_players` (string) to match interfaces
+- Display player names in smaller text under each team name
 
-#### 4. Memoize NotificationBell
-Prevent unnecessary re-renders from parent AppHeader.
+### Technical Details
 
-**File:** `src/components/NotificationBell.tsx`
-- Wrap export in `React.memo`
+**Data flow for tournaments:**
+- Build a `teamMembersMap: Map<teamId, { player1: string, player2: string }>` once during `fetchData()`
+- Reuse it in `getTeamName()`, participant rendering, and match component props
+- For custom teams, use `player1_name` / `player2_name` from `tournament_participants`
+- For registered teams, use `public_profiles.display_name` via `team_members`
 
-#### 5. Add `fetchPriority="high"` to above-fold logo
-The logo in the landing header should load with high priority since it's above the fold.
+**Data flow for dashboard:**
+- Single additional query: `team_members` joined with `public_profiles` for the user's team
+- Runs in the existing `Promise.all` alongside team + rank fetch
 
-**File:** `src/components/Logo.tsx`
-- Remove `loading="lazy"` (it's above the fold in header)
-- Use eager loading for the header logo
+### Summary
 
-### Technical Summary
+| Area | Current | After |
+|------|---------|-------|
+| Dashboard team card | "Team Name" | "Team Name" + "Player 1 & Player 2" below |
+| Ladder rankings | Already shows member names | No change needed |
+| Tournament participant list | Player names only for custom teams | Player names for all teams |
+| Tournament group standings | Team name only | Team name + player names |
+| Tournament matches/brackets | Team name only | Team name + player names |
 
-| File | Change |
-|------|--------|
-| `src/components/Logo.tsx` | Replace framer-motion with CSS transitions, remove lazy loading |
-| `src/pages/Players.tsx` | Wrap `PlayerCard` in `React.memo` |
-| `src/components/AppHeader.tsx` | Wrap in `React.memo` |
-| `src/components/NotificationBell.tsx` | Wrap in `React.memo` |
-
-### Impact
-
-These changes will:
-- Remove framer-motion from the critical render path (it's still loaded for page transitions but now deferred via the animation chunk)
-- Reduce unnecessary re-renders across the most-visited components
-- Ensure above-fold images load eagerly with high priority
-- No UI or functionality changes
-
+No database changes required -- all data is already available via existing `team_members` and `public_profiles` tables.
