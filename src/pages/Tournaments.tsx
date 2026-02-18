@@ -1,15 +1,16 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Trophy, Users, Calendar, Crown, Banknote } from "lucide-react";
+import { Plus, Trophy, Calendar, MapPin } from "lucide-react";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { FAB, FABContainer } from "@/components/ui/fab";
 import { logger } from "@/lib/logger";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface Tournament {
   id: string;
@@ -20,13 +21,50 @@ interface Tournament {
   registration_deadline: string | null;
   entry_fee: number | null;
   created_at: string;
+  start_date: string | null;
+  end_date: string | null;
+  venue: string | null;
   participant_count?: number;
+}
+
+type FilterTab = "all" | "ongoing" | "upcoming" | "completed";
+
+const FILTERS: { key: FilterTab; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "ongoing", label: "Ongoing" },
+  { key: "upcoming", label: "Upcoming" },
+  { key: "completed", label: "Completed" },
+];
+
+function getStatusRibbon(status: Tournament["status"]) {
+  switch (status) {
+    case "in_progress":
+      return { label: "Ongoing", color: "bg-blue-500" };
+    case "registration":
+    case "draft":
+      return { label: "Upcoming", color: "bg-emerald-500" };
+    case "completed":
+      return { label: "Completed", color: "bg-muted-foreground" };
+    case "cancelled":
+      return { label: "Cancelled", color: "bg-destructive" };
+    default:
+      return { label: "Draft", color: "bg-muted-foreground" };
+  }
+}
+
+function formatDateRange(start: string | null, end: string | null) {
+  if (!start) return null;
+  const s = format(new Date(start), "dd MMM");
+  if (!end) return s;
+  const e = format(new Date(end), "dd MMM");
+  return `${s} - ${e}`;
 }
 
 export default function Tournaments() {
   const { user, role, isLoading: authLoading } = useAuth();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
 
   useEffect(() => {
     fetchTournaments();
@@ -34,11 +72,10 @@ export default function Tournaments() {
 
   const fetchTournaments = async () => {
     try {
-      // Parallel fetch: tournaments + all participant counts in 2 queries (not N+1)
       const [tournamentsResult, participantsResult] = await Promise.all([
         supabase
           .from("tournaments")
-          .select("id, name, format, status, max_teams, registration_deadline, entry_fee, created_at")
+          .select("id, name, format, status, max_teams, registration_deadline, entry_fee, created_at, start_date, end_date, venue")
           .order("created_at", { ascending: false }),
         supabase
           .from("tournament_participants_public")
@@ -47,10 +84,9 @@ export default function Tournaments() {
 
       if (tournamentsResult.error) throw tournamentsResult.error;
 
-      // Count participants per tournament client-side
       const countMap = new Map<string, number>();
       (participantsResult.data || []).forEach(p => {
-        countMap.set(p.tournament_id, (countMap.get(p.tournament_id) || 0) + 1);
+        countMap.set(p.tournament_id!, (countMap.get(p.tournament_id!) || 0) + 1);
       });
 
       const tournamentsWithCounts = (tournamentsResult.data || []).map(t => ({
@@ -66,26 +102,15 @@ export default function Tournaments() {
     }
   };
 
-  const getStatusBadge = (status: Tournament["status"]) => {
-    const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-      draft: { variant: "secondary", label: "Draft" },
-      registration: { variant: "default", label: "Registration Open" },
-      in_progress: { variant: "default", label: "In Progress" },
-      completed: { variant: "outline", label: "Completed" },
-      cancelled: { variant: "destructive", label: "Cancelled" },
-    };
-    const { variant, label } = variants[status] || variants.draft;
-    return <Badge variant={variant}>{label}</Badge>;
-  };
-
-  const formatLabel = (format: Tournament["format"]) => {
-    const labels: Record<string, string> = {
-      single_elimination: "Single Elimination",
-      double_elimination: "Double Elimination",
-      round_robin: "Round Robin",
-    };
-    return labels[format] || format;
-  };
+  const filteredTournaments = useMemo(() => {
+    if (activeFilter === "all") return tournaments;
+    return tournaments.filter(t => {
+      if (activeFilter === "ongoing") return t.status === "in_progress";
+      if (activeFilter === "upcoming") return t.status === "registration" || t.status === "draft";
+      if (activeFilter === "completed") return t.status === "completed";
+      return true;
+    });
+  }, [tournaments, activeFilter]);
 
   if (authLoading) {
     return (
@@ -97,144 +122,126 @@ export default function Tournaments() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader 
-        showBack 
-        actions={
-          role === "admin" && (
-            <Button asChild>
-              <Link to="/tournaments/create">
-                <Plus className="w-4 h-4 mr-2" />
-                New Tournament
-              </Link>
-            </Button>
-          )
-        }
-      />
+      <AppHeader showBack />
 
       <PullToRefresh onRefresh={async () => { await fetchTournaments(); }} className="flex-1 overflow-auto">
-        <main className="container py-8 pb-safe-nav sm:pb-8">
+        <main className="container py-6 pb-safe-nav sm:pb-8">
           <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.15 }}
-        >
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-12 h-12 rounded-xl bg-warning/10 flex items-center justify-center">
-                <Trophy className="w-6 h-6 text-warning" />
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
+                <Trophy className="w-5 h-5 text-warning" />
               </div>
-              <div>
-                <h1 className="text-3xl font-bold text-foreground">Tournaments</h1>
-                <p className="text-muted-foreground">Bracket-based competitions</p>
-              </div>
+              <h1 className="text-2xl font-bold text-foreground">Tournaments</h1>
             </div>
-          </div>
 
-          {/* Info Card */}
-          <Card className="mb-8 bg-gradient-to-r from-warning/5 to-warning/10 border-warning/20">
-            <CardContent className="py-6">
-              <h3 className="font-semibold text-foreground mb-3">Tournament Formats</h3>
-              <div className="grid md:grid-cols-3 gap-4 text-sm text-muted-foreground">
-                <div className="flex items-start gap-2">
-                  <Crown className="w-4 h-4 mt-0.5 text-warning" />
-                  <span><strong>Single Elimination:</strong> One loss and you're out</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Trophy className="w-4 h-4 mt-0.5 text-warning" />
-                  <span><strong>Double Elimination:</strong> Two losses to be eliminated</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Users className="w-4 h-4 mt-0.5 text-warning" />
-                  <span><strong>Round Robin:</strong> Everyone plays everyone</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            {/* Filter Tabs */}
+            <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+              {FILTERS.map(f => (
+                <button
+                  key={f.key}
+                  onClick={() => setActiveFilter(f.key)}
+                  className={cn(
+                    "px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
+                    activeFilter === f.key
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
 
-          {/* Tournaments List */}
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-foreground">All Tournaments</h2>
-
+            {/* Tournaments List */}
             {loading ? (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="space-y-4">
                 {[1, 2, 3].map(i => (
-                  <Card key={i} className="animate-pulse h-full">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="h-5 bg-muted rounded w-2/3" />
-                        <div className="h-5 bg-muted rounded w-20" />
-                      </div>
-                      <div className="h-4 bg-muted rounded w-1/3 mt-2" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-4 bg-muted rounded w-full" />
+                  <Card key={i} className="animate-pulse">
+                    <CardContent className="p-4">
+                      <div className="h-5 bg-muted rounded w-2/3 mb-3" />
+                      <div className="h-4 bg-muted rounded w-1/3 mb-2" />
+                      <div className="h-4 bg-muted rounded w-1/2" />
                     </CardContent>
                   </Card>
                 ))}
               </div>
-            ) : tournaments.length === 0 ? (
+            ) : filteredTournaments.length === 0 ? (
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Trophy className="w-12 h-12 text-muted-foreground mb-4" />
-                  <h3 className="font-semibold text-foreground mb-2">No tournaments yet</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Create your first tournament to get started
+                  <h3 className="font-semibold text-foreground mb-2">No tournaments found</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {activeFilter === "all"
+                      ? "No tournaments have been created yet"
+                      : `No ${activeFilter} tournaments`}
                   </p>
-                  {role === "admin" && (
-                    <Button asChild>
-                      <Link to="/tournaments/create">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Create Tournament
-                      </Link>
-                    </Button>
-                  )}
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {tournaments.map((tournament) => (
-                  <Link key={tournament.id} to={`/tournaments/${tournament.id}`}>
-                    <Card className="hover:border-warning/50 transition-colors cursor-pointer h-full">
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <CardTitle className="text-lg">{tournament.name}</CardTitle>
-                          {getStatusBadge(tournament.status)}
-                        </div>
-                        <CardDescription>
-                          {formatLabel(tournament.format)}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-1 text-muted-foreground">
-                            <Users className="w-4 h-4" />
-                            <span>{tournament.participant_count} / {tournament.max_teams}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            {(tournament.entry_fee ?? 0) > 0 && (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <Banknote className="w-4 h-4" />
-                                <span>PKR {tournament.entry_fee!.toLocaleString()}</span>
-                              </div>
+              <div className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
+                {filteredTournaments.map((tournament) => {
+                  const ribbon = getStatusRibbon(tournament.status);
+                  const dateRange = formatDateRange(tournament.start_date, tournament.end_date);
+
+                  return (
+                    <Link key={tournament.id} to={`/tournaments/${tournament.id}`}>
+                      <Card className="relative overflow-hidden hover:border-primary/30 transition-colors cursor-pointer">
+                        {/* Diagonal Ribbon */}
+                        <div className="absolute top-0 right-0 w-28 h-28 overflow-hidden pointer-events-none">
+                          <div
+                            className={cn(
+                              "absolute top-[14px] right-[-34px] w-[150px] text-center text-[10px] font-semibold text-white py-1 rotate-45",
+                              ribbon.color
                             )}
-                            {tournament.registration_deadline && (
-                              <div className="flex items-center gap-1 text-muted-foreground">
-                                <Calendar className="w-4 h-4" />
-                                <span>{new Date(tournament.registration_deadline).toLocaleDateString()}</span>
-                              </div>
-                            )}
+                          >
+                            {ribbon.label}
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
+
+                        <CardContent className="p-4 pr-12">
+                          <h3 className="font-bold text-foreground text-base truncate mb-1">
+                            {tournament.name}
+                          </h3>
+
+                          <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-1">
+                            <MapPin className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{tournament.venue || "Venue TBD"}</span>
+                          </div>
+
+                          {dateRange && (
+                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                              <Calendar className="w-3.5 h-3.5 shrink-0" />
+                              <span>{dateRange}</span>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  );
+                })}
               </div>
             )}
-          </div>
           </motion.div>
         </main>
       </PullToRefresh>
+
+      {/* Admin FAB */}
+      <FABContainer show={role === "admin" || role === "super_admin"}>
+        <FAB
+          asChild
+          icon={<Plus />}
+          label="New Tournament"
+          showLabel
+          position="bottom-center"
+        >
+          <Link to="/tournaments/create" />
+        </FAB>
+      </FABContainer>
     </div>
   );
 }
