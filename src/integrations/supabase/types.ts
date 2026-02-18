@@ -1404,6 +1404,7 @@ export type Database = {
       }
     }
     Functions: {
+      auto_name_team: { Args: { _team_id: string }; Returns: undefined }
       create_team_with_captain: {
         Args: { _avatar_url?: string; _name: string }
         Returns: string

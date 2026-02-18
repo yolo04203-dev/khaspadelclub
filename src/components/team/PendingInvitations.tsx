@@ -134,6 +134,9 @@ export function PendingInvitations({ onAccepted }: PendingInvitationsProps) {
 
         if (updateError) throw updateError;
 
+        // Auto-name the team from both players' display names
+        await supabase.rpc("auto_name_team", { _team_id: invitation.team_id });
+
         toast({
           title: "Team joined!",
           description: `You are now a member of ${invitation.team_name}.`,
