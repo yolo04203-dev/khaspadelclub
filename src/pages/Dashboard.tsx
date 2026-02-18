@@ -179,15 +179,15 @@ export default function Dashboard() {
     return (
       <div className="min-h-screen bg-background">
         <AppHeader />
-        <main className="container py-6 sm:py-8">
-          <div className="mb-6 sm:mb-8">
+        <main className="container py-4 sm:py-8">
+          <div className="mb-5 sm:mb-8">
             <div className="h-8 w-64 bg-muted rounded animate-pulse mb-2" />
             <div className="h-4 w-48 bg-muted rounded animate-pulse" />
           </div>
-          <div className="mb-8">
+          <div className="mb-5 sm:mb-8">
             <TeamCardSkeleton />
           </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
+          <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4 mb-5 sm:mb-8">
             <StatsCardSkeleton />
             <StatsCardSkeleton />
             <StatsCardSkeleton />
@@ -226,9 +226,9 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <PullToRefresh onRefresh={handleRefresh} className="min-h-[calc(100vh-4rem)]">
-        <main className="container py-6 sm:py-8 pb-safe-nav sm:pb-8">
+        <main className="container py-4 sm:py-8 pb-safe-nav sm:pb-8">
           <div>
-            <div className="mb-6 sm:mb-8">
+            <div className="mb-5 sm:mb-8">
               <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
                 Welcome, {user.user_metadata?.display_name || user.email?.split("@")[0]}!
               </h1>
@@ -241,7 +241,7 @@ export default function Dashboard() {
 
           {/* Team Status Card */}
           {!teamLoading && (
-            <div className="mb-8">
+            <div className="mb-5 sm:mb-8">
               {userTeam ? (
                 <Card className="bg-gradient-to-r from-accent/10 to-primary/10 border-accent/30">
                   <CardContent className="py-4">
@@ -323,19 +323,19 @@ export default function Dashboard() {
           )}
 
           {/* Pending Team Invitations */}
-          <div className="mb-8">
+          <div className="mb-5 sm:mb-8">
             <PendingInvitations onAccepted={fetchDashboardData} />
           </div>
 
           {/* Quick Stats */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 mb-8">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 mb-5 sm:mb-8">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Current Rank</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Current Rank</CardTitle>
                 <Trophy className="h-4 w-4 text-rank-gold" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
+              <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-xl sm:text-2xl font-bold">
                   {userTeam?.rank ? `#${userTeam.rank}` : "#--"}
                 </div>
                 <p className="text-xs text-muted-foreground">Ladder position</p>
@@ -343,34 +343,34 @@ export default function Dashboard() {
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Matches Played</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Matches Played</CardTitle>
                 <Swords className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.matchesPlayed}</div>
+              <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-xl sm:text-2xl font-bold">{stats.matchesPlayed}</div>
                 <p className="text-xs text-muted-foreground">Total matches</p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Win Rate</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Win Rate</CardTitle>
                 <Trophy className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.matchesPlayed > 0 ? `${winRate}%` : "--%"}</div>
+              <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-xl sm:text-2xl font-bold">{stats.matchesPlayed > 0 ? `${winRate}%` : "--%"}</div>
                 <p className="text-xs text-muted-foreground">{stats.wins}W / {stats.losses}L</p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pending Challenges</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium">Pending Challenges</CardTitle>
                 <Swords className="h-4 w-4 text-accent" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.pendingChallenges}</div>
+              <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-xl sm:text-2xl font-bold">{stats.pendingChallenges}</div>
                 <p className="text-xs text-muted-foreground">Awaiting response</p>
               </CardContent>
             </Card>
@@ -378,7 +378,7 @@ export default function Dashboard() {
 
           {/* Mode Breakdown */}
           {modeBreakdown && (
-            <div className="flex flex-wrap gap-3 mb-8">
+            <div className="flex flex-wrap gap-3 mb-5 sm:mb-8">
               {(["ladder", "tournament", "americano"] as const).map((m) => {
                 const ms = modeBreakdown[m];
                 const total = ms.wins + ms.losses;
@@ -403,9 +403,9 @@ export default function Dashboard() {
           {/* Quick Actions */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Link to="/ladders">
-              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full press-scale">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-2xl">
                     <Layers className="w-5 h-5 text-accent" />
                     Ladders
                   </CardTitle>
@@ -415,14 +415,14 @@ export default function Dashboard() {
             </Link>
 
             <Link to="/challenges">
-              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full relative">
+              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full relative press-scale">
                 {incomingChallenges > 0 && (
                   <Badge className="absolute -top-2 -right-2 bg-warning text-warning-foreground">
                     {incomingChallenges}
                   </Badge>
                 )}
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-2xl">
                     <Swords className="w-5 h-5 text-accent" />
                     Challenges
                   </CardTitle>
@@ -432,9 +432,9 @@ export default function Dashboard() {
             </Link>
 
             <Link to="/players">
-              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full press-scale">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-2xl">
                     <Users className="w-5 h-5 text-accent" />
                     Find Players
                   </CardTitle>
@@ -444,9 +444,9 @@ export default function Dashboard() {
             </Link>
 
             <Link to="/americano">
-              <Card className="hover:border-success/50 transition-colors cursor-pointer h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+              <Card className="hover:border-success/50 transition-colors cursor-pointer h-full press-scale">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-2xl">
                     <Shuffle className="w-5 h-5 text-success" />
                     Americano
                   </CardTitle>
@@ -456,9 +456,9 @@ export default function Dashboard() {
             </Link>
 
             <Link to="/tournaments">
-              <Card className="hover:border-warning/50 transition-colors cursor-pointer h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+              <Card className="hover:border-warning/50 transition-colors cursor-pointer h-full press-scale">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-2xl">
                     <Trophy className="w-5 h-5 text-warning" />
                     Tournaments
                   </CardTitle>
@@ -468,9 +468,9 @@ export default function Dashboard() {
             </Link>
 
             <Link to="/stats">
-              <Card className="hover:border-accent/50 transition-colors cursor-pointer h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+              <Card className="hover:border-accent/50 transition-colors cursor-pointer h-full press-scale">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-2xl">
                     <Trophy className="w-5 h-5 text-accent" />
                     My Stats
                   </CardTitle>
@@ -480,9 +480,9 @@ export default function Dashboard() {
             </Link>
 
             <Link to="/profile">
-              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+              <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full press-scale">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-2xl">
                     <User className="w-5 h-5 text-accent" />
                     Profile
                   </CardTitle>
@@ -493,9 +493,9 @@ export default function Dashboard() {
 
             {(role === "admin" || role === "super_admin") && (
               <Link to="/admin">
-                <Card className="hover:border-primary/50 transition-colors cursor-pointer border-accent/30 h-full">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
+                <Card className="hover:border-primary/50 transition-colors cursor-pointer border-accent/30 h-full press-scale">
+                  <CardHeader className="p-4 sm:p-6">
+                    <CardTitle className="flex items-center gap-2 text-base sm:text-2xl">
                       <Settings className="w-5 h-5 text-accent" />
                       Admin Panel
                     </CardTitle>

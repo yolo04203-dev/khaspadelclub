@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
-import { 
+import {
   Swords, 
   Clock, 
   Check, 
@@ -593,8 +592,8 @@ export default function Challenges() {
     return (
       <div className="min-h-screen bg-background">
         <AppHeader showBack />
-        <main className="container py-6 sm:py-8 max-w-2xl">
-          <div className="mb-6 sm:mb-8 text-center">
+        <main className="container py-4 sm:py-8 max-w-2xl">
+          <div className="mb-5 sm:mb-8 text-center">
             <div className="h-8 w-40 bg-muted rounded mx-auto mb-2 animate-pulse" />
             <div className="h-4 w-64 bg-muted rounded mx-auto animate-pulse" />
           </div>
@@ -627,7 +626,7 @@ export default function Challenges() {
 
       {/* Main Content */}
       <PullToRefresh onRefresh={handleRefresh} className="min-h-[calc(100vh-4rem)]">
-        <main className="container py-6 sm:py-8 max-w-2xl pb-safe-nav sm:pb-8">
+        <main className="container py-4 sm:py-8 max-w-2xl pb-safe-nav sm:pb-8">
           <div className="hero-animate">
             <div className="mb-6 sm:mb-8 text-center">
               <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Challenges</h1>
@@ -668,9 +667,10 @@ export default function Challenges() {
             </Card>
           ) : (
             <Tabs defaultValue="incoming" className="w-full">
-              <TabsList className="flex w-full overflow-x-auto mb-6">
-                <TabsTrigger value="incoming" className="relative">
+              <TabsList className="flex w-full overflow-x-auto mb-5 sm:mb-6">
+                <TabsTrigger value="incoming" className="relative min-h-[44px]">
                   <Inbox className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="sm:hidden">In</span>
                   <span className="hidden sm:inline">Incoming</span>
                   {incomingChallenges.length > 0 && (
                     <Badge variant="destructive" className="ml-1 sm:ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
@@ -678,12 +678,14 @@ export default function Challenges() {
                     </Badge>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="outgoing">
+                <TabsTrigger value="outgoing" className="min-h-[44px]">
                   <Send className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="sm:hidden">Out</span>
                   <span className="hidden sm:inline">Outgoing</span>
                 </TabsTrigger>
-                <TabsTrigger value="accepted" className="relative">
+                <TabsTrigger value="accepted" className="relative min-h-[44px]">
                   <Target className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="sm:hidden">Active</span>
                   <span className="hidden sm:inline">Active</span>
                   {acceptedChallenges.length > 0 && (
                     <Badge variant="default" className="ml-1 sm:ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs bg-accent">
@@ -691,14 +693,14 @@ export default function Challenges() {
                     </Badge>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="history">
+                <TabsTrigger value="history" className="min-h-[44px]">
                   <History className="w-4 h-4 mr-1 sm:mr-2" />
+                  <span className="sm:hidden">Hist</span>
                   <span className="hidden sm:inline">History</span>
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="incoming">
-                <AnimatePresence mode="popLayout">
                   {incomingChallenges.length === 0 ? (
                     <Card className="text-center py-8">
                       <CardContent>
@@ -709,13 +711,7 @@ export default function Challenges() {
                   ) : (
                     <div className="space-y-3">
                       {incomingChallenges.map((challenge) => (
-                        <motion.div
-                          key={challenge.id}
-                          layout
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                        >
+                        <div key={challenge.id} className="hero-animate">
                           <Card className="border-accent/30">
                             <CardContent className="p-4">
                               <div className="flex items-center justify-between gap-4">
@@ -771,15 +767,13 @@ export default function Challenges() {
                               </div>
                             </CardContent>
                           </Card>
-                        </motion.div>
+                        </div>
                       ))}
                     </div>
                   )}
-                </AnimatePresence>
               </TabsContent>
 
               <TabsContent value="outgoing">
-                <AnimatePresence mode="popLayout">
                   {outgoingChallenges.length === 0 ? (
                     <Card className="text-center py-8">
                       <CardContent>
@@ -793,13 +787,7 @@ export default function Challenges() {
                   ) : (
                     <div className="space-y-3">
                       {outgoingChallenges.map((challenge) => (
-                        <motion.div
-                          key={challenge.id}
-                          layout
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                        >
+                        <div key={challenge.id} className="hero-animate">
                           <Card>
                             <CardContent className="p-4">
                               <div className="flex items-center justify-between gap-4">
@@ -855,15 +843,13 @@ export default function Challenges() {
                               </div>
                             </CardContent>
                           </Card>
-                        </motion.div>
+                        </div>
                       ))}
                     </div>
                   )}
-                </AnimatePresence>
               </TabsContent>
 
               <TabsContent value="accepted">
-                <AnimatePresence mode="popLayout">
                   {acceptedChallenges.length === 0 ? (
                     <Card className="text-center py-8">
                       <CardContent>
@@ -874,13 +860,7 @@ export default function Challenges() {
                   ) : (
                     <div className="space-y-3">
                       {acceptedChallenges.map((challenge) => (
-                        <motion.div
-                          key={challenge.id}
-                          layout
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                        >
+                        <div key={challenge.id} className="hero-animate">
                           <Card className="border-accent/30 bg-accent/5">
                             <CardContent className="p-4">
                               <div className="flex flex-col gap-3">
@@ -980,11 +960,10 @@ export default function Challenges() {
                               </div>
                             </CardContent>
                           </Card>
-                        </motion.div>
+                        </div>
                       ))}
                     </div>
                   )}
-                </AnimatePresence>
               </TabsContent>
 
               {/* History Tab */}
