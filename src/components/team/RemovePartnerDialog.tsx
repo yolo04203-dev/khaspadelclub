@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { UserMinus, Loader2, AlertTriangle } from "lucide-react";
+import { UserMinus, Loader2, ShieldAlert } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { logger } from "@/lib/logger";
@@ -27,6 +27,7 @@ interface ActiveData {
   ladderRankings: { categoryName: string; rank: number }[];
   pendingChallenges: number;
   acceptedChallenges: number;
+  activeTournaments: { name: string }[];
 }
 
 export function RemovePartnerDialog({
@@ -50,7 +51,7 @@ export function RemovePartnerDialog({
     const fetchActiveData = async () => {
       setIsLoading(true);
       try {
-        const [{ data: rankings }, { count: pendingCount }, { count: acceptedCount }] = await Promise.all([
+        const [{ data: rankings }, { count: pendingCount }, { count: acceptedCount }, { data: tournamentParticipants }] = await Promise.all([
           supabase
             .from("ladder_rankings")
             .select("rank, ladder_category_id, ladder_categories(name)")
@@ -65,7 +66,18 @@ export function RemovePartnerDialog({
             .select("*", { count: "exact", head: true })
             .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
             .eq("status", "accepted"),
+          supabase
+            .from("tournament_participants")
+            .select("tournament_id, tournaments(name, status)")
+            .eq("team_id", teamId),
         ]);
+
+        const activeTournaments = (tournamentParticipants || [])
+          .filter((tp: any) => {
+            const status = tp.tournaments?.status;
+            return status && status !== "completed" && status !== "cancelled";
+          })
+          .map((tp: any) => ({ name: tp.tournaments?.name || "Unknown" }));
 
         setActiveData({
           ladderRankings: (rankings || []).map((r: any) => ({
@@ -74,6 +86,7 @@ export function RemovePartnerDialog({
           })),
           pendingChallenges: pendingCount || 0,
           acceptedChallenges: acceptedCount || 0,
+          activeTournaments,
         });
       } catch (error) {
         logger.apiError("fetchActiveData", error);
@@ -85,13 +98,15 @@ export function RemovePartnerDialog({
     fetchActiveData();
   }, [open, teamId]);
 
-  const hasWarnings = activeData && (
+  const isBlocked = activeData && (
     activeData.ladderRankings.length > 0 ||
     activeData.pendingChallenges > 0 ||
-    activeData.acceptedChallenges > 0
+    activeData.acceptedChallenges > 0 ||
+    activeData.activeTournaments.length > 0
   );
 
   const handleRemove = async () => {
+    if (isBlocked) return;
     setIsRemoving(true);
     try {
       const { data: members, error: fetchError } = await supabase
@@ -165,16 +180,24 @@ export function RemovePartnerDialog({
                 </div>
               )}
 
-              {hasWarnings && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+              {isBlocked && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 space-y-2">
                   <div className="flex items-center gap-2 font-medium text-destructive text-sm">
-                    <AlertTriangle className="w-4 h-4" />
-                    Warning: Active competitions detected
+                    <ShieldAlert className="w-4 h-4" />
+                    Partner removal blocked
                   </div>
+                  <p className="text-sm text-foreground">
+                    This team is currently enrolled in active competitions. You must withdraw from all of them before changing your partner.
+                  </p>
                   <ul className="text-sm space-y-1 ml-6 list-disc text-foreground">
                     {activeData!.ladderRankings.map((r, i) => (
                       <li key={i}>
                         Ranked #{r.rank} in <strong>{r.categoryName}</strong>
+                      </li>
+                    ))}
+                    {activeData!.activeTournaments.map((t, i) => (
+                      <li key={`t-${i}`}>
+                        Registered in tournament <strong>{t.name}</strong>
                       </li>
                     ))}
                     {activeData!.pendingChallenges > 0 && (
@@ -184,15 +207,15 @@ export function RemovePartnerDialog({
                       <li>{activeData!.acceptedChallenges} accepted challenge(s) in progress</li>
                     )}
                   </ul>
-                  <p className="text-sm text-muted-foreground">
-                    Removing the partner will affect your team's eligibility for these competitions.
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Partner changes only apply to future ladders and tournaments — not ones you're already enrolled in.
                   </p>
                 </div>
               )}
 
-              {!isLoading && !hasWarnings && activeData && (
+              {!isLoading && !isBlocked && activeData && (
                 <p className="text-sm text-muted-foreground">
-                  No active competitions found for this team.
+                  No active competitions found. You can safely remove the partner.
                 </p>
               )}
             </div>
@@ -202,7 +225,7 @@ export function RemovePartnerDialog({
           <AlertDialogCancel disabled={isRemoving}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleRemove}
-            disabled={isRemoving || isLoading}
+            disabled={isRemoving || isLoading || !!isBlocked}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {isRemoving ? (
