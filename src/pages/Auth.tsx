@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
 import { logger } from "@/lib/logger";
+import { LoadingScreen } from "@/components/ui/loading-screen";
 import { Logo } from "@/components/Logo";
 import { analytics } from "@/lib/analytics/posthog";
 import { Button } from "@/components/ui/button";
@@ -148,11 +149,7 @@ export default function Auth() {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+    return <LoadingScreen message="Loading..." />;
   }
 
   if (user) {
