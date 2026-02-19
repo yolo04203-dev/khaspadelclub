@@ -509,10 +509,12 @@ export default function TournamentDetail() {
   // Group management functions
   const createGroup = async (name: string) => {
     if (!tournament) return;
+    const categoryId = categories.length > 0 && selectedCategoryId !== "all" ? selectedCategoryId : null;
     const { error } = await supabase.from("tournament_groups").insert({
       tournament_id: tournament.id,
       name,
       display_order: groups.length,
+      category_id: categoryId,
     });
     if (error) {
       sonnerToast.error("Failed to create group");
@@ -548,13 +550,20 @@ export default function TournamentDetail() {
   };
 
   const randomAssignTeams = async () => {
-    const unassigned = participants.filter(p => !p.group_id);
-    const shuffled = [...unassigned].sort(() => Math.random() - 0.5);
+    const categoryId = categories.length > 0 && selectedCategoryId !== "all" ? selectedCategoryId : null;
+    const relevantParticipants = categoryId
+      ? participants.filter(p => p.category_id === categoryId && !p.group_id)
+      : participants.filter(p => !p.group_id);
+    const relevantGroups = categoryId
+      ? groups.filter(g => g.category_id === categoryId)
+      : groups;
+    
+    const shuffled = [...relevantParticipants].sort(() => Math.random() - 0.5);
     
     for (let i = 0; i < shuffled.length; i++) {
-      const groupIndex = i % groups.length;
+      const groupIndex = i % relevantGroups.length;
       await supabase.from("tournament_participants")
-        .update({ group_id: groups[groupIndex].id })
+        .update({ group_id: relevantGroups[groupIndex].id })
         .eq("id", shuffled[i].id);
     }
     sonnerToast.success("Teams randomly assigned");
@@ -564,8 +573,14 @@ export default function TournamentDetail() {
   const generateGroupMatches = async () => {
     if (!tournament) return;
     
-    // Check if group matches already exist
-    const existingGroupMatches = matches.filter(m => m.stage === "group");
+    const categoryId = categories.length > 0 && selectedCategoryId !== "all" ? selectedCategoryId : null;
+    const relevantGroups = categoryId
+      ? groups.filter(g => g.category_id === categoryId)
+      : groups;
+    
+    // Check if group matches already exist for these groups
+    const relevantGroupIds = relevantGroups.map(g => g.id);
+    const existingGroupMatches = matches.filter(m => m.stage === "group" && m.group_id && relevantGroupIds.includes(m.group_id));
     if (existingGroupMatches.length > 0) {
       sonnerToast.error("Group matches already generated");
       return;
@@ -574,7 +589,7 @@ export default function TournamentDetail() {
     // Generate round-robin matches for each group
     const matchesToCreate: any[] = [];
     
-    for (const group of groups) {
+    for (const group of relevantGroups) {
       const groupTeams = participants.filter(p => p.group_id === group.id);
       let matchNum = 1;
       
@@ -584,6 +599,7 @@ export default function TournamentDetail() {
           matchesToCreate.push({
             tournament_id: tournament.id,
             group_id: group.id,
+            category_id: categoryId,
             round_number: 1,
             match_number: matchNum++,
             team1_id: groupTeams[i].team_id,
@@ -686,10 +702,15 @@ export default function TournamentDetail() {
   const startKnockoutStage = async () => {
     if (!tournament) return;
 
+    const categoryId = categories.length > 0 && selectedCategoryId !== "all" ? selectedCategoryId : null;
+    const relevantGroups = categoryId
+      ? groups.filter(g => g.category_id === categoryId)
+      : groups;
+
     // Get top 2 from each group
     const qualifiedTeams: { team_id: string; group_id: string; rank: number }[] = [];
     
-    for (const group of groups) {
+    for (const group of relevantGroups) {
       const groupTeams = participants
         .filter(p => p.group_id === group.id)
         .sort((a, b) => {
@@ -708,47 +729,32 @@ export default function TournamentDetail() {
     // Create knockout matches based on number of groups
     const knockoutMatches: any[] = [];
     
-    if (groups.length === 2) {
-      // 2 groups: Semi-finals with cross-matching
-      const groupA = groups[0];
-      const groupB = groups[1];
+    if (relevantGroups.length === 2) {
+      const groupA = relevantGroups[0];
+      const groupB = relevantGroups[1];
       const a1 = qualifiedTeams.find(t => t.group_id === groupA.id && t.rank === 1);
       const a2 = qualifiedTeams.find(t => t.group_id === groupA.id && t.rank === 2);
       const b1 = qualifiedTeams.find(t => t.group_id === groupB.id && t.rank === 1);
       const b2 = qualifiedTeams.find(t => t.group_id === groupB.id && t.rank === 2);
 
-      // Semi 1: A1 vs B2
       knockoutMatches.push({
-        tournament_id: tournament.id,
-        round_number: 1,
-        match_number: 1,
-        team1_id: a1?.team_id || null,
-        team2_id: b2?.team_id || null,
-        stage: "knockout",
+        tournament_id: tournament.id, round_number: 1, match_number: 1,
+        team1_id: a1?.team_id || null, team2_id: b2?.team_id || null,
+        stage: "knockout", category_id: categoryId,
       });
-      // Semi 2: B1 vs A2
       knockoutMatches.push({
-        tournament_id: tournament.id,
-        round_number: 1,
-        match_number: 2,
-        team1_id: b1?.team_id || null,
-        team2_id: a2?.team_id || null,
-        stage: "knockout",
+        tournament_id: tournament.id, round_number: 1, match_number: 2,
+        team1_id: b1?.team_id || null, team2_id: a2?.team_id || null,
+        stage: "knockout", category_id: categoryId,
       });
-      // Finals
       knockoutMatches.push({
-        tournament_id: tournament.id,
-        round_number: 2,
-        match_number: 1,
-        team1_id: null,
-        team2_id: null,
-        stage: "knockout",
+        tournament_id: tournament.id, round_number: 2, match_number: 1,
+        team1_id: null, team2_id: null,
+        stage: "knockout", category_id: categoryId,
       });
-    } else if (groups.length === 4) {
-      // 4 groups: Quarter-finals
-      const groupsSorted = [...groups].sort((a, b) => a.display_order - b.display_order);
+    } else if (relevantGroups.length === 4) {
+      const groupsSorted = [...relevantGroups].sort((a, b) => a.display_order - b.display_order);
       
-      // QF1: A1 vs D2, QF2: B1 vs C2, QF3: C1 vs B2, QF4: D1 vs A2
       const crossMatch = [
         [0, 3], [1, 2], [2, 1], [3, 0]
       ];
@@ -760,21 +766,16 @@ export default function TournamentDetail() {
         const t2 = qualifiedTeams.find(t => t.group_id === g2.id && t.rank === 2);
         
         knockoutMatches.push({
-          tournament_id: tournament.id,
-          round_number: 1,
-          match_number: matchIdx + 1,
-          team1_id: t1?.team_id || null,
-          team2_id: t2?.team_id || null,
-          stage: "knockout",
+          tournament_id: tournament.id, round_number: 1, match_number: matchIdx + 1,
+          team1_id: t1?.team_id || null, team2_id: t2?.team_id || null,
+          stage: "knockout", category_id: categoryId,
         });
       });
       
-      // Semi-finals (empty, filled as QF completes)
-      knockoutMatches.push({ tournament_id: tournament.id, round_number: 2, match_number: 1, team1_id: null, team2_id: null, stage: "knockout" });
-      knockoutMatches.push({ tournament_id: tournament.id, round_number: 2, match_number: 2, team1_id: null, team2_id: null, stage: "knockout" });
-      
-      // Finals
-      knockoutMatches.push({ tournament_id: tournament.id, round_number: 3, match_number: 1, team1_id: null, team2_id: null, stage: "knockout" });
+      knockoutMatches.push({ tournament_id: tournament.id, round_number: 2, match_number: 1, team1_id: null, team2_id: null, stage: "knockout", category_id: categoryId });
+      knockoutMatches.push({ tournament_id: tournament.id, round_number: 2, match_number: 2, team1_id: null, team2_id: null, stage: "knockout", category_id: categoryId });
+      knockoutMatches.push({ tournament_id: tournament.id, round_number: 3, match_number: 1, team1_id: null, team2_id: null, stage: "knockout", category_id: categoryId });
+    }
     }
 
     const { error } = await supabase.from("tournament_matches").insert(knockoutMatches);
@@ -1224,36 +1225,47 @@ export default function TournamentDetail() {
             {/* Admin Management Tab */}
             {isAdmin && (
               <TabsContent value="manage">
-                <AdminGroupManagement
-                  groups={groups}
-                  teams={participants.map(p => ({
-                    id: p.id,
-                    team_id: p.team_id,
-                    team_name: p.team_name || "Unknown",
-                    group_id: p.group_id,
-                  }))}
-                  onCreateGroup={createGroup}
-                  onDeleteGroup={deleteGroup}
-                  onAssignTeam={assignTeamToGroup}
-                  onRandomAssign={randomAssignTeams}
-                  onGenerateGroupMatches={generateGroupMatches}
-                  canStartKnockout={canStartKnockout}
-                  onStartKnockout={startKnockoutStage}
-                  onKickTeam={kickTeam}
-                  setsPerMatch={tournament.sets_per_match}
-                  onSetsPerMatchChange={async (sets) => {
-                    const { error } = await supabase
-                      .from("tournaments")
-                      .update({ sets_per_match: sets })
-                      .eq("id", tournament.id);
-                    if (error) {
-                      sonnerToast.error("Failed to update match format");
-                    } else {
-                      sonnerToast.success(`Match format set to best of ${sets}`);
-                      fetchData();
-                    }
-                  }}
-                />
+                {categories.length > 0 && selectedCategoryId === "all" ? (
+                  <Card>
+                    <CardContent className="py-8 text-center text-muted-foreground">
+                      <Tag className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p className="font-medium mb-2">Select a category first</p>
+                      <p className="text-sm">Use the category filter above to manage groups for a specific category.</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <AdminGroupManagement
+                    groups={filteredGroups}
+                    teams={filteredParticipants.filter(p => p.waitlist_position === null).map(p => ({
+                      id: p.id,
+                      team_id: p.team_id,
+                      team_name: p.custom_team_name || p.team_name || "Unknown",
+                      group_id: p.group_id,
+                    }))}
+                    onCreateGroup={createGroup}
+                    onDeleteGroup={deleteGroup}
+                    onAssignTeam={assignTeamToGroup}
+                    onRandomAssign={randomAssignTeams}
+                    onGenerateGroupMatches={generateGroupMatches}
+                    canStartKnockout={canStartKnockout}
+                    onStartKnockout={startKnockoutStage}
+                    onKickTeam={kickTeam}
+                    setsPerMatch={tournament.sets_per_match}
+                    onSetsPerMatchChange={async (sets) => {
+                      const { error } = await supabase
+                        .from("tournaments")
+                        .update({ sets_per_match: sets })
+                        .eq("id", tournament.id);
+                      if (error) {
+                        sonnerToast.error("Failed to update match format");
+                      } else {
+                        sonnerToast.success(`Match format set to best of ${sets}`);
+                        fetchData();
+                      }
+                    }}
+                    categoryName={selectedCategoryId !== "all" ? categories.find(c => c.id === selectedCategoryId)?.name : undefined}
+                  />
+                )}
               </TabsContent>
             )}
 
