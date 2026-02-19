@@ -1045,8 +1045,8 @@ export default function TournamentDetail() {
               <TabsTrigger value="info" className="text-xs sm:text-sm shrink-0"><Info className="w-4 h-4 mr-1 sm:mr-2" />Info</TabsTrigger>
               {isAdmin && <TabsTrigger value="manage" className="text-xs sm:text-sm shrink-0"><Settings className="w-4 h-4 mr-1 sm:mr-2" />Manage</TabsTrigger>}
               {isAdmin && <TabsTrigger value="categories" className="text-xs sm:text-sm shrink-0"><Tag className="w-4 h-4 mr-1 sm:mr-2" />Categories</TabsTrigger>}
-              {isAdmin && tournament.entry_fee > 0 && (
-                <TabsTrigger value="payments" className="text-xs sm:text-sm shrink-0"><Banknote className="w-4 h-4 mr-1 sm:mr-2" />Payments</TabsTrigger>
+              {isAdmin && (
+                <TabsTrigger value="payments" className="text-xs sm:text-sm shrink-0"><Banknote className="w-4 h-4 mr-1 sm:mr-2" />Registrations</TabsTrigger>
               )}
               <TabsTrigger value="groups" className="text-xs sm:text-sm shrink-0">Groups</TabsTrigger>
               <TabsTrigger value="matches" className="text-xs sm:text-sm shrink-0">Matches</TabsTrigger>
@@ -1271,14 +1271,14 @@ export default function TournamentDetail() {
               </TabsContent>
             )}
 
-            {/* Payments Tab (Admin Only) */}
-            {isAdmin && tournament.entry_fee > 0 && (
+            {/* Registrations Tab (Admin Only) */}
+            {isAdmin && (
               <TabsContent value="payments">
                 <PaymentManagement
                   tournamentId={tournament.id}
-                  entryFee={tournament.entry_fee}
+                  entryFee={tournament.entry_fee || 0}
                   entryFeeCurrency={tournament.entry_fee_currency || "PKR"}
-                participants={paymentParticipants}
+                  participants={paymentParticipants}
                   onRefresh={fetchPaymentData}
                 />
               </TabsContent>
