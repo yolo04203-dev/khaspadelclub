@@ -1,40 +1,83 @@
 
-# Fix: Allow Manually-Named Teams to Join Ladders
 
-## The Problem
+# Add Join Requests Tab to Admin Page
 
-When a captain uses "Enter partner name manually," the system only renames the team (e.g., "Ahmed & Ali") but does NOT add a second row to `team_members`. This means:
+## What Changes
 
-- `team_members` count stays at 1
-- The Join Ladder dialog checks `teamMemberCount < 2` and shows "Team incomplete," blocking the join request entirely
+A new "Join Requests" tab will be added to the Admin page, allowing admins to see and manage all pending ladder join requests across all ladders in one centralized place -- no need to visit each ladder's manage page individually.
 
-## The Fix
+## UI Changes
 
-The `teamMemberCount < 2` check in `JoinLadderDialog` is too strict. A team with a manually-entered partner has only 1 database member but is conceptually a 2-player team. The solution:
+### Admin Page (`src/pages/Admin.tsx`)
 
-**Remove the hard block from `JoinLadderDialog`** and instead:
-1. If the team has 2 actual members -- allow joining with existing team normally
-2. If the team has only 1 member -- still allow opening the form, but **force the "Join with different players" option** (pre-select "custom" join type) so the user must provide both player names. The "Join with existing team" radio option will be hidden/disabled since the team isn't complete in the database.
+- Add a new "Join Requests" tab to the tab list (with a `UserPlus` icon)
+- Show a badge with the pending request count (similar to the Errors tab)
+- Fetch the pending join request count alongside existing admin data
+- Render a new `JoinRequestsTab` component
 
-This way:
-- Solo captains who haven't added anyone yet still need to provide player names
-- Captains who added a partner manually can join by entering both names (or the team name already reflects the pairing)
-- Teams with 2 real members can join with their existing team as before
+### New Component: `src/components/admin/JoinRequestsTab.tsx`
 
-## Technical Changes
+- Fetches ALL pending join requests across all ladders (admin RLS already allows this)
+- Displays each request in a card layout showing:
+  - Team name
+  - Ladder name and category name
+  - Custom player names (if provided)
+  - Message from the team captain
+  - Submission date
+  - Admin notes textarea
+  - Approve / Reject buttons
+- Reuses the same approve/reject logic from `JoinRequestsManagement` (insert ranking on approve, update status on both)
+- Groups or labels requests by ladder for clarity
 
-### File: `src/components/ladder/JoinLadderDialog.tsx`
+## Technical Details
 
-- Remove the `teamMemberCount < 2` block that shows "Team incomplete" and hides the form
-- Instead, when `teamMemberCount < 2`:
-  - Auto-set `joinType` to `"custom"`
-  - Hide the "Join with existing team" radio option (or disable it with a note)
-  - Show the custom player name fields by default
-  - Pre-fill player names from the team name if it contains "&" (e.g., "Ahmed & Ali" becomes player1="Ahmed", player2="Ali")
-- When `teamMemberCount >= 2`: keep existing behavior unchanged
+### Data Fetching
 
-### File: `src/pages/LadderDetail.tsx`
+Query for the new tab:
+```
+supabase
+  .from("ladder_join_requests")
+  .select(`
+    id, team_id, ladder_category_id, status, message,
+    player1_name, player2_name, created_at,
+    team:teams (name),
+    category:ladder_categories (name, ladder_id, ladder:ladders (name))
+  `)
+  .eq("status", "pending")
+  .order("created_at", { ascending: true })
+```
 
-- No changes needed (it already passes `teamMemberCount` correctly)
+This gives us team name, category name, AND ladder name in a single query.
 
-No database changes required.
+### Pending Count
+
+A lightweight count query will run in `Admin.tsx` alongside existing data fetches:
+```
+supabase
+  .from("ladder_join_requests")
+  .select("id", { count: "exact", head: true })
+  .eq("status", "pending")
+```
+
+The count is displayed as a badge on the tab trigger, matching the pattern used for the Errors tab.
+
+### Approve Logic (same as existing `JoinRequestsManagement`)
+
+1. Check team isn't already in the category
+2. Get max rank in category, assign next rank
+3. Insert into `ladder_rankings`
+4. Update request status to "approved"
+
+### Reject Logic
+
+1. Update request status to "rejected" with optional admin notes
+
+### No Database Changes
+
+The `ladder_join_requests` table already has admin-level RLS policies that allow full access. No schema or policy changes needed.
+
+### Files to Create/Edit
+
+1. **Create** `src/components/admin/JoinRequestsTab.tsx` -- new component with the full request list and approve/reject actions
+2. **Edit** `src/pages/Admin.tsx` -- add the tab trigger, pending count state, count fetch, and tab content
+
