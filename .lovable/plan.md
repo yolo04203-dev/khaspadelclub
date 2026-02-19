@@ -1,38 +1,32 @@
 
-
-# Fix: Dashboard "Team needs a partner" Warning for Manually-Added Partners
+# Fix: Tournament Registration "Team Incomplete" Warning for Manually-Added Partners
 
 ## The Problem
 
-The Dashboard builds the team member list from the `team_members` database table. When a partner is added manually (which only renames the team to "Player1 & Player2" without adding a DB row), the table still has 1 row. This causes:
-
-1. The "Team needs a partner to compete" warning to appear
-2. The "Add Partner" button to show instead of team member names
-3. The "Remove Partner" button to be hidden
+The tournament registration dialog checks `userTeamMemberCount` (from `team_members` DB rows) to determine if a team is complete. When a partner is added manually (which only renames the team, e.g., "Ahmed & Ali"), no new DB row is created, so the count stays at 1. This triggers the "Your team needs 2 players before registering" warning, blocking registration.
 
 ## The Fix
 
-### File: `src/pages/Dashboard.tsx`
+### File: `src/pages/TournamentDetail.tsx`
 
-When `memberNames` from the database has only 1 entry, check if the team name contains "&" (indicating a manually-added partner). If so, parse the two player names from the team name and use those as `memberNames`.
+In the `fetchUserTeam` function (around line 230-247), after getting the team member count, apply the same fallback logic used on the Dashboard: if the count is less than 2 but the team name contains " & ", treat the team as complete (set count to 2).
 
-**Logic change in the data fetching section (~line 94-107):**
+**Change in `fetchUserTeam`:**
 
-After building `memberNames` from DB profiles, add a fallback:
+After setting `userTeamMemberCount`, add:
 
-```
-if (memberNames.length < 2 && teamName.includes(" & ")) {
-  const parts = teamName.split("&").map(n => n.trim());
-  if (parts.length === 2 && parts[0] && parts[1]) {
-    memberNames = parts;
-  }
+```typescript
+const memberCount = countResult.count || 0;
+if (memberCount < 2 && teamResult.data?.name?.includes(" & ")) {
+  setUserTeamMemberCount(2);
+} else {
+  setUserTeamMemberCount(memberCount);
 }
 ```
 
 This ensures:
-- The warning disappears for teams with manually-added partners
-- Both player names display correctly (e.g., "Ahmed & Ali")
-- The "Add Partner" button is replaced with "Change Partner" or hidden
-- Teams with 2 real DB members continue working as before (DB names take priority)
-
-No other files need changes. No database changes required.
+- Manually-named teams (e.g., "Ahmed & Ali") pass the 2-player check
+- The "Team incomplete" warning disappears
+- The "Register" button becomes enabled
+- Teams with 2 actual DB members continue working as before
+- No other files need changes
