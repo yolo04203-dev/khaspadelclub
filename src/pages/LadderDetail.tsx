@@ -149,7 +149,7 @@ export default function LadderDetail() {
       // Fetch categories
       const { data: categoriesData, error: categoriesError } = await supabase
         .from("ladder_categories")
-        .select("id, name, description, challenge_range")
+        .select("id, name, description, challenge_range, entry_fee, entry_fee_currency")
         .eq("ladder_id", id)
         .order("display_order", { ascending: true });
 
