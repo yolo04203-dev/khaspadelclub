@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock, Banknote, Tag, Info, MapPin, Calendar, FileText, ChevronLeft } from "lucide-react";
@@ -10,15 +10,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { GroupStandings } from "@/components/tournament/GroupStandings";
 import { GroupMatchList } from "@/components/tournament/GroupMatchList";
-import { AdminGroupManagement } from "@/components/tournament/AdminGroupManagement";
 import { KnockoutBracket } from "@/components/tournament/KnockoutBracket";
 import { RegistrationDialog } from "@/components/tournament/RegistrationDialog";
-import { PaymentManagement } from "@/components/tournament/PaymentManagement";
-import { CategoryManagement, TournamentCategory } from "@/components/tournament/CategoryManagement";
 import { TournamentCategoryCard } from "@/components/tournament/TournamentCategoryCard";
+import type { TournamentCategory } from "@/components/tournament/CategoryManagement";
+
+// Lazy-load admin-only components
+const AdminGroupManagement = lazy(() => import("@/components/tournament/AdminGroupManagement").then(m => ({ default: m.AdminGroupManagement })));
+const PaymentManagement = lazy(() => import("@/components/tournament/PaymentManagement").then(m => ({ default: m.PaymentManagement })));
+const CategoryManagement = lazy(() => import("@/components/tournament/CategoryManagement").then(m => ({ default: m.CategoryManagement })));
 import { logger } from "@/lib/logger";
 import { toast as sonnerToast } from "sonner";
 import { createDebouncedCallback } from "@/lib/realtimeDebounce";
@@ -1053,6 +1057,7 @@ export default function TournamentDetail() {
               </CardContent>
             </Card>
           ) : (
+            <Suspense fallback={<Skeleton className="h-48 w-full" />}>
             <AdminGroupManagement
               groups={filteredGroups}
               teams={filteredParticipants.filter(p => p.waitlist_position === null).map(p => ({
@@ -1076,10 +1081,12 @@ export default function TournamentDetail() {
               }}
               categoryName={categories.find(c => c.id === selectedCategoryId)?.name}
             />
+            </Suspense>
           )}
         </TabsContent>
 
         <TabsContent value="categories">
+          <Suspense fallback={<Skeleton className="h-48 w-full" />}>
           <CategoryManagement
             categories={categories}
             tournamentStatus={tournament.status}
@@ -1088,9 +1095,11 @@ export default function TournamentDetail() {
             onUpdateCategory={updateCategory}
             onDeleteCategory={deleteCategory}
           />
+          </Suspense>
         </TabsContent>
 
         <TabsContent value="payments">
+          <Suspense fallback={<Skeleton className="h-48 w-full" />}>
           <PaymentManagement
             tournamentId={tournament.id}
             entryFee={tournament.entry_fee || 0}
@@ -1098,6 +1107,7 @@ export default function TournamentDetail() {
             participants={paymentParticipants}
             onRefresh={fetchPaymentData}
           />
+          </Suspense>
         </TabsContent>
       </Tabs>
     );
@@ -1186,6 +1196,7 @@ export default function TournamentDetail() {
 
         {isAdmin && (
           <TabsContent value="manage">
+            <Suspense fallback={<Skeleton className="h-48 w-full" />}>
             <AdminGroupManagement
               groups={filteredGroups}
               teams={filteredParticipants.filter(p => p.waitlist_position === null).map(p => ({
@@ -1201,20 +1212,25 @@ export default function TournamentDetail() {
                 else { sonnerToast.success(`Match format set to best of ${sets}`); fetchData(); }
               }}
             />
+            </Suspense>
           </TabsContent>
         )}
 
         {isAdmin && (
           <TabsContent value="categories">
+            <Suspense fallback={<Skeleton className="h-48 w-full" />}>
             <CategoryManagement categories={categories} tournamentStatus={tournament.status} entryFeeCurrency={tournament.entry_fee_currency}
               onCreateCategory={createCategory} onUpdateCategory={updateCategory} onDeleteCategory={deleteCategory} />
+            </Suspense>
           </TabsContent>
         )}
 
         {isAdmin && (
           <TabsContent value="payments">
+            <Suspense fallback={<Skeleton className="h-48 w-full" />}>
             <PaymentManagement tournamentId={tournament.id} entryFee={tournament.entry_fee || 0} entryFeeCurrency={tournament.entry_fee_currency || "PKR"}
               participants={paymentParticipants} onRefresh={fetchPaymentData} />
+            </Suspense>
           </TabsContent>
         )}
 

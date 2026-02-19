@@ -124,10 +124,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Defer initial fetch so it doesn't compete with critical page data
-    const initialDelay = setTimeout(fetchCounts, 1500);
+    const initialDelay = setTimeout(fetchCounts, 3000);
 
-    // Poll every 60s
-    const interval = setInterval(fetchCounts, 60000);
+    // Poll every 120s
+    const interval = setInterval(fetchCounts, 120000);
     return () => {
       clearTimeout(initialDelay);
       clearInterval(interval);
