@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock, Banknote, Tag, Info, MapPin, Calendar, FileText } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock, Banknote, Tag, Info, MapPin, Calendar, FileText, ChevronLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 import { GroupStandings } from "@/components/tournament/GroupStandings";
 import { GroupMatchList } from "@/components/tournament/GroupMatchList";
@@ -18,6 +18,7 @@ import { KnockoutBracket } from "@/components/tournament/KnockoutBracket";
 import { RegistrationDialog } from "@/components/tournament/RegistrationDialog";
 import { PaymentManagement } from "@/components/tournament/PaymentManagement";
 import { CategoryManagement, TournamentCategory } from "@/components/tournament/CategoryManagement";
+import { TournamentCategoryCard } from "@/components/tournament/TournamentCategoryCard";
 import { logger } from "@/lib/logger";
 import { toast as sonnerToast } from "sonner";
 import { createDebouncedCallback } from "@/lib/realtimeDebounce";
@@ -100,7 +101,8 @@ export default function TournamentDetail() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [matches, setMatches] = useState<TournamentMatch[]>([]);
   const [categories, setCategories] = useState<TournamentCategory[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
+  // null = Level 1 (category cards), UUID = Level 2 (category detail)
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [userTeam, setUserTeam] = useState<UserTeam | null>(null);
   const [loading, setLoading] = useState(true);
   const [teamMembersMap, setTeamMembersMap] = useState<Map<string, { player1: string; player2: string }>>(new Map());
@@ -154,7 +156,6 @@ export default function TournamentDetail() {
       // Fetch team names and member profiles for participants
       const participantTeamIds = [...new Set((participantsRes.data || []).map(p => p.team_id).filter(Boolean) as string[])];
       
-      // Batch fetch: team names + team members
       const [teamsResult, membersResult] = await Promise.all([
         participantTeamIds.length > 0 
           ? supabase.from("teams").select("id, name").in("id", participantTeamIds)
@@ -166,7 +167,6 @@ export default function TournamentDetail() {
 
       const teamNameMap = new Map((teamsResult.data || []).map(t => [t.id, t.name]));
       
-      // Fetch display names for all member user_ids
       const allUserIds = [...new Set((membersResult.data || []).map(m => m.user_id))];
       let profileMap = new Map<string, string>();
       if (allUserIds.length > 0) {
@@ -177,7 +177,6 @@ export default function TournamentDetail() {
         profileMap = new Map((profiles || []).map(p => [p.user_id!, p.display_name || "Player"]));
       }
 
-      // Build teamMembersMap
       const membersMap = new Map<string, { player1: string; player2: string }>();
       for (const teamId of participantTeamIds) {
         const members = (membersResult.data || []).filter(m => m.team_id === teamId);
@@ -197,7 +196,6 @@ export default function TournamentDetail() {
 
       const participantsWithNames = (participantsRes.data || []).map((p) => {
         const teamName = teamNameMap.get(p.team_id!) || "Unknown";
-        // For player names: prefer custom participant names, fall back to team member profiles
         let p1 = (p as any).player1_name || null;
         let p2 = (p as any).player2_name || null;
         if (!p1 && !p2 && p.team_id) {
@@ -260,64 +258,26 @@ export default function TournamentDetail() {
       }
     }
 
-    // Debounced refetch to prevent query stampedes from rapid realtime events
     const debouncedFetch = createDebouncedCallback(() => fetchData(), 500);
 
-    // Subscribe to realtime changes — filtered by tournament_id
     const matchesChannel = supabase
       .channel(`tournament-${id}-matches`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'tournament_matches',
-          filter: `tournament_id=eq.${id}`,
-        },
-        debouncedFetch
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_matches', filter: `tournament_id=eq.${id}` }, debouncedFetch)
       .subscribe();
 
     const participantsChannel = supabase
       .channel(`tournament-${id}-participants`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'tournament_participants',
-          filter: `tournament_id=eq.${id}`,
-        },
-        debouncedFetch
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_participants', filter: `tournament_id=eq.${id}` }, debouncedFetch)
       .subscribe();
 
     const groupsChannel = supabase
       .channel(`tournament-${id}-groups`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'tournament_groups',
-          filter: `tournament_id=eq.${id}`,
-        },
-        debouncedFetch
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_groups', filter: `tournament_id=eq.${id}` }, debouncedFetch)
       .subscribe();
 
     const tournamentChannel = supabase
       .channel(`tournament-${id}-tournament`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'tournaments',
-          filter: `id=eq.${id}`,
-        },
-        debouncedFetch
-      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tournaments', filter: `id=eq.${id}` }, debouncedFetch)
       .subscribe();
 
     return () => {
@@ -331,57 +291,39 @@ export default function TournamentDetail() {
   const registerTeam = async (teamId: string | null, customTeamName: string | null, player1Name?: string, player2Name?: string, categoryId?: string) => {
     if (!tournament) return;
     
-    // For custom team registration, we need to create a placeholder
     const actualTeamId = teamId || userTeam?.id;
     if (!actualTeamId && !customTeamName) return;
     
     try {
-      // Count registered teams (not on waitlist) - optionally filtered by category
       const relevantParticipants = categoryId 
         ? participants.filter(p => p.category_id === categoryId)
         : participants;
       const registeredCount = relevantParticipants.filter(p => p.waitlist_position === null).length;
       
-      // Get max teams limit - from category or tournament
       const category = categoryId ? categories.find(c => c.id === categoryId) : null;
       const maxTeams = category ? category.max_teams : tournament.max_teams;
       const isFull = registeredCount >= maxTeams;
 
       if (isFull) {
-        // Add to waitlist
         const waitlistTeams = relevantParticipants.filter(p => p.waitlist_position !== null);
         const nextWaitlistPosition = waitlistTeams.length > 0 
           ? Math.max(...waitlistTeams.map(p => p.waitlist_position!)) + 1 
           : 1;
 
         const { error } = await supabase.from("tournament_participants").insert({
-          tournament_id: tournament.id,
-          team_id: actualTeamId!,
-          waitlist_position: nextWaitlistPosition,
-          custom_team_name: customTeamName,
-          player1_name: player1Name || null,
-          player2_name: player2Name || null,
-          category_id: categoryId || null,
-          payment_status: "pending",
+          tournament_id: tournament.id, team_id: actualTeamId!, waitlist_position: nextWaitlistPosition,
+          custom_team_name: customTeamName, player1_name: player1Name || null, player2_name: player2Name || null,
+          category_id: categoryId || null, payment_status: "pending",
         });
         if (error) throw error;
         
         const teamName = customTeamName || userTeam?.name;
-        toast({ 
-          title: "Added to Waiting List", 
-          description: `${teamName} is #${nextWaitlistPosition} on the waiting list. You'll be added if a team withdraws.` 
-        });
+        toast({ title: "Added to Waiting List", description: `${teamName} is #${nextWaitlistPosition} on the waiting list.` });
       } else {
-        // Normal registration
         const { error } = await supabase.from("tournament_participants").insert({
-          tournament_id: tournament.id,
-          team_id: actualTeamId!,
-          seed: registeredCount + 1,
-          custom_team_name: customTeamName,
-          player1_name: player1Name || null,
-          player2_name: player2Name || null,
-          category_id: categoryId || null,
-          payment_status: "pending",
+          tournament_id: tournament.id, team_id: actualTeamId!, seed: registeredCount + 1,
+          custom_team_name: customTeamName, player1_name: player1Name || null, player2_name: player2Name || null,
+          category_id: categoryId || null, payment_status: "pending",
         });
         if (error) throw error;
         
@@ -389,10 +331,7 @@ export default function TournamentDetail() {
         const feeMessage = tournament.entry_fee > 0 
           ? ` Please pay ${tournament.entry_fee_currency} ${tournament.entry_fee.toLocaleString()} to confirm your slot.`
           : "";
-        toast({ 
-          title: "Registered!", 
-          description: `${teamName} has joined the tournament.${feeMessage}` 
-        });
+        toast({ title: "Registered!", description: `${teamName} has joined the tournament.${feeMessage}` });
       }
       fetchData();
     } catch (error: any) {
@@ -412,10 +351,8 @@ export default function TournamentDetail() {
       if (error) throw error;
       
       if (!wasOnWaitlist) {
-        // Promote first waitlist team if a registered team withdrew
         await promoteFromWaitlist();
       } else {
-        // Reorder waitlist positions
         await reorderWaitlist();
       }
       
@@ -429,7 +366,6 @@ export default function TournamentDetail() {
   const promoteFromWaitlist = async () => {
     if (!tournament) return;
     
-    // Get first team on waitlist
     const { data: waitlistTeam } = await supabase
       .from("tournament_participants")
       .select("id, team_id")
@@ -440,19 +376,15 @@ export default function TournamentDetail() {
       .single();
 
     if (waitlistTeam) {
-      // Get current registered count for seed
       const registeredCount = participants.filter(p => p.waitlist_position === null).length;
       
-      // Promote to registered
       await supabase
         .from("tournament_participants")
         .update({ waitlist_position: null, seed: registeredCount })
         .eq("id", waitlistTeam.id);
       
-      // Reorder remaining waitlist
       await reorderWaitlist();
       
-      // Get team name for notification
       const { data: team } = await supabase.from("teams").select("name").eq("id", waitlistTeam.team_id).single();
       if (team) {
         sonnerToast.success(`${team.name} has been promoted from the waiting list!`);
@@ -487,10 +419,7 @@ export default function TournamentDetail() {
     const wasOnWaitlist = participant?.waitlist_position !== null;
     
     try {
-      const { error } = await supabase
-        .from("tournament_participants")
-        .delete()
-        .eq("id", participantId);
+      const { error } = await supabase.from("tournament_participants").delete().eq("id", participantId);
       if (error) throw error;
       
       if (!wasOnWaitlist) {
@@ -506,51 +435,34 @@ export default function TournamentDetail() {
     }
   };
 
-  // Group management functions
+  // Helper to get the effective selectedCategoryId for admin operations (uses "all" when null for backward compat)
+  const adminCategoryId = selectedCategoryId || "all";
+
   const createGroup = async (name: string) => {
     if (!tournament) return;
-    const categoryId = categories.length > 0 && selectedCategoryId !== "all" ? selectedCategoryId : null;
+    const categoryId = categories.length > 0 && selectedCategoryId ? selectedCategoryId : null;
     const { error } = await supabase.from("tournament_groups").insert({
-      tournament_id: tournament.id,
-      name,
-      display_order: groups.length,
-      category_id: categoryId,
+      tournament_id: tournament.id, name, display_order: groups.length, category_id: categoryId,
     });
-    if (error) {
-      sonnerToast.error("Failed to create group");
-    } else {
-      sonnerToast.success("Group created");
-      fetchData();
-    }
+    if (error) { sonnerToast.error("Failed to create group"); } 
+    else { sonnerToast.success("Group created"); fetchData(); }
   };
 
   const deleteGroup = async (groupId: string) => {
-    // First unassign all teams from this group
-    await supabase.from("tournament_participants")
-      .update({ group_id: null })
-      .eq("group_id", groupId);
-    
+    await supabase.from("tournament_participants").update({ group_id: null }).eq("group_id", groupId);
     const { error } = await supabase.from("tournament_groups").delete().eq("id", groupId);
-    if (error) {
-      sonnerToast.error("Failed to delete group");
-    } else {
-      fetchData();
-    }
+    if (error) { sonnerToast.error("Failed to delete group"); } 
+    else { fetchData(); }
   };
 
   const assignTeamToGroup = async (participantId: string, groupId: string | null) => {
-    const { error } = await supabase.from("tournament_participants")
-      .update({ group_id: groupId })
-      .eq("id", participantId);
-    if (error) {
-      sonnerToast.error("Failed to assign team");
-    } else {
-      fetchData();
-    }
+    const { error } = await supabase.from("tournament_participants").update({ group_id: groupId }).eq("id", participantId);
+    if (error) { sonnerToast.error("Failed to assign team"); } 
+    else { fetchData(); }
   };
 
   const randomAssignTeams = async () => {
-    const categoryId = categories.length > 0 && selectedCategoryId !== "all" ? selectedCategoryId : null;
+    const categoryId = categories.length > 0 && selectedCategoryId ? selectedCategoryId : null;
     const relevantParticipants = categoryId
       ? participants.filter(p => p.category_id === categoryId && !p.group_id)
       : participants.filter(p => !p.group_id);
@@ -562,9 +474,7 @@ export default function TournamentDetail() {
     
     for (let i = 0; i < shuffled.length; i++) {
       const groupIndex = i % relevantGroups.length;
-      await supabase.from("tournament_participants")
-        .update({ group_id: relevantGroups[groupIndex].id })
-        .eq("id", shuffled[i].id);
+      await supabase.from("tournament_participants").update({ group_id: relevantGroups[groupIndex].id }).eq("id", shuffled[i].id);
     }
     sonnerToast.success("Teams randomly assigned");
     fetchData();
@@ -573,38 +483,25 @@ export default function TournamentDetail() {
   const generateGroupMatches = async () => {
     if (!tournament) return;
     
-    const categoryId = categories.length > 0 && selectedCategoryId !== "all" ? selectedCategoryId : null;
-    const relevantGroups = categoryId
-      ? groups.filter(g => g.category_id === categoryId)
-      : groups;
+    const categoryId = categories.length > 0 && selectedCategoryId ? selectedCategoryId : null;
+    const relevantGroups = categoryId ? groups.filter(g => g.category_id === categoryId) : groups;
     
-    // Check if group matches already exist for these groups
     const relevantGroupIds = relevantGroups.map(g => g.id);
     const existingGroupMatches = matches.filter(m => m.stage === "group" && m.group_id && relevantGroupIds.includes(m.group_id));
-    if (existingGroupMatches.length > 0) {
-      sonnerToast.error("Group matches already generated");
-      return;
-    }
+    if (existingGroupMatches.length > 0) { sonnerToast.error("Group matches already generated"); return; }
     
-    // Generate round-robin matches for each group
     const matchesToCreate: any[] = [];
     
     for (const group of relevantGroups) {
       const groupTeams = participants.filter(p => p.group_id === group.id);
       let matchNum = 1;
       
-      // Round-robin: every team plays every other team once
       for (let i = 0; i < groupTeams.length; i++) {
         for (let j = i + 1; j < groupTeams.length; j++) {
           matchesToCreate.push({
-            tournament_id: tournament.id,
-            group_id: group.id,
-            category_id: categoryId,
-            round_number: 1,
-            match_number: matchNum++,
-            team1_id: groupTeams[i].team_id,
-            team2_id: groupTeams[j].team_id,
-            stage: "group",
+            tournament_id: tournament.id, group_id: group.id, category_id: categoryId,
+            round_number: 1, match_number: matchNum++,
+            team1_id: groupTeams[i].team_id, team2_id: groupTeams[j].team_id, stage: "group",
           });
         }
       }
@@ -614,9 +511,7 @@ export default function TournamentDetail() {
     if (error) {
       sonnerToast.error("Failed to generate matches");
     } else {
-      await supabase.from("tournaments")
-        .update({ status: "in_progress", started_at: new Date().toISOString() })
-        .eq("id", tournament.id);
+      await supabase.from("tournaments").update({ status: "in_progress", started_at: new Date().toISOString() }).eq("id", tournament.id);
       sonnerToast.success(`Generated ${matchesToCreate.length} group matches!`);
       fetchData();
     }
@@ -629,36 +524,26 @@ export default function TournamentDetail() {
     const winnerId = team1Score > team2Score ? match.team1_id : match.team2_id;
     const loserId = team1Score > team2Score ? match.team2_id : match.team1_id;
 
-    await supabase.from("tournament_matches")
-      .update({ team1_score: team1Score, team2_score: team2Score, winner_team_id: winnerId })
-      .eq("id", matchId);
+    await supabase.from("tournament_matches").update({ team1_score: team1Score, team2_score: team2Score, winner_team_id: winnerId }).eq("id", matchId);
 
-    // Update winner stats
     const winner = participants.find(p => p.team_id === winnerId);
     if (winner) {
       const winnerPoints = winnerId === match.team1_id ? team1Score : team2Score;
       const winnerAgainst = winnerId === match.team1_id ? team2Score : team1Score;
-      await supabase.from("tournament_participants")
-        .update({ 
-          group_wins: winner.group_wins + 1,
-          group_points_for: winner.group_points_for + winnerPoints,
-          group_points_against: winner.group_points_against + winnerAgainst,
-        })
-        .eq("id", winner.id);
+      await supabase.from("tournament_participants").update({ 
+        group_wins: winner.group_wins + 1, group_points_for: winner.group_points_for + winnerPoints,
+        group_points_against: winner.group_points_against + winnerAgainst,
+      }).eq("id", winner.id);
     }
 
-    // Update loser stats
     const loser = participants.find(p => p.team_id === loserId);
     if (loser) {
       const loserPoints = loserId === match.team1_id ? team1Score : team2Score;
       const loserAgainst = loserId === match.team1_id ? team2Score : team1Score;
-      await supabase.from("tournament_participants")
-        .update({ 
-          group_losses: loser.group_losses + 1,
-          group_points_for: loser.group_points_for + loserPoints,
-          group_points_against: loser.group_points_against + loserAgainst,
-        })
-        .eq("id", loser.id);
+      await supabase.from("tournament_participants").update({ 
+        group_losses: loser.group_losses + 1, group_points_for: loser.group_points_for + loserPoints,
+        group_points_against: loser.group_points_against + loserAgainst,
+      }).eq("id", loser.id);
     }
 
     sonnerToast.success("Match result saved");
@@ -671,11 +556,8 @@ export default function TournamentDetail() {
 
     const winnerId = team1Score > team2Score ? match.team1_id : match.team2_id;
 
-    await supabase.from("tournament_matches")
-      .update({ team1_score: team1Score, team2_score: team2Score, winner_team_id: winnerId })
-      .eq("id", matchId);
+    await supabase.from("tournament_matches").update({ team1_score: team1Score, team2_score: team2Score, winner_team_id: winnerId }).eq("id", matchId);
 
-    // Advance winner to next round
     const knockoutMatches = matches.filter(m => m.stage === "knockout");
     const nextRoundMatches = knockoutMatches.filter(m => m.round_number === match.round_number + 1);
     
@@ -684,15 +566,10 @@ export default function TournamentDetail() {
       const nextMatch = nextRoundMatches[nextMatchIndex];
       if (nextMatch) {
         const isTeam1 = match.match_number % 2 === 1;
-        await supabase.from("tournament_matches")
-          .update(isTeam1 ? { team1_id: winnerId } : { team2_id: winnerId })
-          .eq("id", nextMatch.id);
+        await supabase.from("tournament_matches").update(isTeam1 ? { team1_id: winnerId } : { team2_id: winnerId }).eq("id", nextMatch.id);
       }
     } else {
-      // Finals - crown winner
-      await supabase.from("tournaments")
-        .update({ status: "completed", winner_team_id: winnerId, completed_at: new Date().toISOString() })
-        .eq("id", tournament.id);
+      await supabase.from("tournaments").update({ status: "completed", winner_team_id: winnerId, completed_at: new Date().toISOString() }).eq("id", tournament.id);
     }
 
     sonnerToast.success("Match result saved");
@@ -702,12 +579,9 @@ export default function TournamentDetail() {
   const startKnockoutStage = async () => {
     if (!tournament) return;
 
-    const categoryId = categories.length > 0 && selectedCategoryId !== "all" ? selectedCategoryId : null;
-    const relevantGroups = categoryId
-      ? groups.filter(g => g.category_id === categoryId)
-      : groups;
+    const categoryId = categories.length > 0 && selectedCategoryId ? selectedCategoryId : null;
+    const relevantGroups = categoryId ? groups.filter(g => g.category_id === categoryId) : groups;
 
-    // Get top 2 from each group
     const qualifiedTeams: { team_id: string; group_id: string; rank: number }[] = [];
     
     for (const group of relevantGroups) {
@@ -715,9 +589,7 @@ export default function TournamentDetail() {
         .filter(p => p.group_id === group.id)
         .sort((a, b) => {
           if (b.group_wins !== a.group_wins) return b.group_wins - a.group_wins;
-          const diffA = a.group_points_for - a.group_points_against;
-          const diffB = b.group_points_for - b.group_points_against;
-          return diffB - diffA;
+          return (b.group_points_for - b.group_points_against) - (a.group_points_for - a.group_points_against);
         })
         .slice(0, 2);
 
@@ -726,7 +598,6 @@ export default function TournamentDetail() {
       });
     }
 
-    // Create knockout matches based on number of groups
     const knockoutMatches: any[] = [];
     
     if (relevantGroups.length === 2) {
@@ -737,39 +608,19 @@ export default function TournamentDetail() {
       const b1 = qualifiedTeams.find(t => t.group_id === groupB.id && t.rank === 1);
       const b2 = qualifiedTeams.find(t => t.group_id === groupB.id && t.rank === 2);
 
-      knockoutMatches.push({
-        tournament_id: tournament.id, round_number: 1, match_number: 1,
-        team1_id: a1?.team_id || null, team2_id: b2?.team_id || null,
-        stage: "knockout", category_id: categoryId,
-      });
-      knockoutMatches.push({
-        tournament_id: tournament.id, round_number: 1, match_number: 2,
-        team1_id: b1?.team_id || null, team2_id: a2?.team_id || null,
-        stage: "knockout", category_id: categoryId,
-      });
-      knockoutMatches.push({
-        tournament_id: tournament.id, round_number: 2, match_number: 1,
-        team1_id: null, team2_id: null,
-        stage: "knockout", category_id: categoryId,
-      });
+      knockoutMatches.push({ tournament_id: tournament.id, round_number: 1, match_number: 1, team1_id: a1?.team_id || null, team2_id: b2?.team_id || null, stage: "knockout", category_id: categoryId });
+      knockoutMatches.push({ tournament_id: tournament.id, round_number: 1, match_number: 2, team1_id: b1?.team_id || null, team2_id: a2?.team_id || null, stage: "knockout", category_id: categoryId });
+      knockoutMatches.push({ tournament_id: tournament.id, round_number: 2, match_number: 1, team1_id: null, team2_id: null, stage: "knockout", category_id: categoryId });
     } else if (relevantGroups.length === 4) {
       const groupsSorted = [...relevantGroups].sort((a, b) => a.display_order - b.display_order);
-      
-      const crossMatch = [
-        [0, 3], [1, 2], [2, 1], [3, 0]
-      ];
+      const crossMatch = [[0, 3], [1, 2], [2, 1], [3, 0]];
       
       crossMatch.forEach(([g1Idx, g2Idx], matchIdx) => {
         const g1 = groupsSorted[g1Idx];
         const g2 = groupsSorted[g2Idx];
         const t1 = qualifiedTeams.find(t => t.group_id === g1.id && t.rank === 1);
         const t2 = qualifiedTeams.find(t => t.group_id === g2.id && t.rank === 2);
-        
-        knockoutMatches.push({
-          tournament_id: tournament.id, round_number: 1, match_number: matchIdx + 1,
-          team1_id: t1?.team_id || null, team2_id: t2?.team_id || null,
-          stage: "knockout", category_id: categoryId,
-        });
+        knockoutMatches.push({ tournament_id: tournament.id, round_number: 1, match_number: matchIdx + 1, team1_id: t1?.team_id || null, team2_id: t2?.team_id || null, stage: "knockout", category_id: categoryId });
       });
       
       knockoutMatches.push({ tournament_id: tournament.id, round_number: 2, match_number: 1, team1_id: null, team2_id: null, stage: "knockout", category_id: categoryId });
@@ -778,58 +629,30 @@ export default function TournamentDetail() {
     }
 
     const { error } = await supabase.from("tournament_matches").insert(knockoutMatches);
-    if (error) {
-      sonnerToast.error("Failed to start knockout stage");
-    } else {
-      sonnerToast.success("Knockout stage started!");
-      fetchData();
-    }
+    if (error) { sonnerToast.error("Failed to start knockout stage"); } 
+    else { sonnerToast.success("Knockout stage started!"); fetchData(); }
   };
 
-  // Category management functions
   const createCategory = async (name: string, description: string, maxTeams: number, entryFee: number) => {
     if (!tournament) return;
     const { error } = await supabase.from("tournament_categories").insert({
-      tournament_id: tournament.id,
-      name,
-      description: description || null,
-      max_teams: maxTeams,
-      entry_fee: entryFee,
-      display_order: categories.length,
+      tournament_id: tournament.id, name, description: description || null, max_teams: maxTeams, entry_fee: entryFee, display_order: categories.length,
     });
-    if (error) {
-      sonnerToast.error("Failed to create category");
-    } else {
-      sonnerToast.success("Category created");
-      fetchData();
-    }
+    if (error) { sonnerToast.error("Failed to create category"); } 
+    else { sonnerToast.success("Category created"); fetchData(); }
   };
 
   const updateCategory = async (id: string, name: string, description: string, maxTeams: number, entryFee: number) => {
-    const { error } = await supabase.from("tournament_categories")
-      .update({ name, description: description || null, max_teams: maxTeams, entry_fee: entryFee })
-      .eq("id", id);
-    if (error) {
-      sonnerToast.error("Failed to update category");
-    } else {
-      sonnerToast.success("Category updated");
-      fetchData();
-    }
+    const { error } = await supabase.from("tournament_categories").update({ name, description: description || null, max_teams: maxTeams, entry_fee: entryFee }).eq("id", id);
+    if (error) { sonnerToast.error("Failed to update category"); } 
+    else { sonnerToast.success("Category updated"); fetchData(); }
   };
 
   const deleteCategory = async (id: string) => {
-    // Unassign participants from this category
-    await supabase.from("tournament_participants")
-      .update({ category_id: null })
-      .eq("category_id", id);
-    
+    await supabase.from("tournament_participants").update({ category_id: null }).eq("category_id", id);
     const { error } = await supabase.from("tournament_categories").delete().eq("id", id);
-    if (error) {
-      sonnerToast.error("Failed to delete category");
-    } else {
-      sonnerToast.success("Category deleted");
-      fetchData();
-    }
+    if (error) { sonnerToast.error("Failed to delete category"); } 
+    else { sonnerToast.success("Category deleted"); fetchData(); }
   };
 
   const getTeamName = (teamId: string | null) => {
@@ -850,16 +673,19 @@ export default function TournamentDetail() {
   const isOwner = user?.id === tournament?.created_by;
   const isAdmin = role === "admin" || role === "super_admin" || isOwner;
   
-  // Filter participants by selected category
-  const filteredParticipants = selectedCategoryId === "all" 
-    ? participants 
-    : participants.filter(p => p.category_id === selectedCategoryId);
-  const filteredGroups = selectedCategoryId === "all"
-    ? groups
-    : groups.filter(g => g.category_id === selectedCategoryId);
-  const filteredMatches = selectedCategoryId === "all"
-    ? matches
-    : matches.filter(m => m.category_id === selectedCategoryId);
+  const hasCategories = categories.length > 0;
+  const isLevel2 = hasCategories && selectedCategoryId !== null;
+  
+  // Filter participants/groups/matches by selected category for Level 2
+  const filteredParticipants = selectedCategoryId 
+    ? participants.filter(p => p.category_id === selectedCategoryId)
+    : participants;
+  const filteredGroups = selectedCategoryId
+    ? groups.filter(g => g.category_id === selectedCategoryId)
+    : groups;
+  const filteredMatches = selectedCategoryId
+    ? matches.filter(m => m.category_id === selectedCategoryId)
+    : matches;
     
   const registeredParticipants = filteredParticipants.filter(p => p.waitlist_position === null);
   const waitlistParticipants = filteredParticipants.filter(p => p.waitlist_position !== null).sort((a, b) => (a.waitlist_position || 0) - (b.waitlist_position || 0));
@@ -873,8 +699,16 @@ export default function TournamentDetail() {
   const allGroupMatchesComplete = groupMatches.length > 0 && groupMatches.every(m => m.winner_team_id !== null);
   const canStartKnockout = allGroupMatchesComplete && knockoutMatches.length === 0;
 
-  // Find user's group
   const userGroup = userParticipant?.group_id ? groups.find(g => g.id === userParticipant.group_id) : null;
+
+  // Helper: get round label for knockout
+  const getRoundLabel = (roundNumber: number, maxRound: number) => {
+    const fromEnd = maxRound - roundNumber;
+    if (fromEnd === 0) return "Final";
+    if (fromEnd === 1) return "Semi Final";
+    if (fromEnd === 2) return "Quarter Final";
+    return `Round ${roundNumber}`;
+  };
 
   if (loading) {
     return (
@@ -892,6 +726,608 @@ export default function TournamentDetail() {
     );
   }
 
+  // ========== RENDER ==========
+
+  const renderRegistrationActions = () => {
+    if (tournament.status !== "registration") return null;
+    const allRegistered = participants.filter(p => p.waitlist_position === null);
+    const allWaitlist = participants.filter(p => p.waitlist_position !== null);
+    return (
+      <Card className="mb-6">
+        <CardContent className="py-4 flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <p className="font-medium">Registration is open</p>
+              {tournament.entry_fee > 0 && (
+                <Badge variant="outline" className="text-xs">
+                  <Banknote className="w-3 h-3 mr-1" />
+                  PKR {tournament.entry_fee.toLocaleString()}
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {allRegistered.length} teams registered
+              {allRegistered.length >= tournament.max_teams && " (Full)"}
+              {allWaitlist.length > 0 && `, ${allWaitlist.length} on waiting list`}
+            </p>
+          </div>
+          <div className="flex gap-2 items-center">
+            {canRegister && (
+              <Button onClick={() => setRegistrationDialogOpen(true)}>
+                <Users className="w-4 h-4 mr-2" />
+                {allRegistered.length >= tournament.max_teams ? "Join Waiting List" : "Register"}
+              </Button>
+            )}
+            {isRegistered && !isOnWaitlist && (
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className={userParticipant?.payment_status === "paid" ? "bg-emerald-500/20 text-emerald-600" : "bg-warning/20 text-warning"}>
+                  {userParticipant?.payment_status === "paid" ? "Paid" : "Payment Pending"}
+                </Badge>
+                <Button variant="outline" onClick={withdrawTeam}>
+                  <XCircle className="w-4 h-4 mr-2" />Withdraw
+                </Button>
+              </div>
+            )}
+            {isRegistered && isOnWaitlist && (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="bg-warning/20 text-warning-foreground">Waitlist #{userParticipant?.waitlist_position}</Badge>
+                <Button variant="outline" size="sm" onClick={withdrawTeam}>
+                  <XCircle className="w-4 h-4 mr-2" />Leave Waitlist
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  // ===== Level 2: Category Detail View with Standings/Matches/Info =====
+  const renderCategoryDetail = () => {
+    const selectedCategory = categories.find(c => c.id === selectedCategoryId);
+    if (!selectedCategory) return null;
+
+    return (
+      <div>
+        <Button variant="ghost" size="sm" className="mb-4 -ml-2" onClick={() => setSelectedCategoryId(null)}>
+          <ChevronLeft className="w-4 h-4 mr-1" />
+          Back to Categories
+        </Button>
+
+        <h2 className="text-xl font-bold mb-4">{selectedCategory.name}</h2>
+
+        <Tabs defaultValue="standings" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="standings">Standings</TabsTrigger>
+            <TabsTrigger value="matches">Matches</TabsTrigger>
+            <TabsTrigger value="info">Info</TabsTrigger>
+          </TabsList>
+
+          {/* Standings Tab */}
+          <TabsContent value="standings">
+            {filteredGroups.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>Groups haven't been created yet</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Accordion type="multiple" defaultValue={filteredGroups.map(g => g.id)} className="space-y-3">
+                {filteredGroups.map(group => {
+                  const groupTeams = filteredParticipants
+                    .filter(p => p.group_id === group.id)
+                    .map(p => ({
+                      team_id: p.team_id,
+                      team_name: p.custom_team_name || p.team_name || "Unknown",
+                      wins: p.group_wins, losses: p.group_losses,
+                      points_for: p.group_points_for, points_against: p.group_points_against,
+                      player1_name: p.player1_name || undefined, player2_name: p.player2_name || undefined,
+                    }));
+
+                  return (
+                    <AccordionItem key={group.id} value={group.id} className="border rounded-lg">
+                      <AccordionTrigger className="px-4 hover:no-underline">
+                        <span className="font-semibold">{group.name}</span>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-0 pb-0">
+                        <GroupStandings groupName={group.name} teams={groupTeams} highlightTeamId={userTeam?.id} />
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
+            )}
+          </TabsContent>
+
+          {/* Matches Tab (Merged: Knockout + Group Matches) */}
+          <TabsContent value="matches">
+            {filteredGroups.length === 0 && knockoutMatches.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  <Trophy className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No matches yet</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {/* Knockout rounds (reverse order: Final first) */}
+                {knockoutMatches.length > 0 && (() => {
+                  const roundsGrouped = knockoutMatches.reduce((acc, match) => {
+                    if (!acc[match.round_number]) acc[match.round_number] = [];
+                    acc[match.round_number].push(match);
+                    return acc;
+                  }, {} as Record<number, TournamentMatch[]>);
+
+                  const maxRound = Math.max(...Object.keys(roundsGrouped).map(Number));
+                  const roundNumbers = Object.keys(roundsGrouped).map(Number).sort((a, b) => b - a);
+
+                  return (
+                    <Accordion type="multiple" defaultValue={roundNumbers.map(r => `knockout-${r}`)} className="space-y-3">
+                      {roundNumbers.map(roundNum => (
+                        <AccordionItem key={`knockout-${roundNum}`} value={`knockout-${roundNum}`} className="border rounded-lg">
+                          <AccordionTrigger className="px-4 hover:no-underline">
+                            <div className="flex items-center gap-2">
+                              <Trophy className="w-4 h-4 text-warning" />
+                              <span className="font-semibold">{getRoundLabel(roundNum, maxRound)}</span>
+                              <Badge variant="outline" className="text-xs ml-2">
+                                {roundsGrouped[roundNum].filter(m => m.winner_team_id).length}/{roundsGrouped[roundNum].length}
+                              </Badge>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="px-4 pb-4">
+                            <div className="grid gap-3 md:grid-cols-2">
+                              {roundsGrouped[roundNum].map(match => (
+                                <Card key={match.id} className={match.winner_team_id ? "bg-muted/50" : ""}>
+                                  <CardContent className="py-3">
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <div className={`flex-1 ${match.winner_team_id === match.team1_id ? "font-bold text-success" : ""}`}>
+                                          {getTeamName(match.team1_id)}
+                                        </div>
+                                        {match.team1_score !== null && <span className="font-mono font-semibold">{match.team1_score}</span>}
+                                      </div>
+                                      <div className="flex items-center justify-between">
+                                        <div className={`flex-1 ${match.winner_team_id === match.team2_id ? "font-bold text-success" : ""}`}>
+                                          {getTeamName(match.team2_id)}
+                                        </div>
+                                        {match.team2_score !== null && <span className="font-mono font-semibold">{match.team2_score}</span>}
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  );
+                })()}
+
+                {/* Group matches */}
+                {filteredGroups.length > 0 && groupMatches.length > 0 && (
+                  <Accordion type="multiple" defaultValue={filteredGroups.map(g => `group-match-${g.id}`)} className="space-y-3">
+                    {filteredGroups.map(group => {
+                      const gMatches = groupMatches
+                        .filter(m => m.group_id === group.id)
+                        .map(m => ({
+                          id: m.id, team1_id: m.team1_id, team2_id: m.team2_id,
+                          team1_name: getTeamName(m.team1_id), team2_name: getTeamName(m.team2_id),
+                          team1_players: getTeamPlayers(m.team1_id), team2_players: getTeamPlayers(m.team2_id),
+                          team1_score: m.team1_score, team2_score: m.team2_score, winner_team_id: m.winner_team_id,
+                        }));
+
+                      if (gMatches.length === 0) return null;
+
+                      return (
+                        <AccordionItem key={`group-match-${group.id}`} value={`group-match-${group.id}`} className="border rounded-lg">
+                          <AccordionTrigger className="px-4 hover:no-underline">
+                            <span className="font-semibold">{group.name} Matches</span>
+                          </AccordionTrigger>
+                          <AccordionContent className="px-0 pb-0">
+                            <GroupMatchList
+                              groupName={group.name}
+                              matches={gMatches}
+                              isAdmin={isAdmin}
+                              onSubmitScore={submitGroupMatchScore}
+                              setsPerMatch={tournament.sets_per_match}
+                            />
+                          </AccordionContent>
+                        </AccordionItem>
+                      );
+                    })}
+                  </Accordion>
+                )}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Info Tab */}
+          <TabsContent value="info">
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                {tournament.description && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><FileText className="w-4 h-4" />Description</div>
+                    <p className="text-foreground">{tournament.description}</p>
+                  </div>
+                )}
+                {tournament.venue && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><MapPin className="w-4 h-4" />Venue</div>
+                    <p className="text-foreground">{tournament.venue}</p>
+                  </div>
+                )}
+                {(tournament.start_date || tournament.end_date) && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Calendar className="w-4 h-4" />Event Dates</div>
+                    <p className="text-foreground">
+                      {tournament.start_date && tournament.end_date ? (
+                        <>{new Date(tournament.start_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} — {new Date(tournament.end_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</>
+                      ) : tournament.start_date ? (
+                        new Date(tournament.start_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                      ) : `Ends ${new Date(tournament.end_date!).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`}
+                    </p>
+                  </div>
+                )}
+                {(selectedCategory.entry_fee || tournament.entry_fee > 0) && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Banknote className="w-4 h-4" />Entry Fee</div>
+                    <p className="text-foreground font-semibold">
+                      PKR {(selectedCategory.entry_fee || tournament.entry_fee).toLocaleString()}
+                    </p>
+                    {tournament.payment_instructions && (
+                      <div className="p-3 rounded-lg bg-muted/50 border border-border mt-2">
+                        <p className="text-sm font-medium mb-1">Payment Instructions:</p>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{tournament.payment_instructions}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Users className="w-4 h-4" />Category Details</div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline">{registeredParticipants.length}/{selectedCategory.max_teams} Teams</Badge>
+                    <Badge variant="outline">Best of {tournament.sets_per_match} Sets</Badge>
+                    <Badge variant="outline">{filteredGroups.length} Groups</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  };
+
+  // ===== Level 1: Category Cards View =====
+  const renderCategoryCards = () => {
+    return (
+      <div className="space-y-3">
+        {categories.map(cat => {
+          const catParticipants = participants.filter(p => p.category_id === cat.id && p.waitlist_position === null);
+          // Find winner for this category (if tournament completed, find the knockout final winner)
+          const catKnockoutMatches = matches.filter(m => m.stage === "knockout" && m.category_id === cat.id);
+          const maxRound = catKnockoutMatches.length > 0 ? Math.max(...catKnockoutMatches.map(m => m.round_number)) : 0;
+          const finalMatch = catKnockoutMatches.find(m => m.round_number === maxRound && m.winner_team_id);
+          const winnerName = finalMatch?.winner_team_id ? getTeamName(finalMatch.winner_team_id) : null;
+
+          return (
+            <TournamentCategoryCard
+              key={cat.id}
+              name={cat.name}
+              venue={tournament.venue}
+              teamsJoined={catParticipants.length}
+              maxTeams={cat.max_teams}
+              entryFee={cat.entry_fee || tournament.entry_fee}
+              currency={tournament.entry_fee_currency || "PKR"}
+              winnerName={winnerName}
+              onClick={() => setSelectedCategoryId(cat.id)}
+            />
+          );
+        })}
+      </div>
+    );
+  };
+
+  // ===== Admin Tabs (shown at both levels) =====
+  const renderAdminTabs = () => {
+    if (!isAdmin) return null;
+
+    return (
+      <Tabs defaultValue="manage" className="w-full mb-6">
+        <TabsList className="mb-4 flex overflow-x-auto h-auto flex-nowrap justify-start gap-1 p-1">
+          <TabsTrigger value="manage" className="text-xs sm:text-sm shrink-0"><Settings className="w-4 h-4 mr-1 sm:mr-2" />Manage</TabsTrigger>
+          <TabsTrigger value="categories" className="text-xs sm:text-sm shrink-0"><Tag className="w-4 h-4 mr-1 sm:mr-2" />Categories</TabsTrigger>
+          <TabsTrigger value="payments" className="text-xs sm:text-sm shrink-0"><Banknote className="w-4 h-4 mr-1 sm:mr-2" />Registrations</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="manage">
+          {!selectedCategoryId ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <Tag className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p className="font-medium mb-2">Select a category first</p>
+                <p className="text-sm">Click on a category card above to manage groups for that category.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <AdminGroupManagement
+              groups={filteredGroups}
+              teams={filteredParticipants.filter(p => p.waitlist_position === null).map(p => ({
+                id: p.id, team_id: p.team_id,
+                team_name: p.custom_team_name || p.team_name || "Unknown",
+                group_id: p.group_id,
+              }))}
+              onCreateGroup={createGroup}
+              onDeleteGroup={deleteGroup}
+              onAssignTeam={assignTeamToGroup}
+              onRandomAssign={randomAssignTeams}
+              onGenerateGroupMatches={generateGroupMatches}
+              canStartKnockout={canStartKnockout}
+              onStartKnockout={startKnockoutStage}
+              onKickTeam={kickTeam}
+              setsPerMatch={tournament.sets_per_match}
+              onSetsPerMatchChange={async (sets) => {
+                const { error } = await supabase.from("tournaments").update({ sets_per_match: sets }).eq("id", tournament.id);
+                if (error) { sonnerToast.error("Failed to update match format"); } 
+                else { sonnerToast.success(`Match format set to best of ${sets}`); fetchData(); }
+              }}
+              categoryName={categories.find(c => c.id === selectedCategoryId)?.name}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="categories">
+          <CategoryManagement
+            categories={categories}
+            tournamentStatus={tournament.status}
+            entryFeeCurrency={tournament.entry_fee_currency}
+            onCreateCategory={createCategory}
+            onUpdateCategory={updateCategory}
+            onDeleteCategory={deleteCategory}
+          />
+        </TabsContent>
+
+        <TabsContent value="payments">
+          <PaymentManagement
+            tournamentId={tournament.id}
+            entryFee={tournament.entry_fee || 0}
+            entryFeeCurrency={tournament.entry_fee_currency || "PKR"}
+            participants={paymentParticipants}
+            onRefresh={fetchPaymentData}
+          />
+        </TabsContent>
+      </Tabs>
+    );
+  };
+
+  // ===== Fallback: No Categories (legacy flat tab layout) =====
+  const renderFlatLayout = () => {
+    return (
+      <Tabs defaultValue="info" className="w-full">
+        <TabsList className="mb-6 flex overflow-x-auto h-auto flex-nowrap justify-start gap-1 p-1">
+          <TabsTrigger value="info" className="text-xs sm:text-sm shrink-0"><Info className="w-4 h-4 mr-1 sm:mr-2" />Info</TabsTrigger>
+          {isAdmin && <TabsTrigger value="manage" className="text-xs sm:text-sm shrink-0"><Settings className="w-4 h-4 mr-1 sm:mr-2" />Manage</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="categories" className="text-xs sm:text-sm shrink-0"><Tag className="w-4 h-4 mr-1 sm:mr-2" />Categories</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="payments" className="text-xs sm:text-sm shrink-0"><Banknote className="w-4 h-4 mr-1 sm:mr-2" />Registrations</TabsTrigger>}
+          <TabsTrigger value="groups" className="text-xs sm:text-sm shrink-0">Groups</TabsTrigger>
+          <TabsTrigger value="matches" className="text-xs sm:text-sm shrink-0">Matches</TabsTrigger>
+          <TabsTrigger value="knockout" className="text-xs sm:text-sm shrink-0">Knockout</TabsTrigger>
+          <TabsTrigger value="participants" className="text-xs sm:text-sm shrink-0">Participants</TabsTrigger>
+        </TabsList>
+
+        {/* Info Tab */}
+        <TabsContent value="info">
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Info className="w-5 h-5" />Tournament Information</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+              {tournament.description && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><FileText className="w-4 h-4" />Description</div>
+                  <p className="text-foreground">{tournament.description}</p>
+                </div>
+              )}
+              {tournament.venue && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><MapPin className="w-4 h-4" />Venue</div>
+                  <p className="text-foreground">{tournament.venue}</p>
+                </div>
+              )}
+              {(tournament.start_date || tournament.end_date) && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Calendar className="w-4 h-4" />Event Dates</div>
+                  <p className="text-foreground">
+                    {tournament.start_date && tournament.end_date ? (
+                      <>{new Date(tournament.start_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} — {new Date(tournament.end_date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</>
+                    ) : tournament.start_date ? (
+                      new Date(tournament.start_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                    ) : `Ends ${new Date(tournament.end_date!).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`}
+                  </p>
+                </div>
+              )}
+              {tournament.registration_deadline && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Clock className="w-4 h-4" />Registration Deadline</div>
+                  <p className="text-foreground">{new Date(tournament.registration_deadline).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                </div>
+              )}
+              {tournament.entry_fee > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Banknote className="w-4 h-4" />Entry Fee</div>
+                  <p className="text-foreground font-semibold">PKR {tournament.entry_fee.toLocaleString()}</p>
+                  {tournament.payment_instructions && (
+                    <div className="p-3 rounded-lg bg-muted/50 border border-border mt-2">
+                      <p className="text-sm font-medium mb-1">Payment Instructions:</p>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{tournament.payment_instructions}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Trophy className="w-4 h-4" />Format</div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline">{groups.length} Groups</Badge>
+                  <Badge variant="outline">{tournament.max_teams} Max Teams</Badge>
+                  <Badge variant="outline">Best of {tournament.sets_per_match} Sets</Badge>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground"><Users className="w-4 h-4" />Participants</div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline">{registeredParticipants.length} Registered</Badge>
+                  {waitlistParticipants.length > 0 && <Badge variant="outline">{waitlistParticipants.length} on Waitlist</Badge>}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="manage">
+            <AdminGroupManagement
+              groups={filteredGroups}
+              teams={filteredParticipants.filter(p => p.waitlist_position === null).map(p => ({
+                id: p.id, team_id: p.team_id, team_name: p.custom_team_name || p.team_name || "Unknown", group_id: p.group_id,
+              }))}
+              onCreateGroup={createGroup} onDeleteGroup={deleteGroup} onAssignTeam={assignTeamToGroup}
+              onRandomAssign={randomAssignTeams} onGenerateGroupMatches={generateGroupMatches}
+              canStartKnockout={canStartKnockout} onStartKnockout={startKnockoutStage} onKickTeam={kickTeam}
+              setsPerMatch={tournament.sets_per_match}
+              onSetsPerMatchChange={async (sets) => {
+                const { error } = await supabase.from("tournaments").update({ sets_per_match: sets }).eq("id", tournament.id);
+                if (error) { sonnerToast.error("Failed to update match format"); } 
+                else { sonnerToast.success(`Match format set to best of ${sets}`); fetchData(); }
+              }}
+            />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="categories">
+            <CategoryManagement categories={categories} tournamentStatus={tournament.status} entryFeeCurrency={tournament.entry_fee_currency}
+              onCreateCategory={createCategory} onUpdateCategory={updateCategory} onDeleteCategory={deleteCategory} />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="payments">
+            <PaymentManagement tournamentId={tournament.id} entryFee={tournament.entry_fee || 0} entryFeeCurrency={tournament.entry_fee_currency || "PKR"}
+              participants={paymentParticipants} onRefresh={fetchPaymentData} />
+          </TabsContent>
+        )}
+
+        <TabsContent value="groups">
+          {filteredGroups.length === 0 ? (
+            <Card><CardContent className="py-8 text-center text-muted-foreground"><Users className="w-12 h-12 mx-auto mb-4 opacity-50" /><p>Groups haven't been created yet</p></CardContent></Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {filteredGroups.map(group => {
+                const groupTeams = filteredParticipants.filter(p => p.group_id === group.id).map(p => ({
+                  team_id: p.team_id, team_name: p.custom_team_name || p.team_name || "Unknown",
+                  wins: p.group_wins, losses: p.group_losses, points_for: p.group_points_for, points_against: p.group_points_against,
+                  player1_name: p.player1_name || undefined, player2_name: p.player2_name || undefined,
+                }));
+                return <GroupStandings key={group.id} groupName={group.name} teams={groupTeams} highlightTeamId={userTeam?.id} />;
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="matches">
+          {filteredGroups.length === 0 ? (
+            <Card><CardContent className="py-8 text-center text-muted-foreground"><Trophy className="w-12 h-12 mx-auto mb-4 opacity-50" /><p>Matches will appear after groups are created</p></CardContent></Card>
+          ) : (
+            <div className="space-y-6">
+              {filteredGroups.map(group => {
+                const gMatches = groupMatches.filter(m => m.group_id === group.id).map(m => ({
+                  id: m.id, team1_id: m.team1_id, team2_id: m.team2_id,
+                  team1_name: getTeamName(m.team1_id), team2_name: getTeamName(m.team2_id),
+                  team1_players: getTeamPlayers(m.team1_id), team2_players: getTeamPlayers(m.team2_id),
+                  team1_score: m.team1_score, team2_score: m.team2_score, winner_team_id: m.winner_team_id,
+                }));
+                return <GroupMatchList key={group.id} groupName={group.name} matches={gMatches} isAdmin={isAdmin} onSubmitScore={submitGroupMatchScore} setsPerMatch={tournament.sets_per_match} />;
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="knockout">
+          <KnockoutBracket
+            matches={knockoutMatches.map(m => ({ ...m, team1_name: getTeamName(m.team1_id), team2_name: getTeamName(m.team2_id), team1_players: getTeamPlayers(m.team1_id), team2_players: getTeamPlayers(m.team2_id) }))}
+            isAdmin={isAdmin} onSubmitScore={submitKnockoutScore} winnerTeamId={tournament.winner_team_id}
+            winnerTeamName={tournament.winner_team_id ? getTeamName(tournament.winner_team_id) : undefined}
+          />
+        </TabsContent>
+
+        <TabsContent value="participants">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader><CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" />Registered Teams ({registeredParticipants.length}/{tournament.max_teams})</CardTitle></CardHeader>
+              <CardContent>
+                {registeredParticipants.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">No teams registered</p>
+                ) : (
+                  <div className="space-y-2">
+                    {registeredParticipants.map((p, idx) => {
+                      const groupName = groups.find(g => g.id === p.group_id)?.name;
+                      const categoryName = categories.find(c => c.id === p.category_id)?.name;
+                      const displayName = p.custom_team_name || p.team_name;
+                      return (
+                        <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg border ${p.is_eliminated ? "opacity-50 bg-muted/30" : ""}`}>
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <span className="text-sm text-muted-foreground w-6">{idx + 1}.</span>
+                            <span className={p.is_eliminated ? "line-through" : "font-medium"}>{displayName}</span>
+                            {categoryName && <Badge variant="secondary" className="text-xs"><Tag className="w-3 h-3 mr-1" />{categoryName}</Badge>}
+                            {groupName && <Badge variant="outline" className="text-xs">{groupName}</Badge>}
+                            {p.player1_name && p.player2_name && <span className="text-xs text-muted-foreground">({p.player1_name} & {p.player2_name})</span>}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {tournament.entry_fee > 0 && (
+                              <Badge variant="outline" className={`text-xs ${p.payment_status === "paid" ? "bg-emerald-500/20 text-emerald-600" : "bg-warning/20 text-warning"}`}>
+                                {p.payment_status === "paid" ? "Paid" : "Pending"}
+                              </Badge>
+                            )}
+                            {p.is_eliminated && <XCircle className="w-4 h-4 text-destructive" />}
+                            {tournament.winner_team_id === p.team_id && <Crown className="w-4 h-4 text-rank-gold" />}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            {waitlistParticipants.length > 0 && (
+              <Card className="border-warning/30">
+                <CardHeader><CardTitle className="flex items-center gap-2 text-warning"><Clock className="w-5 h-5" />Waiting List ({waitlistParticipants.length})</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {waitlistParticipants.map((p) => {
+                      const categoryName = categories.find(c => c.id === p.category_id)?.name;
+                      const displayName = p.custom_team_name || p.team_name;
+                      return (
+                        <div key={p.id} className="flex items-center justify-between p-3 rounded-lg border border-warning/20 bg-warning/5">
+                          <div className="flex items-center gap-3">
+                            <Badge variant="outline" className="bg-warning/20 text-warning-foreground">#{p.waitlist_position}</Badge>
+                            <span className="font-medium">{displayName}</span>
+                            {categoryName && <Badge variant="secondary" className="text-xs"><Tag className="w-3 h-3 mr-1" />{categoryName}</Badge>}
+                          </div>
+                          <span className="text-sm text-muted-foreground">Will be added if a team withdraws</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
@@ -907,7 +1343,7 @@ export default function TournamentDetail() {
 
       <main className="container py-8">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="flex items-start justify-between mb-8">
+          <div className="flex items-start justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-warning/10 flex items-center justify-center">
                 <Trophy className="w-6 h-6 text-warning" />
@@ -915,8 +1351,7 @@ export default function TournamentDetail() {
               <div>
                 <h1 className="text-2xl font-bold text-foreground">{tournament.name}</h1>
                 <p className="text-muted-foreground">
-                  {groups.length} groups • {registeredParticipants.length} / {tournament.max_teams} teams
-                  {waitlistParticipants.length > 0 && ` • ${waitlistParticipants.length} on waitlist`}
+                  {hasCategories ? `${categories.length} categories` : `${groups.length} groups`} • {participants.filter(p => p.waitlist_position === null).length} teams
                 </p>
               </div>
             </div>
@@ -925,69 +1360,8 @@ export default function TournamentDetail() {
             </Badge>
           </div>
 
-          {/* Registration Actions */}
-          {tournament.status === "registration" && (
-            <Card className="mb-6">
-              <CardContent className="py-4 flex items-center justify-between flex-wrap gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="font-medium">Registration is open</p>
-                    {tournament.entry_fee > 0 && (
-                      <Badge variant="outline" className="text-xs">
-                        <Banknote className="w-3 h-3 mr-1" />
-                        PKR {tournament.entry_fee.toLocaleString()}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {registeredParticipants.length} teams registered
-                    {registeredParticipants.length >= tournament.max_teams && " (Full)"}
-                    {waitlistParticipants.length > 0 && `, ${waitlistParticipants.length} on waiting list`}
-                  </p>
-                </div>
-                <div className="flex gap-2 items-center">
-                  {canRegister && (
-                    <Button onClick={() => setRegistrationDialogOpen(true)}>
-                      <Users className="w-4 h-4 mr-2" />
-                      {registeredParticipants.length >= tournament.max_teams 
-                        ? "Join Waiting List" 
-                        : "Register"}
-                    </Button>
-                  )}
-                  {isRegistered && !isOnWaitlist && (
-                    <div className="flex items-center gap-2">
-                      <Badge 
-                        variant="outline" 
-                        className={userParticipant?.payment_status === "paid" 
-                          ? "bg-emerald-500/20 text-emerald-600" 
-                          : "bg-warning/20 text-warning"
-                        }
-                      >
-                        {userParticipant?.payment_status === "paid" ? "Paid" : "Payment Pending"}
-                      </Badge>
-                      <Button variant="outline" onClick={withdrawTeam}>
-                        <XCircle className="w-4 h-4 mr-2" />
-                        Withdraw
-                      </Button>
-                    </div>
-                  )}
-                  {isRegistered && isOnWaitlist && (
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="bg-warning/20 text-warning-foreground">
-                        Waitlist #{userParticipant?.waitlist_position}
-                      </Badge>
-                      <Button variant="outline" size="sm" onClick={withdrawTeam}>
-                        <XCircle className="w-4 h-4 mr-2" />
-                        Leave Waitlist
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {renderRegistrationActions()}
 
-          {/* Registration Dialog */}
           <RegistrationDialog
             open={registrationDialogOpen}
             onOpenChange={setRegistrationDialogOpen}
@@ -996,14 +1370,10 @@ export default function TournamentDetail() {
             entryFee={tournament.entry_fee || 0}
             entryFeeCurrency={tournament.entry_fee_currency || "PKR"}
             paymentInstructions={tournament.payment_instructions}
-            isFull={registeredParticipants.length >= tournament.max_teams}
+            isFull={participants.filter(p => p.waitlist_position === null).length >= tournament.max_teams}
             userTeam={userTeam}
             categories={categories.map(c => ({
-              id: c.id,
-              name: c.name,
-              max_teams: c.max_teams,
-              participantCount: c.participantCount ?? 0,
-              entry_fee: c.entry_fee,
+              id: c.id, name: c.name, max_teams: c.max_teams, participantCount: c.participantCount ?? 0, entry_fee: c.entry_fee,
             }))}
             onRegister={registerTeam}
             teamMemberCount={userTeamMemberCount}
@@ -1014,499 +1384,23 @@ export default function TournamentDetail() {
             <Card className="mb-6 bg-gradient-to-r from-rank-gold/10 to-warning/10 border-rank-gold/30">
               <CardContent className="py-6 flex items-center justify-center gap-3">
                 <Crown className="w-8 h-8 text-rank-gold" />
-                <span className="text-2xl font-bold text-foreground">
-                  {getTeamName(tournament.winner_team_id)} wins!
-                </span>
+                <span className="text-2xl font-bold text-foreground">{getTeamName(tournament.winner_team_id)} wins!</span>
               </CardContent>
             </Card>
           )}
 
-          {/* Category Filter */}
-          {categories.length > 0 && (
-            <div className="flex items-center gap-3 mb-6">
-              <Tag className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Filter by category:</span>
-              <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
-                <SelectTrigger className="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map(cat => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {/* Main Content */}
+          {hasCategories ? (
+            <div>
+              {/* Admin tabs shown above for both levels */}
+              {renderAdminTabs()}
+
+              {/* Level 1: Category Cards or Level 2: Category Detail */}
+              {isLevel2 ? renderCategoryDetail() : renderCategoryCards()}
             </div>
+          ) : (
+            renderFlatLayout()
           )}
-
-          <Tabs defaultValue="info" className="w-full">
-            <TabsList className="mb-6 flex overflow-x-auto h-auto flex-nowrap justify-start gap-1 p-1">
-              <TabsTrigger value="info" className="text-xs sm:text-sm shrink-0"><Info className="w-4 h-4 mr-1 sm:mr-2" />Info</TabsTrigger>
-              {isAdmin && <TabsTrigger value="manage" className="text-xs sm:text-sm shrink-0"><Settings className="w-4 h-4 mr-1 sm:mr-2" />Manage</TabsTrigger>}
-              {isAdmin && <TabsTrigger value="categories" className="text-xs sm:text-sm shrink-0"><Tag className="w-4 h-4 mr-1 sm:mr-2" />Categories</TabsTrigger>}
-              {isAdmin && (
-                <TabsTrigger value="payments" className="text-xs sm:text-sm shrink-0"><Banknote className="w-4 h-4 mr-1 sm:mr-2" />Registrations</TabsTrigger>
-              )}
-              <TabsTrigger value="groups" className="text-xs sm:text-sm shrink-0">Groups</TabsTrigger>
-              <TabsTrigger value="matches" className="text-xs sm:text-sm shrink-0">Matches</TabsTrigger>
-              <TabsTrigger value="knockout" className="text-xs sm:text-sm shrink-0">Knockout</TabsTrigger>
-              <TabsTrigger value="participants" className="text-xs sm:text-sm shrink-0">Participants</TabsTrigger>
-            </TabsList>
-
-            {/* Info Tab */}
-            <TabsContent value="info">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Info className="w-5 h-5" />
-                    Tournament Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Description */}
-                  {tournament.description && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        <FileText className="w-4 h-4" />
-                        Description
-                      </div>
-                      <p className="text-foreground">{tournament.description}</p>
-                    </div>
-                  )}
-
-                  {/* Venue */}
-                  {tournament.venue && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        <MapPin className="w-4 h-4" />
-                        Venue
-                      </div>
-                      <p className="text-foreground">{tournament.venue}</p>
-                    </div>
-                  )}
-
-                  {/* Event Dates */}
-                  {(tournament.start_date || tournament.end_date) && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        <Calendar className="w-4 h-4" />
-                        Event Dates
-                      </div>
-                      <p className="text-foreground">
-                        {tournament.start_date && tournament.end_date ? (
-                          <>
-                            {new Date(tournament.start_date).toLocaleDateString('en-US', {
-                              weekday: 'short',
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric'
-                            })}
-                            {' — '}
-                            {new Date(tournament.end_date).toLocaleDateString('en-US', {
-                              weekday: 'short',
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric'
-                            })}
-                          </>
-                        ) : tournament.start_date ? (
-                          new Date(tournament.start_date).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })
-                        ) : (
-                          `Ends ${new Date(tournament.end_date!).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })}`
-                        )}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Registration Deadline */}
-                  {tournament.registration_deadline && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        <Clock className="w-4 h-4" />
-                        Registration Deadline
-                      </div>
-                      <p className="text-foreground">
-                        {new Date(tournament.registration_deadline).toLocaleDateString('en-US', {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Entry Fee */}
-                  {tournament.entry_fee > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        <Banknote className="w-4 h-4" />
-                        Entry Fee
-                      </div>
-                      <p className="text-foreground font-semibold">
-                        PKR {tournament.entry_fee.toLocaleString()}
-                      </p>
-                      {tournament.payment_instructions && (
-                        <div className="p-3 rounded-lg bg-muted/50 border border-border mt-2">
-                          <p className="text-sm font-medium mb-1">Payment Instructions:</p>
-                          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{tournament.payment_instructions}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Tournament Format */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <Trophy className="w-4 h-4" />
-                      Format
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline">{groups.length} Groups</Badge>
-                      <Badge variant="outline">{tournament.max_teams} Max Teams</Badge>
-                      <Badge variant="outline">Best of {tournament.sets_per_match} Sets</Badge>
-                    </div>
-                  </div>
-
-                  {/* Categories */}
-                  {categories.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        <Tag className="w-4 h-4" />
-                        Categories
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {categories.map(cat => (
-                          <Badge key={cat.id} variant="secondary">
-                            {cat.name} ({cat.participantCount || 0}/{cat.max_teams})
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Teams Info */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                      <Users className="w-4 h-4" />
-                      Participants
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline">{registeredParticipants.length} Registered</Badge>
-                      {waitlistParticipants.length > 0 && (
-                        <Badge variant="outline">{waitlistParticipants.length} on Waitlist</Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* No info available placeholder */}
-                  {!tournament.description && !tournament.venue && !tournament.registration_deadline && tournament.entry_fee === 0 && (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Info className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p>No additional information available for this tournament.</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Admin Management Tab */}
-            {isAdmin && (
-              <TabsContent value="manage">
-                {categories.length > 0 && selectedCategoryId === "all" ? (
-                  <Card>
-                    <CardContent className="py-8 text-center text-muted-foreground">
-                      <Tag className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p className="font-medium mb-2">Select a category first</p>
-                      <p className="text-sm">Use the category filter above to manage groups for a specific category.</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <AdminGroupManagement
-                    groups={filteredGroups}
-                    teams={filteredParticipants.filter(p => p.waitlist_position === null).map(p => ({
-                      id: p.id,
-                      team_id: p.team_id,
-                      team_name: p.custom_team_name || p.team_name || "Unknown",
-                      group_id: p.group_id,
-                    }))}
-                    onCreateGroup={createGroup}
-                    onDeleteGroup={deleteGroup}
-                    onAssignTeam={assignTeamToGroup}
-                    onRandomAssign={randomAssignTeams}
-                    onGenerateGroupMatches={generateGroupMatches}
-                    canStartKnockout={canStartKnockout}
-                    onStartKnockout={startKnockoutStage}
-                    onKickTeam={kickTeam}
-                    setsPerMatch={tournament.sets_per_match}
-                    onSetsPerMatchChange={async (sets) => {
-                      const { error } = await supabase
-                        .from("tournaments")
-                        .update({ sets_per_match: sets })
-                        .eq("id", tournament.id);
-                      if (error) {
-                        sonnerToast.error("Failed to update match format");
-                      } else {
-                        sonnerToast.success(`Match format set to best of ${sets}`);
-                        fetchData();
-                      }
-                    }}
-                    categoryName={selectedCategoryId !== "all" ? categories.find(c => c.id === selectedCategoryId)?.name : undefined}
-                  />
-                )}
-              </TabsContent>
-            )}
-
-            {/* Categories Tab (Admin Only) */}
-            {isAdmin && (
-              <TabsContent value="categories">
-                <CategoryManagement
-                  categories={categories}
-                  tournamentStatus={tournament.status}
-                  entryFeeCurrency={tournament.entry_fee_currency}
-                  onCreateCategory={createCategory}
-                  onUpdateCategory={updateCategory}
-                  onDeleteCategory={deleteCategory}
-                />
-              </TabsContent>
-            )}
-
-            {/* Registrations Tab (Admin Only) */}
-            {isAdmin && (
-              <TabsContent value="payments">
-                <PaymentManagement
-                  tournamentId={tournament.id}
-                  entryFee={tournament.entry_fee || 0}
-                  entryFeeCurrency={tournament.entry_fee_currency || "PKR"}
-                  participants={paymentParticipants}
-                  onRefresh={fetchPaymentData}
-                />
-              </TabsContent>
-            )}
-
-            {/* Groups Tab */}
-            <TabsContent value="groups">
-              {filteredGroups.length === 0 ? (
-                <Card>
-                  <CardContent className="py-8 text-center text-muted-foreground">
-                    <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>Groups haven't been created yet</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="grid gap-4 md:grid-cols-2">
-                  {filteredGroups.map(group => {
-                    const groupTeams = filteredParticipants
-                      .filter(p => p.group_id === group.id)
-                      .map(p => ({
-                        team_id: p.team_id,
-                        team_name: p.custom_team_name || p.team_name || "Unknown",
-                        wins: p.group_wins,
-                        losses: p.group_losses,
-                        points_for: p.group_points_for,
-                        points_against: p.group_points_against,
-                        player1_name: p.player1_name || undefined,
-                        player2_name: p.player2_name || undefined,
-                      }));
-
-                    return (
-                      <GroupStandings
-                        key={group.id}
-                        groupName={group.name}
-                        teams={groupTeams}
-                        highlightTeamId={userTeam?.id}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-            </TabsContent>
-
-            {/* Matches Tab */}
-            <TabsContent value="matches">
-              {filteredGroups.length === 0 ? (
-                <Card>
-                  <CardContent className="py-8 text-center text-muted-foreground">
-                    <Trophy className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>Matches will appear after groups are created</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="space-y-6">
-                  {filteredGroups.map(group => {
-                    const gMatches = groupMatches
-                      .filter(m => m.group_id === group.id)
-                      .map(m => ({
-                        id: m.id,
-                        team1_id: m.team1_id,
-                        team2_id: m.team2_id,
-                        team1_name: getTeamName(m.team1_id),
-                        team2_name: getTeamName(m.team2_id),
-                        team1_players: getTeamPlayers(m.team1_id),
-                        team2_players: getTeamPlayers(m.team2_id),
-                        team1_score: m.team1_score,
-                        team2_score: m.team2_score,
-                        winner_team_id: m.winner_team_id,
-                      }));
-
-                    return (
-                      <GroupMatchList
-                        key={group.id}
-                        groupName={group.name}
-                        matches={gMatches}
-                        isAdmin={isAdmin}
-                        onSubmitScore={submitGroupMatchScore}
-                        setsPerMatch={tournament.sets_per_match}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-            </TabsContent>
-
-            {/* Knockout Tab */}
-            <TabsContent value="knockout">
-              <KnockoutBracket
-                matches={knockoutMatches.map(m => ({
-                  ...m,
-                  team1_name: getTeamName(m.team1_id),
-                  team2_name: getTeamName(m.team2_id),
-                  team1_players: getTeamPlayers(m.team1_id),
-                  team2_players: getTeamPlayers(m.team2_id),
-                }))}
-                isAdmin={isAdmin}
-                onSubmitScore={submitKnockoutScore}
-                winnerTeamId={tournament.winner_team_id}
-                winnerTeamName={tournament.winner_team_id ? getTeamName(tournament.winner_team_id) : undefined}
-              />
-            </TabsContent>
-
-            {/* Participants Tab */}
-            <TabsContent value="participants">
-              <div className="space-y-6">
-                {/* Registered Teams */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="w-5 h-5" />
-                      Registered Teams ({registeredParticipants.length}/{tournament.max_teams})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {registeredParticipants.length === 0 ? (
-                      <p className="text-muted-foreground text-center py-4">No teams registered</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {registeredParticipants.map((p, idx) => {
-                          const groupName = groups.find(g => g.id === p.group_id)?.name;
-                          const categoryName = categories.find(c => c.id === p.category_id)?.name;
-                          const displayName = p.custom_team_name || p.team_name;
-                          return (
-                            <div
-                              key={p.id}
-                              className={`flex items-center justify-between p-3 rounded-lg border ${
-                                p.is_eliminated ? "opacity-50 bg-muted/30" : ""
-                              }`}
-                            >
-                              <div className="flex items-center gap-3 flex-wrap">
-                                <span className="text-sm text-muted-foreground w-6">{idx + 1}.</span>
-                                <span className={p.is_eliminated ? "line-through" : "font-medium"}>
-                                  {displayName}
-                                </span>
-                                {categoryName && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    <Tag className="w-3 h-3 mr-1" />
-                                    {categoryName}
-                                  </Badge>
-                                )}
-                                {groupName && (
-                                  <Badge variant="outline" className="text-xs">{groupName}</Badge>
-                                )}
-                                {p.player1_name && p.player2_name && (
-                                  <span className="text-xs text-muted-foreground">
-                                    ({p.player1_name} & {p.player2_name})
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {tournament.entry_fee > 0 && (
-                                  <Badge 
-                                    variant="outline" 
-                                    className={`text-xs ${
-                                      p.payment_status === "paid" 
-                                        ? "bg-emerald-500/20 text-emerald-600" 
-                                        : "bg-warning/20 text-warning"
-                                    }`}
-                                  >
-                                    {p.payment_status === "paid" ? "Paid" : "Pending"}
-                                  </Badge>
-                                )}
-                                {p.is_eliminated && <XCircle className="w-4 h-4 text-destructive" />}
-                                {tournament.winner_team_id === p.team_id && <Crown className="w-4 h-4 text-rank-gold" />}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Waiting List */}
-                {waitlistParticipants.length > 0 && (
-                  <Card className="border-warning/30">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-warning">
-                        <Clock className="w-5 h-5" />
-                        Waiting List ({waitlistParticipants.length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {waitlistParticipants.map((p) => {
-                          const categoryName = categories.find(c => c.id === p.category_id)?.name;
-                          const displayName = p.custom_team_name || p.team_name;
-                          return (
-                            <div
-                              key={p.id}
-                              className="flex items-center justify-between p-3 rounded-lg border border-warning/20 bg-warning/5"
-                            >
-                              <div className="flex items-center gap-3">
-                                <Badge variant="outline" className="bg-warning/20 text-warning-foreground">
-                                  #{p.waitlist_position}
-                                </Badge>
-                                <span className="font-medium">{displayName}</span>
-                                {categoryName && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    <Tag className="w-3 h-3 mr-1" />
-                                    {categoryName}
-                                  </Badge>
-                                )}
-                              </div>
-                              <span className="text-sm text-muted-foreground">
-                                Will be added if a team withdraws
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
         </motion.div>
       </main>
     </div>
