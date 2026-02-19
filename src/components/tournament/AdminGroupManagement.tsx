@@ -34,6 +34,7 @@ interface AdminGroupManagementProps {
   onKickTeam?: (participantId: string, teamName: string) => Promise<void>;
   setsPerMatch?: number;
   onSetsPerMatchChange?: (sets: number) => Promise<void>;
+  categoryName?: string;
 }
 
 export function AdminGroupManagement({
@@ -49,6 +50,7 @@ export function AdminGroupManagement({
   onKickTeam,
   setsPerMatch = 3,
   onSetsPerMatchChange,
+  categoryName,
 }: AdminGroupManagementProps) {
   const [newGroupName, setNewGroupName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
@@ -80,7 +82,9 @@ export function AdminGroupManagement({
           <Users className="w-5 h-5" />
           Group Management
         </CardTitle>
-        <CardDescription>Create groups and assign teams</CardDescription>
+        <CardDescription>
+          {categoryName ? `Managing groups for ${categoryName}` : "Create groups and assign teams"}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Match Format Setting */}
