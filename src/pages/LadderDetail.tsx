@@ -123,8 +123,7 @@ export default function LadderDetail() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userTeamId, setUserTeamId] = useState<string | null>(null);
-  const [userCategoryId, setUserCategoryId] = useState<string | null>(null);
-  const [userTeamRank, setUserTeamRank] = useState<number | null>(null);
+  const [userRanksByCategory, setUserRanksByCategory] = useState<Map<string, number>>(new Map());
   const [challengingTeamId, setChallengingTeamId] = useState<string | null>(null);
   const [pendingChallenges, setPendingChallenges] = useState<Set<string>>(new Set());
   const [userTeamName, setUserTeamName] = useState<string | null>(null);
@@ -291,10 +290,15 @@ export default function LadderDetail() {
             .eq("team_id", teamId);
           setUserTeamMemberCount(memberCount || 0);
 
-          const userRanking = rankingsData?.find((r) => (r.team as any)?.id === teamId);
-          setUserTeamRank(userRanking?.rank || null);
-          setUserCategoryId(userRanking?.ladder_category_id || null);
-          setIsInLadder(!!userRanking);
+          // Build a map of category_id -> rank for the user's team
+          const rankMap = new Map<string, number>();
+          (rankingsData || [])
+            .filter((r) => (r.team as any)?.id === teamId)
+            .forEach((r) => {
+              if (r.ladder_category_id) rankMap.set(r.ladder_category_id, r.rank);
+            });
+          setUserRanksByCategory(rankMap);
+          setIsInLadder(rankMap.size > 0);
 
           // Fetch pending challenges
           const { data: challenges } = await supabase
@@ -345,16 +349,18 @@ export default function LadderDetail() {
   };
 
   const canChallenge = (targetRank: number, targetTeamId: string, categoryId: string, team: TeamRanking["team"]): boolean => {
-    if (!userTeamId || !userTeamRank || !userCategoryId) return false;
-    if (userCategoryId !== categoryId) return false;
+    if (!userTeamId) return false;
+    const userRankInCategory = userRanksByCategory.get(categoryId);
+    if (userRankInCategory == null) return false;
     if (targetTeamId === userTeamId) return false;
     if (pendingChallenges.has(targetTeamId)) return false;
     if (isTeamFrozen(team)) return false;
     // Teams with manually-added partners (name format "Player1 & Player2") count as complete
     const hasManualPartner = userTeamName?.includes(" & ") ?? false;
     if (userTeamMemberCount < 2 && !hasManualPartner) return false;
-    const challengeRange = activeCategoryData?.challenge_range || 5;
-    return targetRank < userTeamRank && userTeamRank - targetRank <= challengeRange;
+    const catData = categories.find((c) => c.id === categoryId);
+    const challengeRange = catData?.challenge_range || 5;
+    return targetRank < userRankInCategory && userRankInCategory - targetRank <= challengeRange;
   };
 
   const handleChallenge = async (targetTeamId: string, targetTeamName: string) => {
