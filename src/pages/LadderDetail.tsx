@@ -350,7 +350,9 @@ export default function LadderDetail() {
     if (targetTeamId === userTeamId) return false;
     if (pendingChallenges.has(targetTeamId)) return false;
     if (isTeamFrozen(team)) return false;
-    if (userTeamMemberCount < 2) return false;
+    // Teams with manually-added partners (name format "Player1 & Player2") count as complete
+    const hasManualPartner = userTeamName?.includes(" & ") ?? false;
+    if (userTeamMemberCount < 2 && !hasManualPartner) return false;
     const challengeRange = activeCategoryData?.challenge_range || 5;
     return targetRank < userTeamRank && userTeamRank - targetRank <= challengeRange;
   };
