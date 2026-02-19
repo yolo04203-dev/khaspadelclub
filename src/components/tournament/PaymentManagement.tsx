@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Banknote, Check, X, FileText, Filter } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Banknote, Check, X, FileText, Filter, ClipboardCheck, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -39,6 +39,7 @@ export function PaymentManagement({
   participants,
   onRefresh,
 }: PaymentManagementProps) {
+  const hasEntryFee = entryFee > 0;
   const [filter, setFilter] = useState<"all" | "pending" | "paid" | "refunded">("all");
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [selectedParticipant, setSelectedParticipant] = useState<Participant | null>(null);
@@ -51,16 +52,14 @@ export function PaymentManagement({
   });
 
   const registeredParticipants = participants.filter(p => p.waitlist_position === null);
-  const paidCount = registeredParticipants.filter((p) => p.payment_status === "paid").length;
+  const confirmedCount = registeredParticipants.filter((p) => p.payment_status === "paid").length;
   const pendingCount = registeredParticipants.filter((p) => p.payment_status === "pending").length;
-  const totalCollected = paidCount * entryFee;
+  const totalCollected = confirmedCount * entryFee;
 
   const updatePaymentStatus = async (participantId: string, status: "pending" | "paid" | "refunded") => {
     setIsUpdating(participantId);
     try {
-      const updateData: any = {
-        payment_status: status,
-      };
+      const updateData: any = { payment_status: status };
 
       if (status === "paid") {
         const { data: { user } } = await supabase.auth.getUser();
@@ -78,10 +77,10 @@ export function PaymentManagement({
 
       if (error) throw error;
 
-      toast.success(`Payment marked as ${status}`);
+      toast.success(hasEntryFee ? `Payment marked as ${status}` : (status === "paid" ? "Registration confirmed" : "Registration unconfirmed"));
       onRefresh();
     } catch (error: any) {
-      toast.error("Failed to update payment status");
+      toast.error("Failed to update status");
     } finally {
       setIsUpdating(null);
     }
@@ -95,7 +94,6 @@ export function PaymentManagement({
 
   const saveNote = async () => {
     if (!selectedParticipant) return;
-
     try {
       const { error } = await supabase
         .from("tournament_participants")
@@ -103,7 +101,6 @@ export function PaymentManagement({
         .eq("id", selectedParticipant.id);
 
       if (error) throw error;
-
       toast.success("Note saved");
       setNoteDialogOpen(false);
       onRefresh();
@@ -112,11 +109,14 @@ export function PaymentManagement({
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return `PKR ${amount.toLocaleString()}`;
-  };
+  const formatCurrency = (amount: number) => `PKR ${amount.toLocaleString()}`;
 
   const getStatusBadge = (status: string) => {
+    if (!hasEntryFee) {
+      return status === "paid"
+        ? <Badge className="bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30">Confirmed</Badge>
+        : <Badge variant="secondary" className="bg-warning/20 text-warning">Unconfirmed</Badge>;
+    }
     switch (status) {
       case "paid":
         return <Badge className="bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30">Paid</Badge>;
@@ -134,7 +134,7 @@ export function PaymentManagement({
   return (
     <div className="space-y-6">
       {/* Summary Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className={`grid gap-4 ${hasEntryFee ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
         <Card>
           <CardContent className="pt-6">
             <div className="text-2xl font-bold">{registeredParticipants.length}</div>
@@ -143,57 +143,64 @@ export function PaymentManagement({
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-emerald-500">{paidCount}</div>
-            <p className="text-sm text-muted-foreground">Paid</p>
+            <div className="text-2xl font-bold text-emerald-500">{confirmedCount}</div>
+            <p className="text-sm text-muted-foreground">Confirmed</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <div className="text-2xl font-bold text-warning">{pendingCount}</div>
-            <p className="text-sm text-muted-foreground">Pending</p>
+            <p className="text-sm text-muted-foreground">{hasEntryFee ? "Pending Payment" : "Unconfirmed"}</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5">
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-emerald-500">
-              {formatCurrency(totalCollected)}
-            </div>
-            <p className="text-sm text-muted-foreground">Total Collected</p>
-          </CardContent>
-        </Card>
+        {hasEntryFee && (
+          <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5">
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-emerald-500">
+                {formatCurrency(totalCollected)}
+              </div>
+              <p className="text-sm text-muted-foreground">Total Collected</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* Payment Table */}
+      {/* Registration / Payment Table */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <Banknote className="w-5 h-5" />
-                Payment Tracking
+                {hasEntryFee ? <Banknote className="w-5 h-5" /> : <ClipboardCheck className="w-5 h-5" />}
+                {hasEntryFee ? "Payment Tracking" : "Registration Management"}
               </CardTitle>
-              <CardDescription>
-                Entry fee: {formatCurrency(entryFee)} per team
-              </CardDescription>
+              {hasEntryFee && (
+                <CardDescription>
+                  Entry fee: {formatCurrency(entryFee)} per team
+                </CardDescription>
+              )}
             </div>
-            <Select value={filter} onValueChange={(v) => setFilter(v as any)}>
-              <SelectTrigger className="w-32">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="refunded">Refunded</SelectItem>
-              </SelectContent>
-            </Select>
+            {hasEntryFee && (
+              <Select value={filter} onValueChange={(v) => setFilter(v as any)}>
+                <SelectTrigger className="w-32">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="refunded">Refunded</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </CardHeader>
         <CardContent>
           {filteredParticipants.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No participants found
+              <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No participants found</p>
             </div>
           ) : (
             <Table>
@@ -202,7 +209,7 @@ export function PaymentManagement({
                   <TableHead>Team</TableHead>
                   <TableHead>Registered</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Notes</TableHead>
+                  {hasEntryFee && <TableHead>Notes</TableHead>}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -228,57 +235,79 @@ export function PaymentManagement({
                       {format(new Date(participant.registered_at), "MMM d, yyyy")}
                     </TableCell>
                     <TableCell>{getStatusBadge(participant.payment_status)}</TableCell>
-                    <TableCell>
-                      {participant.payment_notes ? (
-                        <span className="text-sm text-muted-foreground truncate max-w-[150px] block">
-                          {participant.payment_notes}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
+                    {hasEntryFee && (
+                      <TableCell>
+                        {participant.payment_notes ? (
+                          <span className="text-sm text-muted-foreground truncate max-w-[150px] block">
+                            {participant.payment_notes}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {participant.payment_status !== "paid" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-emerald-500 hover:text-emerald-600"
-                            onClick={() => updatePaymentStatus(participant.id, "paid")}
-                            disabled={isUpdating === participant.id}
-                          >
-                            <Check className="w-4 h-4 mr-1" />
-                            Paid
-                          </Button>
+                        {/* No-fee mode: simple toggle */}
+                        {!hasEntryFee && (
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={participant.payment_status === "paid"}
+                              onCheckedChange={(checked) =>
+                                updatePaymentStatus(participant.id, checked ? "paid" : "pending")
+                              }
+                              disabled={isUpdating === participant.id}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                              {participant.payment_status === "paid" ? "Confirmed" : "Unconfirmed"}
+                            </span>
+                          </div>
                         )}
-                        {participant.payment_status === "paid" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updatePaymentStatus(participant.id, "refunded")}
-                            disabled={isUpdating === participant.id}
-                          >
-                            <X className="w-4 h-4 mr-1" />
-                            Refund
-                          </Button>
+                        {/* Fee mode: full payment actions */}
+                        {hasEntryFee && (
+                          <>
+                            {participant.payment_status !== "paid" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-emerald-500 hover:text-emerald-600"
+                                onClick={() => updatePaymentStatus(participant.id, "paid")}
+                                disabled={isUpdating === participant.id}
+                              >
+                                <Check className="w-4 h-4 mr-1" />
+                                Paid
+                              </Button>
+                            )}
+                            {participant.payment_status === "paid" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updatePaymentStatus(participant.id, "refunded")}
+                                disabled={isUpdating === participant.id}
+                              >
+                                <X className="w-4 h-4 mr-1" />
+                                Refund
+                              </Button>
+                            )}
+                            {participant.payment_status !== "pending" && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => updatePaymentStatus(participant.id, "pending")}
+                                disabled={isUpdating === participant.id}
+                              >
+                                Reset
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => openNoteDialog(participant)}
+                            >
+                              <FileText className="w-4 h-4" />
+                            </Button>
+                          </>
                         )}
-                        {participant.payment_status !== "pending" && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => updatePaymentStatus(participant.id, "pending")}
-                            disabled={isUpdating === participant.id}
-                          >
-                            Reset
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => openNoteDialog(participant)}
-                        >
-                          <FileText className="w-4 h-4" />
-                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
