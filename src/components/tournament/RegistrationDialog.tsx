@@ -51,7 +51,7 @@ export function RegistrationDialog({
   const [registrationType, setRegistrationType] = useState<"existing" | "custom">(
     userTeam ? "existing" : "custom"
   );
-  const [customTeamName, setCustomTeamName] = useState("");
+  
   const [player1Name, setPlayer1Name] = useState("");
   const [player2Name, setPlayer2Name] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
@@ -60,7 +60,7 @@ export function RegistrationDialog({
   useEffect(() => {
     if (open) {
       setRegistrationType(userTeam ? "existing" : "custom");
-      setCustomTeamName("");
+      
       setPlayer1Name("");
       setPlayer2Name("");
       // Auto-select first category if only one exists
@@ -73,7 +73,6 @@ export function RegistrationDialog({
   }, [open, userTeam, categories]);
 
   const isCustomFormValid = 
-    customTeamName.trim() !== "" && 
     player1Name.trim() !== "" && 
     player2Name.trim() !== "";
 
@@ -105,7 +104,8 @@ export function RegistrationDialog({
       if (registrationType === "existing" && userTeam) {
         await onRegister(userTeam.id, null, undefined, undefined, selectedCategoryId || undefined);
       } else {
-        await onRegister(null, customTeamName.trim(), player1Name.trim(), player2Name.trim(), selectedCategoryId || undefined);
+        const generatedTeamName = `${player1Name.trim()} & ${player2Name.trim()}`;
+        await onRegister(null, generatedTeamName, player1Name.trim(), player2Name.trim(), selectedCategoryId || undefined);
       }
       onOpenChange(false);
     } finally {
@@ -179,22 +179,13 @@ export function RegistrationDialog({
                 <RadioGroupItem value="custom" id="custom" />
                 <Label htmlFor="custom" className="flex-1 cursor-pointer">
                   <div className="font-medium">Register a new team</div>
-                  <div className="text-sm text-muted-foreground">Enter team name and player names</div>
+                   <div className="text-sm text-muted-foreground">Enter player names</div>
                 </Label>
               </div>
             </RadioGroup>
 
             {registrationType === "custom" && (
               <div className="space-y-4 pt-2">
-                <div className="space-y-2">
-                  <Label htmlFor="teamName">Team Name</Label>
-                  <Input
-                    id="teamName"
-                    placeholder="Enter team name"
-                    value={customTeamName}
-                    onChange={(e) => setCustomTeamName(e.target.value)}
-                  />
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="player1">Player 1 Name</Label>
                   <Input
