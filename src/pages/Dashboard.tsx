@@ -54,6 +54,7 @@ export default function Dashboard() {
   const [incomingChallenges, setIncomingChallenges] = useState(0);
   const [modeBreakdown, setModeBreakdown] = useState<ModeBreakdown | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   const fetchDashboardData = useCallback(async () => {
     if (!user) {
@@ -157,6 +158,8 @@ export default function Dashboard() {
             });
           } catch (err) {
             logger.warn("Dashboard: stats section failed, using defaults", err);
+          } finally {
+            setStatsLoading(false);
           }
         };
 
@@ -398,7 +401,12 @@ export default function Dashboard() {
           </div>
 
           {/* Mode Breakdown */}
-          {modeBreakdown && (
+          {statsLoading ? (
+            <div className="flex flex-wrap gap-3 mb-5 sm:mb-8 min-h-[36px]">
+              <div className="h-8 w-32 bg-muted rounded-full animate-pulse" />
+              <div className="h-8 w-36 bg-muted rounded-full animate-pulse" />
+            </div>
+          ) : modeBreakdown && (
             <div className="flex flex-wrap gap-3 mb-5 sm:mb-8">
               {(["ladder", "tournament", "americano"] as const).map((m) => {
                 const ms = modeBreakdown[m];
