@@ -242,7 +242,12 @@ export default function TournamentDetail() {
         supabase.from("team_members").select("*", { count: "exact", head: true }).eq("team_id", member.team_id),
       ]);
       if (teamResult.data) setUserTeam(teamResult.data);
-      setUserTeamMemberCount(countResult.count || 0);
+      const memberCount = countResult.count || 0;
+      if (memberCount < 2 && teamResult.data?.name?.includes(" & ")) {
+        setUserTeamMemberCount(2);
+      } else {
+        setUserTeamMemberCount(memberCount);
+      }
     }
   }, [user]);
 
