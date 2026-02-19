@@ -776,7 +776,6 @@ export default function TournamentDetail() {
       knockoutMatches.push({ tournament_id: tournament.id, round_number: 2, match_number: 2, team1_id: null, team2_id: null, stage: "knockout", category_id: categoryId });
       knockoutMatches.push({ tournament_id: tournament.id, round_number: 3, match_number: 1, team1_id: null, team2_id: null, stage: "knockout", category_id: categoryId });
     }
-    }
 
     const { error } = await supabase.from("tournament_matches").insert(knockoutMatches);
     if (error) {
