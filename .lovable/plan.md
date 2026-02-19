@@ -1,112 +1,63 @@
 
 
-# Restructure Tournament Detail into Category-First Navigation
+# Performance Audit and Cold-Start Optimization
 
-## Overview
+## Findings
 
-Transform the tournament detail page from a flat tab layout with a category dropdown filter into a two-level navigation flow that matches the reference app design:
+After thorough audit of the codebase, the app already has good foundations (lazy routes, deferred analytics/Sentry, code splitting). However, several regressions have been introduced in recent changes:
 
-1. **Level 1 - Tournament Page**: Shows category cards (like the reference "JUNIOR NATIONAL PADEL CHAMPIONSHIP" screen)
-2. **Level 2 - Category View**: Shows tabs for Standings, Matches, and Info within that category
+### Issue 1: NotFound page is eagerly imported in AuthenticatedRoutes
 
-## Current vs New Flow
+`AuthenticatedRoutes.tsx` line 8 imports `NotFound` eagerly (`import NotFound from "@/pages/NotFound"`). Since `AuthenticatedRoutes` is the shell for all authenticated pages, this import gets bundled with it and loads for every authenticated user even though 404s are rare.
 
-```text
-CURRENT:
-Tournament -> [Info | Manage | Categories | Registrations | Groups | Matches | Knockout | Participants]
-              + Category dropdown filter
+**Fix**: Change to `lazyWithRetry` like all other routes in the file.
 
-NEW:
-Tournament -> Category Cards (entry fee, teams joined, winner if completed)
-           -> Click category -> [Standings | Matches | Info]
-                                  |            |         |
-                                  |            |         +-- Tournament info + category details
-                                  |            +-- Merged: knockout rounds (Final, Semi, QF) as accordions
-                                  |                        + group matches as accordions (Group A, B, ...)
-                                  +-- Group standings as accordions (Group A, B, C, D)
+### Issue 2: TournamentDetail.tsx imports `motion` from framer-motion at top level
 
-Admin still has access to: Manage, Categories, Registrations tabs
-```
+The 1,408-line `TournamentDetail.tsx` statically imports `motion` from `framer-motion` (line 3). Since this page is lazy-loaded, the framer-motion chunk must be fetched before TournamentDetail can render. While framer-motion is in its own chunk, this creates an unnecessary chain. The same pattern exists in 14 other page files.
 
-## Detailed Changes
+**Fix**: Not critical since framer-motion is already chunked and pages are lazy. No change needed here -- the chunk splitting in vite.config.ts already handles this correctly.
 
-### 1. Tournament Detail Page - Category Cards View (Level 1)
+### Issue 3: NotificationContext fetches data on mount with only a 1.5s delay
 
-When the page loads and categories exist, show:
-- Tournament header (name, status badge, back button)
-- Admin action buttons (if admin): Manage, Categories, Registrations as tabs or buttons
-- Category cards in a vertical list, each card showing:
-  - Category name (e.g., "Mens A")
-  - Venue (from tournament)
-  - Teams joined count (e.g., "10/16 Joined")
-  - Entry fee (category-specific or tournament default, e.g., "PKR 5,000 Per team")
-  - Winner team name (if tournament completed and category has a winner)
-  - Clickable -> sets `selectedCategoryId` to enter Level 2
+In `NotificationContext.tsx` (line 110), notification counts are fetched 1.5 seconds after mount. This runs 3-4 sequential Supabase queries on every authenticated page load. While deferred slightly, it still competes with page-specific data.
 
-### 2. Category Detail View (Level 2)
+**Fix**: Increase the initial delay to 3 seconds and reduce polling frequency from 60s to 120s to reduce background load.
 
-When a category is selected, show:
-- Back arrow to return to category list (resets `selectedCategoryId` to `"all"`)
-- Category name as title
-- Three tabs: **Standings**, **Matches**, **Info**
+### Issue 4: TournamentDetail eagerly imports 6 heavy sub-components
 
-#### Standings Tab
-- Accordion sections for each group (Group A, Group B, etc.)
-- Each accordion expands to show the group standings table (reuse existing `GroupStandings` component)
+`TournamentDetail.tsx` statically imports `GroupStandings`, `GroupMatchList`, `AdminGroupManagement`, `KnockoutBracket`, `RegistrationDialog`, `PaymentManagement`, and `CategoryManagement`. These are all bundled together in one chunk, making the TournamentDetail chunk very large even though only a subset is needed at any time (based on active tab).
 
-#### Matches Tab (merged Groups + Knockout)
-- Knockout rounds shown first as accordion sections in reverse order:
-  - Final, Third Position, Semi Final, Quarter Final (based on round numbers)
-  - Each expands to show match cards
-- Then group matches as accordion sections:
-  - Group A, Group B, etc.
-  - Each expands to show group match list (reuse `GroupMatchList`)
+**Fix**: Lazy-load admin-only components (`AdminGroupManagement`, `PaymentManagement`, `CategoryManagement`) since they are only shown to admins.
 
-#### Info Tab
-- Tournament description, venue, dates, entry fee, payment instructions
-- Category-specific details (max teams, category entry fee override)
+### Issue 5: `useLocation` import in AuthenticatedRoutes
 
-### 3. Admin Tabs
+`AuthenticatedRoutes.tsx` imports `useLocation` from react-router-dom (line 2) but never uses it. This is harmless dead code but should be cleaned up.
 
-Admin-only tabs (Manage, Categories, Registrations) remain accessible:
-- When at Level 1 (category cards view): show as tabs above the cards
-- The Manage tab still requires selecting a specific category to work with groups
-- Categories and Registrations tabs work as they do now
+**Fix**: Remove unused import.
 
-### 4. Fallback for No Categories
+## Implementation Plan
 
-If a tournament has zero categories, keep the current flat tab layout so existing tournaments without categories still work.
+### Step 1: Lazy-load NotFound in AuthenticatedRoutes
+- Change `import NotFound from "@/pages/NotFound"` to use `lazyWithRetry`
+- Remove unused `useLocation` import
 
-## Technical Details
+### Step 2: Lazy-load admin tournament components
+In `TournamentDetail.tsx`:
+- Lazy-load `AdminGroupManagement`, `PaymentManagement`, and `CategoryManagement` since they are admin-only
+- Wrap their usage in `<Suspense>` with a small loader fallback
 
-### Files to Modify
+### Step 3: Increase NotificationContext defer time
+- Change initial delay from 1500ms to 3000ms
+- Change polling interval from 60s to 120s
+- This ensures page-specific data loads first
 
-**`src/pages/TournamentDetail.tsx`** - Major restructure:
-- Add state: `selectedCategoryId` changes from filter to navigation (`null` = Level 1, a UUID = Level 2)
-- Level 1 rendering: category cards with onClick to set selectedCategoryId
-- Level 2 rendering: back button + Standings/Matches/Info tabs
-- Admin tabs shown at both levels
-- Merge knockout + group matches into single "Matches" tab using Accordion component
-- Map knockout round numbers to labels: highest round = "Final", second highest = "Semi Final", etc.
+### Step 4: Remove unused import
+- Clean up `useLocation` from `AuthenticatedRoutes.tsx`
 
-**New component: `src/components/tournament/TournamentCategoryCard.tsx`**
-- Card component for each category in Level 1
-- Props: category name, venue, teams joined/max, entry fee, currency, winner name
-- Styled similar to reference image (clean card with info layout)
-
-### Accordion Usage for Matches Tab
-- Use existing `@radix-ui/react-accordion` (already installed)
-- Knockout sections: "Final", "Third Position", "Semi Final", "Quarter Final"
-- Group sections: "Group A", "Group B", etc.
-- Each section expandable/collapsible
-
-### Round Number to Label Mapping
-```text
-If max round = 3: Round 3 = "Final", Round 2 = "Semi Final", Round 1 = "Quarter Final"
-If max round = 2: Round 2 = "Final", Round 1 = "Semi Final"
-If max round = 1: Round 1 = "Final"
-```
-
-### No Database Changes Required
-All data already exists - this is purely a UI restructure.
+## Expected Impact
+- Smaller initial chunk for authenticated routes (NotFound removed from bundle)
+- Faster TournamentDetail page rendering for non-admin users (admin components not loaded)
+- Less network contention during first 3 seconds (notification queries deferred further)
+- No functionality changes -- all features remain intact
 
