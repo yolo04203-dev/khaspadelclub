@@ -106,10 +106,19 @@ export default function Dashboard() {
             }
           }
 
+          // Fallback: if partner was added manually (team name contains "&"), parse names from team name
+          const teamName = safeString(teamResult.data?.name, "Unknown Team");
+          if (memberNames.length < 2 && teamName.includes(" & ")) {
+            const parts = teamName.split("&").map(n => n.trim());
+            if (parts.length === 2 && parts[0] && parts[1]) {
+              memberNames = parts;
+            }
+          }
+
           if (teamResult.data) {
             setUserTeam({
               id: teamResult.data.id,
-              name: safeString(teamResult.data.name, "Unknown Team"),
+              name: teamName,
               rank: rankResult.data?.rank ?? null,
               memberNames,
             });
