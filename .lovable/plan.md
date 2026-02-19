@@ -1,32 +1,45 @@
 
 
-# Add Registered Teams Management for Admins
+# Make Group Management Category-Wise
 
-## What's Changing
+## What Changes
 
-Currently, the "Payments" tab on the tournament detail page only appears when the tournament has an entry fee greater than 0. Your tournament (CHINIOT PADEL CUP) has no entry fee set, so you can't see registered teams or confirm them.
-
-The fix: Always show a "Registrations" tab for admins that lists all registered teams with a toggle to confirm/approve each registration, regardless of whether there's an entry fee.
+Currently the admin "Manage" tab shows all groups and all teams in a single flat view, ignoring categories. This plan makes group management respect categories so each category has its own independent set of groups, teams, and matches.
 
 ## Changes
 
 ### File: `src/pages/TournamentDetail.tsx`
 
-1. **Always show the admin tab** -- Remove the `tournament.entry_fee > 0` condition from both the tab trigger and tab content for the payments/registrations tab
-2. **Rename the tab** from "Payments" to "Registrations" so it makes sense even when there's no entry fee
-3. **Always fetch payment data** for admins (remove conditional)
+1. **Filter participants passed to AdminGroupManagement** -- When categories exist, only pass participants that belong to the currently selected category (using the existing `selectedCategoryId` filter). When "All Categories" is selected and categories exist, show a message prompting the admin to select a specific category first.
 
-### File: `src/components/tournament/PaymentManagement.tsx`
+2. **Pass `category_id` to `createGroup`** -- When creating a group, store the selected category's ID on the group record (the `category_id` column already exists on `tournament_groups`).
 
-1. **Conditionally show payment-specific UI** -- Only show entry fee amounts, "Total Collected" card, and payment action buttons (Paid/Refund/Reset) when `entryFee > 0`
-2. **Always show a confirmation toggle** -- Add a "Confirmed" toggle/button for each team so admins can confirm registrations regardless of fees
-3. **Rename component title** to "Registration Management" when there's no entry fee, keep "Payment Tracking" when there is one
-4. **Use the existing `payment_status` field** as confirmation status: "paid" = confirmed, "pending" = unconfirmed. No database changes needed.
+3. **Filter groups by category** -- The `filteredGroups` variable already filters by category, so pass `filteredGroups` instead of `groups` to `AdminGroupManagement`.
 
-## Technical Details
+4. **Update `randomAssignTeams`** -- Only shuffle and assign participants from the current category into groups belonging to that category.
 
-- No database migrations required -- the `payment_status` column already exists on `tournament_participants`
-- The `payment_status` field will double as a confirmation flag: `paid` = confirmed, `pending` = not yet confirmed
-- RLS policies already allow tournament creators and admins to update participants
-- The Registrations tab will show: team name, registration date, confirmation status, and a toggle to confirm/unconfirm
-- When entry fee exists, the full payment tracking UI (amounts, refunds, notes) will continue to appear as before
+5. **Update `generateGroupMatches`** -- Set `category_id` on generated group matches so they are properly filtered. Only generate for groups in the current category.
+
+6. **Update `startKnockoutStage`** -- Generate knockout brackets per category, setting `category_id` on knockout matches.
+
+7. **Show the category filter above or inside the Manage tab** -- Move the category selector to be visible within the Manage tab, or show a prompt to select a category when categories exist.
+
+### File: `src/components/tournament/AdminGroupManagement.tsx`
+
+1. **Add optional `categoryName` prop** -- Display which category is being managed in the card header/description.
+
+2. **No other structural changes needed** -- The component already works with whatever groups/teams are passed to it. The filtering happens in the parent.
+
+## How It Works
+
+- Admin selects a category from the existing category filter dropdown
+- The Manage tab then shows only groups and teams for that category
+- Creating a group assigns it to the selected category
+- Random draw only affects teams in the selected category
+- Generate Group Matches only creates matches for the selected category
+- If no categories exist, everything works as before (no filtering)
+
+## No Database Changes Needed
+
+The `tournament_groups.category_id` and `tournament_matches.category_id` columns already exist and just need to be populated.
+
