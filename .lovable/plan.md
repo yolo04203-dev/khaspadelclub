@@ -1,83 +1,38 @@
 
 
-# Add Join Requests Tab to Admin Page
+# Fix: Dashboard "Team needs a partner" Warning for Manually-Added Partners
 
-## What Changes
+## The Problem
 
-A new "Join Requests" tab will be added to the Admin page, allowing admins to see and manage all pending ladder join requests across all ladders in one centralized place -- no need to visit each ladder's manage page individually.
+The Dashboard builds the team member list from the `team_members` database table. When a partner is added manually (which only renames the team to "Player1 & Player2" without adding a DB row), the table still has 1 row. This causes:
 
-## UI Changes
+1. The "Team needs a partner to compete" warning to appear
+2. The "Add Partner" button to show instead of team member names
+3. The "Remove Partner" button to be hidden
 
-### Admin Page (`src/pages/Admin.tsx`)
+## The Fix
 
-- Add a new "Join Requests" tab to the tab list (with a `UserPlus` icon)
-- Show a badge with the pending request count (similar to the Errors tab)
-- Fetch the pending join request count alongside existing admin data
-- Render a new `JoinRequestsTab` component
+### File: `src/pages/Dashboard.tsx`
 
-### New Component: `src/components/admin/JoinRequestsTab.tsx`
+When `memberNames` from the database has only 1 entry, check if the team name contains "&" (indicating a manually-added partner). If so, parse the two player names from the team name and use those as `memberNames`.
 
-- Fetches ALL pending join requests across all ladders (admin RLS already allows this)
-- Displays each request in a card layout showing:
-  - Team name
-  - Ladder name and category name
-  - Custom player names (if provided)
-  - Message from the team captain
-  - Submission date
-  - Admin notes textarea
-  - Approve / Reject buttons
-- Reuses the same approve/reject logic from `JoinRequestsManagement` (insert ranking on approve, update status on both)
-- Groups or labels requests by ladder for clarity
+**Logic change in the data fetching section (~line 94-107):**
 
-## Technical Details
+After building `memberNames` from DB profiles, add a fallback:
 
-### Data Fetching
-
-Query for the new tab:
 ```
-supabase
-  .from("ladder_join_requests")
-  .select(`
-    id, team_id, ladder_category_id, status, message,
-    player1_name, player2_name, created_at,
-    team:teams (name),
-    category:ladder_categories (name, ladder_id, ladder:ladders (name))
-  `)
-  .eq("status", "pending")
-  .order("created_at", { ascending: true })
+if (memberNames.length < 2 && teamName.includes(" & ")) {
+  const parts = teamName.split("&").map(n => n.trim());
+  if (parts.length === 2 && parts[0] && parts[1]) {
+    memberNames = parts;
+  }
+}
 ```
 
-This gives us team name, category name, AND ladder name in a single query.
+This ensures:
+- The warning disappears for teams with manually-added partners
+- Both player names display correctly (e.g., "Ahmed & Ali")
+- The "Add Partner" button is replaced with "Change Partner" or hidden
+- Teams with 2 real DB members continue working as before (DB names take priority)
 
-### Pending Count
-
-A lightweight count query will run in `Admin.tsx` alongside existing data fetches:
-```
-supabase
-  .from("ladder_join_requests")
-  .select("id", { count: "exact", head: true })
-  .eq("status", "pending")
-```
-
-The count is displayed as a badge on the tab trigger, matching the pattern used for the Errors tab.
-
-### Approve Logic (same as existing `JoinRequestsManagement`)
-
-1. Check team isn't already in the category
-2. Get max rank in category, assign next rank
-3. Insert into `ladder_rankings`
-4. Update request status to "approved"
-
-### Reject Logic
-
-1. Update request status to "rejected" with optional admin notes
-
-### No Database Changes
-
-The `ladder_join_requests` table already has admin-level RLS policies that allow full access. No schema or policy changes needed.
-
-### Files to Create/Edit
-
-1. **Create** `src/components/admin/JoinRequestsTab.tsx` -- new component with the full request list and approve/reject actions
-2. **Edit** `src/pages/Admin.tsx` -- add the tab trigger, pending count state, count fetch, and tab content
-
+No other files need changes. No database changes required.
