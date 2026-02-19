@@ -1,48 +1,64 @@
 
 
-# Block Partner Removal When Team Has Active Competitions
+# Show Entry Fee in Ladder Join Request Dialog
 
 ## What Changes
 
-Currently, the "Remove Partner" dialog shows a **warning** about active ladder rankings, pending challenges, and accepted challenges -- but still allows removal. This needs to change:
+When a user opens the "Join Ladder" dialog and selects a category, they will see the entry fee for that category displayed clearly. This ensures players know the cost before submitting a join request.
 
-- If the team is **enrolled in any ladder** (has entries in `ladder_rankings`) or has **active tournament registrations** (entries in `tournament_participants` for non-completed tournaments), the "Remove Partner" button should be **disabled** with a clear explanation.
-- Pending/accepted challenges should also block removal.
-- The message should explain that the partner can only be changed for **future** ladders and tournaments, not ones they're already enrolled in.
+## Database Change
 
-## How It Works for the User
+The `ladder_categories` table currently has no `entry_fee` column. A new column will be added:
 
-1. Captain clicks "Remove Partner"
-2. Dialog opens and checks for active competitions
-3. **If active competitions exist**: The "Remove Partner" button is disabled. A message explains:
-   - Which ladders the team is ranked in
-   - Which tournaments the team is registered for
-   - Any pending/accepted challenges
-   - "You must withdraw from all active competitions before changing your partner. Partner changes only apply to future ladders and tournaments."
-4. **If no active competitions**: Removal proceeds as before
+- **Column**: `entry_fee` (numeric, nullable, default 0)
+- **Column**: `entry_fee_currency` (text, nullable, default 'PKR')
+
+This mirrors the same pattern used in `tournament_categories`.
+
+## UI Changes
+
+### File: `src/components/ladder/JoinLadderDialog.tsx`
+
+- Update the `Category` interface to include `entry_fee` and `entry_fee_currency`
+- After the user selects a category, display an info box showing the entry fee (or "Free" if 0)
+- The fee will appear between the category selector and the "Join as" radio group
+
+### File: `src/pages/LadderDetail.tsx`
+
+- Update the `ladder_categories` query (line 152) to also select `entry_fee, entry_fee_currency` so the data is passed to the dialog
+
+### Admin Side (optional, for completeness)
+
+- If there's a ladder category management UI, add entry fee input fields there too (similar to tournament category management)
 
 ## Technical Details
 
-### File: `src/components/team/RemovePartnerDialog.tsx`
+### Migration SQL
 
-- Add a query for active tournament registrations:
+```sql
+ALTER TABLE public.ladder_categories
+  ADD COLUMN entry_fee numeric DEFAULT 0,
+  ADD COLUMN entry_fee_currency text DEFAULT 'PKR';
+```
+
+### JoinLadderDialog Changes
+
+- Extend Category interface:
   ```
-  supabase
-    .from("tournament_participants")
-    .select("tournament_id, tournaments(name, status)")
-    .eq("team_id", teamId)
+  interface Category {
+    id: string;
+    name: string;
+    description: string | null;
+    entry_fee?: number;
+    entry_fee_currency?: string;
+  }
   ```
-  Then filter for tournaments where status is not `completed`.
-- Update the `ActiveData` interface to include `activeTournaments: { name: string }[]`
-- Change `hasWarnings` to a `isBlocked` boolean -- when any active data exists, the action is **blocked**, not just warned
-- Disable the "Remove Partner" button when `isBlocked` is true
-- Update the warning text to explain that the team must first withdraw from ladders/tournaments before the partner can be removed
-- Change the warning box color/style to indicate a hard block (not just a warning)
+- When `selectedCategory` changes, look up the fee from the categories array
+- Show a styled info block below the category select:
+  - If fee > 0: "Entry Fee: PKR 2,000" with a money icon
+  - If fee is 0 or null: "Free to join"
 
-### File: `src/pages/Dashboard.tsx`
+### LadderDetail.tsx Changes
 
-- Also add a "Change Partner" button for 2-member teams (alongside "Remove Partner") that opens `AddPartnerDialog` -- but **only when the team has no active competitions**
-- Alternatively, keep it simple: the captain must remove the partner first (which requires withdrawing from competitions), then add a new one
-
-No database changes needed.
+- Line 152: change select from `"id, name, description, challenge_range"` to `"id, name, description, challenge_range, entry_fee, entry_fee_currency"`
 
