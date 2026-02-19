@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap, Shuffle, Shield, Bug } from "lucide-react";
+import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap, Shuffle, Shield, Bug, UserPlus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import { ChallengesTab } from "@/components/admin/ChallengesTab";
 import { AmericanoTab } from "@/components/admin/AmericanoTab";
 import { PermissionsTab } from "@/components/admin/PermissionsTab";
 import { ErrorsTab } from "@/components/admin/ErrorsTab";
+import { JoinRequestsTab } from "@/components/admin/JoinRequestsTab";
 import { logger } from "@/lib/logger";
 
 interface Player {
@@ -86,6 +87,7 @@ export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [unresolvedErrorCount, setUnresolvedErrorCount] = useState(0);
+  const [pendingJoinRequestCount, setPendingJoinRequestCount] = useState(0);
 
   // Debounce search input
   useEffect(() => {
@@ -324,6 +326,15 @@ export default function Admin() {
                   Permissions
                 </TabsTrigger>
               )}
+              <TabsTrigger value="join-requests" className="text-xs sm:text-sm shrink-0 relative">
+                <UserPlus className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline" />
+                Join Requests
+                {pendingJoinRequestCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                    {pendingJoinRequestCount > 99 ? "99+" : pendingJoinRequestCount}
+                  </span>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="errors" className="text-xs sm:text-sm shrink-0 relative">
                 <Bug className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline" />
                 Errors
@@ -368,6 +379,10 @@ export default function Admin() {
                 <PermissionsTab players={players} />
               </TabsContent>
             )}
+
+            <TabsContent value="join-requests">
+              <JoinRequestsTab onPendingCountChange={setPendingJoinRequestCount} />
+            </TabsContent>
 
             <TabsContent value="errors">
               <ErrorsTab onUnresolvedCountChange={setUnresolvedErrorCount} />
