@@ -408,6 +408,8 @@ export type Database = {
           created_at: string
           description: string | null
           display_order: number
+          entry_fee: number | null
+          entry_fee_currency: string | null
           id: string
           ladder_id: string
           name: string
@@ -417,6 +419,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           display_order?: number
+          entry_fee?: number | null
+          entry_fee_currency?: string | null
           id?: string
           ladder_id: string
           name: string
@@ -426,6 +430,8 @@ export type Database = {
           created_at?: string
           description?: string | null
           display_order?: number
+          entry_fee?: number | null
+          entry_fee_currency?: string | null
           id?: string
           ladder_id?: string
           name?: string

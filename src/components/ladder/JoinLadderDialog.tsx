@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertCircle, Loader2, UserPlus } from "lucide-react";
+import { AlertCircle, Loader2, UserPlus, Banknote } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +28,8 @@ interface Category {
   id: string;
   name: string;
   description: string | null;
+  entry_fee?: number;
+  entry_fee_currency?: string;
 }
 
 interface JoinLadderDialogProps {
@@ -175,6 +177,27 @@ export function JoinLadderDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {selectedCategory && (() => {
+            const cat = categories.find((c) => c.id === selectedCategory);
+            const fee = cat?.entry_fee ?? 0;
+            const currency = cat?.entry_fee_currency ?? "PKR";
+            return (
+              <div className={`rounded-lg border p-3 flex items-center gap-3 ${fee > 0 ? "border-primary/30 bg-primary/5" : "border-muted bg-muted/30"}`}>
+                <Banknote className={`w-5 h-5 shrink-0 ${fee > 0 ? "text-primary" : "text-muted-foreground"}`} />
+                <div>
+                  <p className="font-medium text-sm">
+                    {fee > 0 ? `Entry Fee: ${currency} ${fee.toLocaleString()}` : "Free to join"}
+                  </p>
+                  {fee > 0 && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Payment details will be shared after approval
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="space-y-3">
             <Label>Join as</Label>
