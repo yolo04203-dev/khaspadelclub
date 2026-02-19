@@ -150,17 +150,32 @@ export function AdminGroupManagement({
                 {group.teams.map((team) => (
                   <div
                     key={team.id}
-                    className="flex items-center justify-between p-2 rounded bg-muted/50"
+                    className="flex items-center justify-between p-2 rounded bg-muted/50 gap-2"
                   >
-                    <span className="font-medium">{team.team_name}</span>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onAssignTeam(team.id, null)}
+                    <span className="font-medium truncate">{team.team_name}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Select
+                        value={group.id}
+                        onValueChange={(value) => {
+                          if (value === "__unassign__") {
+                            onAssignTeam(team.id, null);
+                          } else {
+                            onAssignTeam(team.id, value);
+                          }
+                        }}
                       >
-                        Remove
-                      </Button>
+                        <SelectTrigger className="w-28 h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {groups.map((g) => (
+                            <SelectItem key={g.id} value={g.id}>
+                              {g.name}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="__unassign__">Unassign</SelectItem>
+                        </SelectContent>
+                      </Select>
                       {onKickTeam && (
                         <Button
                           variant="ghost"
