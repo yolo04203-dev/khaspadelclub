@@ -200,15 +200,7 @@ export function PendingInvitations({ onAccepted }: PendingInvitationsProps) {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center py-4">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (invitations.length === 0) {
+  if (isLoading || invitations.length === 0) {
     return null;
   }
 
