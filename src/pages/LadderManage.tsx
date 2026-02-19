@@ -22,6 +22,8 @@ interface LadderCategory {
   description: string | null;
   challenge_range: number;
   display_order: number;
+  entry_fee: number | null;
+  entry_fee_currency: string | null;
 }
 
 interface TeamInCategory {
@@ -423,9 +425,58 @@ export default function LadderManage() {
                         </div>
                         <CardDescription>
                           Challenge range: {category.challenge_range} positions
+                          {(category.entry_fee ?? 0) > 0 && (
+                            <span className="ml-2">• Entry fee: {category.entry_fee_currency ?? "PKR"} {(category.entry_fee ?? 0).toLocaleString()}</span>
+                          )}
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
+                        <div className="grid gap-3 sm:grid-cols-3 mb-4">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Category Name</Label>
+                            <Input
+                              value={category.name}
+                              onChange={(e) => {
+                                setCategories(categories.map(c => c.id === category.id ? { ...c, name: e.target.value } : c));
+                              }}
+                              onBlur={() => {
+                                supabase.from("ladder_categories").update({ name: category.name }).eq("id", category.id).then();
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Challenge Range</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={category.challenge_range}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 5;
+                                setCategories(categories.map(c => c.id === category.id ? { ...c, challenge_range: val } : c));
+                              }}
+                              onBlur={() => {
+                                supabase.from("ladder_categories").update({ challenge_range: category.challenge_range }).eq("id", category.id).then();
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Entry Fee ({category.entry_fee_currency ?? "PKR"})</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              step={100}
+                              value={category.entry_fee ?? 0}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                setCategories(categories.map(c => c.id === category.id ? { ...c, entry_fee: val } : c));
+                              }}
+                              onBlur={() => {
+                                supabase.from("ladder_categories").update({ entry_fee: category.entry_fee ?? 0 }).eq("id", category.id).then();
+                              }}
+                            />
+                            <p className="text-xs text-muted-foreground">0 = free</p>
+                          </div>
+                        </div>
                         <div className="space-y-2">
                           <Label className="text-sm">Teams in this category:</Label>
                           {(teamsByCategory[category.id] || []).length === 0 ? (
