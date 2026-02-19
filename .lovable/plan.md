@@ -1,32 +1,21 @@
 
-# Fix: Tournament Registration "Team Incomplete" Warning for Manually-Added Partners
 
-## The Problem
+# Remove Team Name Field from Tournament Registration
 
-The tournament registration dialog checks `userTeamMemberCount` (from `team_members` DB rows) to determine if a team is complete. When a partner is added manually (which only renames the team, e.g., "Ahmed & Ali"), no new DB row is created, so the count stays at 1. This triggers the "Your team needs 2 players before registering" warning, blocking registration.
+## What Changes
 
-## The Fix
+In the "Register a new team" flow of the tournament registration dialog, remove the separate "Team Name" input field. Instead, automatically generate the team name as "Player1 & Player2" from the two player name fields.
 
-### File: `src/pages/TournamentDetail.tsx`
+## Changes
 
-In the `fetchUserTeam` function (around line 230-247), after getting the team member count, apply the same fallback logic used on the Dashboard: if the count is less than 2 but the team name contains " & ", treat the team as complete (set count to 2).
+### File: `src/components/tournament/RegistrationDialog.tsx`
 
-**Change in `fetchUserTeam`:**
+1. **Remove** the `customTeamName` state variable and its input field
+2. **Update validation**: `isCustomFormValid` only checks that both player names are filled
+3. **Auto-generate team name** in `handleSubmit`: pass `${player1Name.trim()} & ${player2Name.trim()}` as the custom team name to `onRegister`
+4. The form will show only Player 1 Name and Player 2 Name fields when "Register a new team" is selected
 
-After setting `userTeamMemberCount`, add:
+### No other file changes needed
 
-```typescript
-const memberCount = countResult.count || 0;
-if (memberCount < 2 && teamResult.data?.name?.includes(" & ")) {
-  setUserTeamMemberCount(2);
-} else {
-  setUserTeamMemberCount(memberCount);
-}
-```
+The `onRegister` callback already accepts `customTeamName` as a parameter -- we just compute it from the player names instead of a separate input.
 
-This ensures:
-- Manually-named teams (e.g., "Ahmed & Ali") pass the 2-player check
-- The "Team incomplete" warning disappears
-- The "Register" button becomes enabled
-- Teams with 2 actual DB members continue working as before
-- No other files need changes
