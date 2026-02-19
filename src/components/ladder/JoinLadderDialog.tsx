@@ -49,12 +49,24 @@ export function JoinLadderDialog({
   onRequestSubmitted,
   teamMemberCount = 2,
 }: JoinLadderDialogProps) {
+  const forceCustom = teamMemberCount < 2;
+
+  // Pre-fill player names from team name if it contains "&"
+  const getDefaultNames = () => {
+    if (forceCustom && teamName.includes("&")) {
+      const parts = teamName.split("&").map((n) => n.trim());
+      return { p1: parts[0] || "", p2: parts[1] || "" };
+    }
+    return { p1: "", p2: "" };
+  };
+  const defaults = getDefaultNames();
+
   const [open, setOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [message, setMessage] = useState("");
-  const [joinType, setJoinType] = useState<"existing" | "custom">("existing");
-  const [player1Name, setPlayer1Name] = useState("");
-  const [player2Name, setPlayer2Name] = useState("");
+  const [joinType, setJoinType] = useState<"existing" | "custom">(forceCustom ? "custom" : "existing");
+  const [player1Name, setPlayer1Name] = useState(defaults.p1);
+  const [player2Name, setPlayer2Name] = useState(defaults.p2);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const availableCategories = categories.filter(
@@ -143,19 +155,6 @@ export function JoinLadderDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {teamMemberCount < 2 ? (
-          <div className="py-4">
-            <div className="rounded-lg border border-warning/30 bg-warning/10 p-4 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-warning mt-0.5 shrink-0" />
-              <div>
-                <p className="font-medium text-foreground">Team incomplete</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Your team needs 2 players before joining a ladder. Invite a partner from the Find Players page.
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : (
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="category">Category</Label>
@@ -201,24 +200,33 @@ export function JoinLadderDialog({
 
           <div className="space-y-3">
             <Label>Join as</Label>
-            <RadioGroup
-              value={joinType}
-              onValueChange={(val) => setJoinType(val as "existing" | "custom")}
-              className="space-y-2"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="existing" id="join-existing" />
-                <Label htmlFor="join-existing" className="font-normal cursor-pointer">
-                  Join with existing team "{teamName}"
-                </Label>
+            {forceCustom ? (
+              <div className="rounded-lg border border-muted bg-muted/30 p-3 flex items-start gap-3">
+                <AlertCircle className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                <p className="text-sm text-muted-foreground">
+                  Your team doesn't have 2 registered members. Please provide both player names below.
+                </p>
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="custom" id="join-custom" />
-                <Label htmlFor="join-custom" className="font-normal cursor-pointer">
-                  Join with different players
-                </Label>
-              </div>
-            </RadioGroup>
+            ) : (
+              <RadioGroup
+                value={joinType}
+                onValueChange={(val) => setJoinType(val as "existing" | "custom")}
+                className="space-y-2"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="existing" id="join-existing" />
+                  <Label htmlFor="join-existing" className="font-normal cursor-pointer">
+                    Join with existing team "{teamName}"
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="custom" id="join-custom" />
+                  <Label htmlFor="join-custom" className="font-normal cursor-pointer">
+                    Join with different players
+                  </Label>
+                </div>
+              </RadioGroup>
+            )}
           </div>
 
           {joinType === "custom" && (
@@ -256,24 +264,20 @@ export function JoinLadderDialog({
           </div>
         </div>
 
-        )}
-
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
-            {teamMemberCount < 2 ? "Close" : "Cancel"}
+            Cancel
           </Button>
-          {teamMemberCount >= 2 && (
-            <Button onClick={handleSubmit} disabled={isSubmitting || !selectedCategory}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                "Submit Request"
-              )}
-            </Button>
-          )}
+          <Button onClick={handleSubmit} disabled={isSubmitting || !selectedCategory}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              "Submit Request"
+            )}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
