@@ -1,11 +1,12 @@
 import { Suspense } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { useScreenTracking } from "@/hooks/useScreenTracking";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
-import NotFound from "@/pages/NotFound";
+
+const NotFound = lazyWithRetry(() => import("@/pages/NotFound"));
 
 // All authenticated routes are lazy-loaded
 const Dashboard = lazyWithRetry(() => import("@/pages/Dashboard"));
