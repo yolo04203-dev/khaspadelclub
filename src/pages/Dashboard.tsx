@@ -253,7 +253,11 @@ export default function Dashboard() {
             </div>
 
           {/* Team Status Card */}
-          {!teamLoading && (
+          {teamLoading ? (
+            <div className="mb-5 sm:mb-8">
+              <TeamCardSkeleton />
+            </div>
+          ) : (
             <div className="mb-5 sm:mb-8">
               {userTeam ? (
                 <Card className="bg-gradient-to-r from-accent/10 to-primary/10 border-accent/30">
