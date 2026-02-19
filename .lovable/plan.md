@@ -1,64 +1,40 @@
 
+# Fix: Allow Manually-Named Teams to Join Ladders
 
-# Show Entry Fee in Ladder Join Request Dialog
+## The Problem
 
-## What Changes
+When a captain uses "Enter partner name manually," the system only renames the team (e.g., "Ahmed & Ali") but does NOT add a second row to `team_members`. This means:
 
-When a user opens the "Join Ladder" dialog and selects a category, they will see the entry fee for that category displayed clearly. This ensures players know the cost before submitting a join request.
+- `team_members` count stays at 1
+- The Join Ladder dialog checks `teamMemberCount < 2` and shows "Team incomplete," blocking the join request entirely
 
-## Database Change
+## The Fix
 
-The `ladder_categories` table currently has no `entry_fee` column. A new column will be added:
+The `teamMemberCount < 2` check in `JoinLadderDialog` is too strict. A team with a manually-entered partner has only 1 database member but is conceptually a 2-player team. The solution:
 
-- **Column**: `entry_fee` (numeric, nullable, default 0)
-- **Column**: `entry_fee_currency` (text, nullable, default 'PKR')
+**Remove the hard block from `JoinLadderDialog`** and instead:
+1. If the team has 2 actual members -- allow joining with existing team normally
+2. If the team has only 1 member -- still allow opening the form, but **force the "Join with different players" option** (pre-select "custom" join type) so the user must provide both player names. The "Join with existing team" radio option will be hidden/disabled since the team isn't complete in the database.
 
-This mirrors the same pattern used in `tournament_categories`.
+This way:
+- Solo captains who haven't added anyone yet still need to provide player names
+- Captains who added a partner manually can join by entering both names (or the team name already reflects the pairing)
+- Teams with 2 real members can join with their existing team as before
 
-## UI Changes
+## Technical Changes
 
 ### File: `src/components/ladder/JoinLadderDialog.tsx`
 
-- Update the `Category` interface to include `entry_fee` and `entry_fee_currency`
-- After the user selects a category, display an info box showing the entry fee (or "Free" if 0)
-- The fee will appear between the category selector and the "Join as" radio group
+- Remove the `teamMemberCount < 2` block that shows "Team incomplete" and hides the form
+- Instead, when `teamMemberCount < 2`:
+  - Auto-set `joinType` to `"custom"`
+  - Hide the "Join with existing team" radio option (or disable it with a note)
+  - Show the custom player name fields by default
+  - Pre-fill player names from the team name if it contains "&" (e.g., "Ahmed & Ali" becomes player1="Ahmed", player2="Ali")
+- When `teamMemberCount >= 2`: keep existing behavior unchanged
 
 ### File: `src/pages/LadderDetail.tsx`
 
-- Update the `ladder_categories` query (line 152) to also select `entry_fee, entry_fee_currency` so the data is passed to the dialog
+- No changes needed (it already passes `teamMemberCount` correctly)
 
-### Admin Side (optional, for completeness)
-
-- If there's a ladder category management UI, add entry fee input fields there too (similar to tournament category management)
-
-## Technical Details
-
-### Migration SQL
-
-```sql
-ALTER TABLE public.ladder_categories
-  ADD COLUMN entry_fee numeric DEFAULT 0,
-  ADD COLUMN entry_fee_currency text DEFAULT 'PKR';
-```
-
-### JoinLadderDialog Changes
-
-- Extend Category interface:
-  ```
-  interface Category {
-    id: string;
-    name: string;
-    description: string | null;
-    entry_fee?: number;
-    entry_fee_currency?: string;
-  }
-  ```
-- When `selectedCategory` changes, look up the fee from the categories array
-- Show a styled info block below the category select:
-  - If fee > 0: "Entry Fee: PKR 2,000" with a money icon
-  - If fee is 0 or null: "Free to join"
-
-### LadderDetail.tsx Changes
-
-- Line 152: change select from `"id, name, description, challenge_range"` to `"id, name, description, challenge_range, entry_fee, entry_fee_currency"`
-
+No database changes required.
