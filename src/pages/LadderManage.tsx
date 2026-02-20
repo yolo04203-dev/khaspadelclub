@@ -263,7 +263,7 @@ export default function LadderManage() {
     }
   };
 
-  if (role !== "admin") {
+  if (role !== "admin" && role !== "super_admin") {
     return (
       <div className="min-h-screen bg-background">
         <header className="border-b border-border bg-card">
