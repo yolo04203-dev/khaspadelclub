@@ -238,6 +238,21 @@ export default function LadderDetail() {
                 };
               });
 
+            // If team has a manual partner (name format "Player1 & Player2")
+            // and only one real member, add synthetic member for the partner
+            let finalMembers = teamMembers;
+            if (team?.name?.includes(" & ") && teamMembers.length === 1) {
+              const parts = team.name.split(" & ");
+              const existingName = teamMembers[0]?.display_name?.toLowerCase();
+              const partnerName = parts.find(p => p.toLowerCase() !== existingName) || parts[1];
+              if (partnerName) {
+                finalMembers = [
+                  ...teamMembers,
+                  { user_id: `manual-${team.id}`, display_name: partnerName.trim(), avatar_url: null },
+                ];
+              }
+            }
+
             return {
               id: ranking.id,
               rank: ranking.rank,
@@ -246,7 +261,7 @@ export default function LadderDetail() {
               losses: ranking.losses,
               streak: ranking.streak,
               team,
-              members: teamMembers,
+              members: finalMembers,
             };
           });
 
