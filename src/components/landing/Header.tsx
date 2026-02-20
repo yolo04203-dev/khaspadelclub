@@ -39,7 +39,7 @@ export function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <button onClick={handleNavigateHome} className="focus:outline-none">
-            <Logo size="sm" />
+            <Logo size="md" />
           </button>
 
           {/* Desktop nav */}
