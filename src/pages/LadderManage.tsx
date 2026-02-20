@@ -112,14 +112,30 @@ export default function LadderManage() {
         }
 
         // Fetch all teams not in any category of this ladder
+        // Also fetch member counts to filter out incomplete teams
         const { data: allTeams } = await supabase.from("teams").select("id, name");
+        const { data: teamMembers } = await supabase
+          .from("team_members")
+          .select("team_id");
         const { data: assignedRankings } = await supabase
           .from("ladder_rankings")
           .select("team_id")
           .in("ladder_category_id", categoryIds);
 
+        // Count members per team
+        const memberCounts: Record<string, number> = {};
+        (teamMembers || []).forEach((m) => {
+          memberCounts[m.team_id] = (memberCounts[m.team_id] || 0) + 1;
+        });
+
         const assignedTeamIds = new Set((assignedRankings || []).map((r) => r.team_id));
-        const available = (allTeams || []).filter((t) => !assignedTeamIds.has(t.id));
+        // Only show teams that have 2 members OR use "Player1 & Player2" name format
+        const available = (allTeams || []).filter((t) => {
+          if (assignedTeamIds.has(t.id)) return false;
+          const hasFullRoster = (memberCounts[t.id] || 0) >= 2;
+          const hasManualPartner = t.name.includes("&");
+          return hasFullRoster || hasManualPartner;
+        });
         setAvailableTeams(available);
       } catch (error) {
         logger.apiError("fetchLadder", error);
