@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Navigate, Link } from "react-router-dom";
+import { Navigate, Link, useNavigate } from "react-router-dom";
 
 import { User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers, Pencil, AlertTriangle, UserPlus, UserMinus, RefreshCw } from "lucide-react";
 import { RenameTeamDialog } from "@/components/team/RenameTeamDialog";
@@ -17,10 +17,12 @@ import { FAB, FABContainer } from "@/components/ui/fab";
 import { logger } from "@/lib/logger";
 import { safeCount, safeString } from "@/lib/safeData";
 import { PendingInvitations } from "@/components/team/PendingInvitations";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 interface LadderRank {
   rank: number;
   categoryName: string;
   ladderName: string;
+  ladderId: string;
   points: number;
 }
 
@@ -46,6 +48,7 @@ interface ModeBreakdown {
 
 export default function Dashboard() {
   const { user, role, isLoading, signOut } = useAuth();
+  const navigate = useNavigate();
   const [userTeam, setUserTeam] = useState<UserTeam | null>(null);
   const [isCaptain, setIsCaptain] = useState(false);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
@@ -129,6 +132,7 @@ export default function Dashboard() {
               points: r.points,
               categoryName: r.ladder_categories?.name || "Unknown",
               ladderName: r.ladder_categories?.ladders?.name || "Unknown",
+              ladderId: r.ladder_categories?.ladder_id || "",
             }));
             setUserTeam({
               id: teamResult.data.id,
@@ -375,23 +379,70 @@ export default function Dashboard() {
 
           {/* Quick Stats */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 mb-5 sm:mb-8 min-h-[120px]">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Current Rank</CardTitle>
-                <Trophy className="h-4 w-4 text-rank-gold" />
-              </CardHeader>
-              <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
-                <div className="text-xl sm:text-2xl font-bold">
-                  {userTeam?.rankings?.length ? `#${userTeam.rankings[0].rank}` : "#--"}
-                </div>
-                <p className="text-xs text-muted-foreground truncate">
-                  {userTeam?.rankings?.length ? userTeam.rankings[0].categoryName : "Ladder position"}
-                  {(userTeam?.rankings?.length ?? 0) > 1 && (
-                    <span className="ml-1 text-accent">+{userTeam!.rankings.length - 1} more</span>
-                  )}
-                </p>
-              </CardContent>
-            </Card>
+            {(() => {
+              const rankings = userTeam?.rankings ?? [];
+              const rankCardContent = (
+                <>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6 sm:pb-2">
+                    <CardTitle className="text-xs sm:text-sm font-medium">Current Rank</CardTitle>
+                    <Trophy className="h-4 w-4 text-rank-gold" />
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+                    <div className="text-xl sm:text-2xl font-bold">
+                      {rankings.length ? `#${rankings[0].rank}` : "#--"}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {rankings.length ? rankings[0].categoryName : "Ladder position"}
+                      {rankings.length > 1 && (
+                        <span className="ml-1 text-accent">+{rankings.length - 1} more</span>
+                      )}
+                    </p>
+                  </CardContent>
+                </>
+              );
+
+              if (rankings.length > 1) {
+                return (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                        {rankCardContent}
+                      </Card>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 p-0" align="start">
+                      <div className="p-3 border-b">
+                        <p className="font-semibold text-sm">All Rankings</p>
+                      </div>
+                      <div className="p-2 space-y-1 max-h-60 overflow-y-auto">
+                        {rankings.map((r, i) => (
+                          <button
+                            key={i}
+                            className="w-full flex items-center justify-between p-2 rounded-md hover:bg-accent/10 transition-colors text-left"
+                            onClick={() => navigate(`/ladders/${r.ladderId}`)}
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{r.categoryName}</p>
+                              <p className="text-xs text-muted-foreground truncate">{r.ladderName} · {r.points} pts</p>
+                            </div>
+                            <Badge variant="secondary" className="ml-2 shrink-0 font-semibold">#{r.rank}</Badge>
+                          </button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                );
+              } else if (rankings.length === 1) {
+                return (
+                  <Link to={`/ladders/${rankings[0].ladderId}`}>
+                    <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
+                      {rankCardContent}
+                    </Card>
+                  </Link>
+                );
+              } else {
+                return <Card>{rankCardContent}</Card>;
+              }
+            })()}
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4 sm:p-6 sm:pb-2">
