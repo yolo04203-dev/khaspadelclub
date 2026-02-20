@@ -1,62 +1,39 @@
 
 
-# Fix: Show All Ladder Rankings on Dashboard
+# Make Current Rank Card Clickable with Expandable Rankings
 
-## Problem
-The dashboard currently fetches only one ladder ranking per team (using `.limit(1).maybeSingle()`), so if a team is enrolled in multiple ladder categories (e.g., Category A rank #2 and Category B rank #1), only one rank is displayed. The "Current Rank" stat card and the team card both show a single rank, which is misleading.
+## What changes
 
-## Solution
-Fetch all ladder rankings for the user's team and display them in the dashboard. The "Current Rank" stat card will show the best rank with a label indicating the category, and additional rankings will be visible.
+The "Current Rank" stat card on the dashboard will become clickable/tappable when the user has rankings. Clicking it will expand to show all ladder rankings in a popover or collapsible detail view.
 
-## Changes
+## UI Behavior
 
-### 1. Update the `UserTeam` interface
-Replace the single `rank: number | null` with an array of rankings:
-```typescript
-interface LadderRank {
-  rank: number;
-  categoryName: string;
-  ladderName: string;
-  points: number;
-}
+- **Single ranking**: Card shows the rank as-is; clicking navigates to the ladder detail page for that category.
+- **Multiple rankings**: Clicking the card opens a Popover (desktop) / bottom sheet showing all rankings with category name, ladder name, rank, and points. Each entry links to its respective ladder.
+- **No rankings**: Card remains non-interactive (no cursor change, no click behavior).
 
-interface UserTeam {
-  id: string;
-  name: string;
-  rankings: LadderRank[];  // replaces rank
-  memberNames: string[];
-}
-```
+## Implementation
 
-### 2. Update the rank query (line 88)
-Replace the current `.limit(1).maybeSingle()` query with a query that fetches all rankings and joins category/ladder names:
+### 1. Wrap the Current Rank Card with a Popover (`src/pages/Dashboard.tsx`)
 
-```typescript
-supabase
-  .from("ladder_rankings")
-  .select("rank, points, ladder_category_id")
-  .eq("team_id", teamId)
-  .order("rank", { ascending: true })
-```
+- Import `Popover`, `PopoverTrigger`, `PopoverContent` from the existing UI components.
+- Wrap the Current Rank `Card` in a `PopoverTrigger` when multiple rankings exist.
+- The popover content lists all rankings with:
+  - Category name and ladder name
+  - Rank number and points
+  - A link/button to navigate to the ladder detail page
+- Add `cursor-pointer` and hover styling to indicate interactivity.
+- If only one ranking exists, make the card a direct `Link` to the ladder detail page instead of using a popover.
 
-Then fetch category names for the returned `ladder_category_id` values from `ladder_categories` joined with `ladders`.
+### 2. Required data
 
-### 3. Update the "Current Rank" stat card (lines 356-367)
-- Show the best rank prominently (lowest number)
-- Add the category name as subtitle (e.g., "Cat A -- Chiniot Ladder")
-- If multiple rankings exist, show a small indicator like "+1 more"
+The `rankings` array already contains `categoryName`, `ladderName`, `rank`, and `points`. We also need the `ladder_id` to build navigation links. This requires a small update to the rankings query to also store the `ladder_id` in the `LadderRank` interface.
 
-### 4. Update the team status card rank display (line 297-298)
-Replace `Rank #X` with a list of all rankings:
-- "Cat A: #2 -- Cat B: #1" or show them as small badges
+### Technical details
 
-### 5. Update `PlayerStatsSection` (optional, same issue)
-The `get_player_unified_stats` RPC also returns a single rank/points. This is a known limitation but out of scope for this change -- the dashboard fix is the priority.
-
-## Technical Details
-
-- The rank query changes from a single `.maybeSingle()` call to fetching multiple rows
-- Category names require an additional lookup since `ladder_rankings` only stores `ladder_category_id`
-- The `UserTeam.rank` field throughout the component needs updating to `UserTeam.rankings`
-- No database migration needed -- this is purely a frontend display fix using existing data
+- Add `ladderId: string` to the `LadderRank` interface
+- Update the rankings mapping to extract `ladder_id` from the joined `ladder_categories` data
+- For single ranking: wrap card in `<Link to={/ladders/${ladderId}}>` 
+- For multiple rankings: use `Popover` with a list of ranked entries, each linking to `/ladders/${ladderId}`
+- Add visual cue: `cursor-pointer hover:shadow-md transition-shadow` on the card when rankings exist
 
