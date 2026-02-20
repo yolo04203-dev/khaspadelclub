@@ -1,24 +1,21 @@
 
 
-# Replace Logo Throughout the App
+# Use New Logo as Website Favicon
 
 ## What Changes
 
-The app uses a single centralized `Logo` component (`src/components/Logo.tsx`) that imports the logo image from `src/assets/logo.png`. Every page and header in the app references this one component, so replacing the image file is all that's needed.
+Copy the uploaded logo image to the `public` directory as the favicon, and update `index.html` to reference it.
 
 ## Steps
 
-1. **Copy the new logo image** from `user-uploads://SOUTH_CITY_STATICS_2_-removebg-preview.png` to `src/assets/logo.png`, replacing the old file
-2. **No other file changes needed** -- the `Logo` component already handles sizing (sm: 40px, md: 52px, lg: 72px) and all pages import from this single source
+1. **Copy the uploaded image** from `user-uploads://SOUTH_CITY_STATICS_2_-removebg-preview-2.png` to `public/favicon.png` (replacing the old favicon)
+2. **No HTML changes needed** -- `index.html` already references `/favicon.png`:
+   ```html
+   <link rel="icon" type="image/png" href="/favicon.png" />
+   ```
 
-## Affected Areas (all automatic via the shared component)
+## Scope
 
-- Landing page header
-- App header (dashboard, ladders, challenges, etc.)
-- Admin header
-- Auth page
-- Footer
-- Tournament detail page
-- Ladder manage page
-- Terms and Privacy pages
+- 1 file replaced (`public/favicon.png`)
+- 0 code changes
 
