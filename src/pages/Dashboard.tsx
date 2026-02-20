@@ -17,10 +17,17 @@ import { FAB, FABContainer } from "@/components/ui/fab";
 import { logger } from "@/lib/logger";
 import { safeCount, safeString } from "@/lib/safeData";
 import { PendingInvitations } from "@/components/team/PendingInvitations";
+interface LadderRank {
+  rank: number;
+  categoryName: string;
+  ladderName: string;
+  points: number;
+}
+
 interface UserTeam {
   id: string;
   name: string;
-  rank: number | null;
+  rankings: LadderRank[];
   memberNames: string[];
 }
 
@@ -83,9 +90,9 @@ export default function Dashboard() {
 
         // Section 1: Team info (critical — if this fails, show error)
         try {
-          const [teamResult, rankResult, membersResult] = await Promise.all([
+          const [teamResult, rankingsResult, membersResult] = await Promise.all([
             supabase.from("teams").select("id, name").eq("id", teamId).maybeSingle(),
-            supabase.from("ladder_rankings").select("rank, wins, losses").eq("team_id", teamId).order("rank", { ascending: true }).limit(1).maybeSingle(),
+            supabase.from("ladder_rankings").select("rank, points, ladder_category_id, ladder_categories(name, ladder_id, ladders(name))").eq("team_id", teamId).order("rank", { ascending: true }),
             supabase.from("team_members").select("user_id").eq("team_id", teamId).order("joined_at"),
           ]);
 
@@ -117,10 +124,16 @@ export default function Dashboard() {
           }
 
           if (teamResult.data) {
+            const rankings: LadderRank[] = (rankingsResult.data || []).map((r: any) => ({
+              rank: r.rank,
+              points: r.points,
+              categoryName: r.ladder_categories?.name || "Unknown",
+              ladderName: r.ladder_categories?.ladders?.name || "Unknown",
+            }));
             setUserTeam({
               id: teamResult.data.id,
               name: teamName,
-              rank: rankResult.data?.rank ?? null,
+              rankings,
               memberNames,
             });
           }
@@ -293,9 +306,18 @@ export default function Dashboard() {
                               <p className="text-xs font-medium">Team needs a partner to compete</p>
                             </div>
                           )}
-                          <p className="text-sm text-muted-foreground">
-                            {userTeam.rank ? `Rank #${userTeam.rank}` : "Unranked"}
-                          </p>
+                          {userTeam.rankings.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5 mt-0.5">
+                              {userTeam.rankings.map((r, i) => (
+                                <Badge key={i} variant="secondary" className="text-xs gap-1">
+                                  <span className="font-medium">{r.categoryName}</span>
+                                  <span className="text-foreground font-semibold">#{r.rank}</span>
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">Unranked</p>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -360,9 +382,14 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
                 <div className="text-xl sm:text-2xl font-bold">
-                  {userTeam?.rank ? `#${userTeam.rank}` : "#--"}
+                  {userTeam?.rankings?.length ? `#${userTeam.rankings[0].rank}` : "#--"}
                 </div>
-                <p className="text-xs text-muted-foreground">Ladder position</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {userTeam?.rankings?.length ? userTeam.rankings[0].categoryName : "Ladder position"}
+                  {(userTeam?.rankings?.length ?? 0) > 1 && (
+                    <span className="ml-1 text-accent">+{userTeam!.rankings.length - 1} more</span>
+                  )}
+                </p>
               </CardContent>
             </Card>
 
