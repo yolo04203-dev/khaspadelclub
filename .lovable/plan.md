@@ -1,39 +1,23 @@
 
+# Replace Logo and Favicon with New KP Image
 
-# Make Current Rank Card Clickable with Expandable Rankings
+## What will change
 
-## What changes
+The uploaded "KP Padel Club" logo image will replace the current logo and favicon across the entire app.
 
-The "Current Rank" stat card on the dashboard will become clickable/tappable when the user has rankings. Clicking it will expand to show all ladder rankings in a popover or collapsible detail view.
+## Files to update
 
-## UI Behavior
+### 1. Copy the image to project assets
+- Copy `user-uploads://SOUTH_CITY_STATICS_2.jpg` to `src/assets/logo.png` (replacing the current logo used in React components)
+- Copy it to `public/favicon.png` (replacing the current favicon)
+- Copy it to `public/icon-192.png` and `public/icon-512.png` (replacing PWA icons and apple-touch-icon)
 
-- **Single ranking**: Card shows the rank as-is; clicking navigates to the ladder detail page for that category.
-- **Multiple rankings**: Clicking the card opens a Popover (desktop) / bottom sheet showing all rankings with category name, ladder name, rank, and points. Each entry links to its respective ladder.
-- **No rankings**: Card remains non-interactive (no cursor change, no click behavior).
+### 2. No code changes needed
+The `Logo` component (`src/components/Logo.tsx`) already imports from `@/assets/logo.png`, and `index.html` already references `/favicon.png`, `/icon-192.png`, and `/icon-512.png`. Since we're replacing files at the same paths, everything will pick up the new image automatically.
 
-## Implementation
+### 3. Update SVG icons (optional cleanup)
+The `public/icon-192.svg` and `public/icon-512.svg` files contain the old icon as SVG. These can be left as-is since the manifest and HTML reference the PNG versions, not SVGs.
 
-### 1. Wrap the Current Rank Card with a Popover (`src/pages/Dashboard.tsx`)
-
-- Import `Popover`, `PopoverTrigger`, `PopoverContent` from the existing UI components.
-- Wrap the Current Rank `Card` in a `PopoverTrigger` when multiple rankings exist.
-- The popover content lists all rankings with:
-  - Category name and ladder name
-  - Rank number and points
-  - A link/button to navigate to the ladder detail page
-- Add `cursor-pointer` and hover styling to indicate interactivity.
-- If only one ranking exists, make the card a direct `Link` to the ladder detail page instead of using a popover.
-
-### 2. Required data
-
-The `rankings` array already contains `categoryName`, `ladderName`, `rank`, and `points`. We also need the `ladder_id` to build navigation links. This requires a small update to the rankings query to also store the `ladder_id` in the `LadderRank` interface.
-
-### Technical details
-
-- Add `ladderId: string` to the `LadderRank` interface
-- Update the rankings mapping to extract `ladder_id` from the joined `ladder_categories` data
-- For single ranking: wrap card in `<Link to={/ladders/${ladderId}}>` 
-- For multiple rankings: use `Popover` with a list of ranked entries, each linking to `/ladders/${ladderId}`
-- Add visual cue: `cursor-pointer hover:shadow-md transition-shadow` on the card when rankings exist
-
+## Notes
+- The image has a white background which works well for favicons and PWA icons
+- The brand text "Khas Padel Club" in the `Logo` component will remain alongside the new logo image
