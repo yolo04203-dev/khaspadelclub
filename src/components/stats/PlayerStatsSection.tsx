@@ -21,19 +21,47 @@ interface StatsData {
   points: number;
 }
 
+interface LadderRank {
+  rank: number;
+  categoryName: string;
+  ladderName: string;
+  points: number;
+}
+
 export function PlayerStatsSection({ userId }: PlayerStatsSectionProps) {
   const [stats, setStats] = useState<StatsData | null>(null);
+  const [rankings, setRankings] = useState<LadderRank[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const { data, error } = await supabase.rpc("get_player_unified_stats", {
-          p_user_id: userId,
-          p_days: 0,
-        });
-        if (error) throw error;
-        setStats(data as unknown as StatsData);
+        const [unifiedResult, teamMembersResult] = await Promise.all([
+          supabase.rpc("get_player_unified_stats", { p_user_id: userId, p_days: 0 }),
+          supabase.from("team_members").select("team_id").eq("user_id", userId),
+        ]);
+
+        if (unifiedResult.error) throw unifiedResult.error;
+        setStats(unifiedResult.data as unknown as StatsData);
+
+        // Fetch all rankings for the user's teams
+        const teamIds = (teamMembersResult.data || []).map(m => m.team_id);
+        if (teamIds.length > 0) {
+          const { data: rankingsData } = await supabase
+            .from("ladder_rankings")
+            .select("rank, points, ladder_category_id, ladder_categories(name, ladder_id, ladders(name))")
+            .in("team_id", teamIds)
+            .order("rank", { ascending: true });
+
+          if (rankingsData) {
+            setRankings(rankingsData.map((r: any) => ({
+              rank: r.rank,
+              points: r.points,
+              categoryName: r.ladder_categories?.name || "Unknown",
+              ladderName: r.ladder_categories?.ladders?.name || "Unknown",
+            })));
+          }
+        }
       } catch (error) {
         logger.apiError("fetchPlayerStats", error);
       } finally {
@@ -75,7 +103,7 @@ export function PlayerStatsSection({ userId }: PlayerStatsSectionProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center gap-6 mb-4">
+        <div className="flex items-center gap-6 mb-4 flex-wrap">
           <div>
             <p className="text-2xl font-bold text-foreground">{winRate}%</p>
             <p className="text-xs text-muted-foreground">Win Rate</p>
@@ -90,16 +118,20 @@ export function PlayerStatsSection({ userId }: PlayerStatsSectionProps) {
             </p>
             <p className="text-xs text-muted-foreground">Record</p>
           </div>
-          {stats.rank && (
-            <div>
-              <p className="text-2xl font-bold text-foreground flex items-center gap-1">
-                <Trophy className="w-4 h-4 text-rank-gold" />
-                #{stats.rank}
-              </p>
-              <p className="text-xs text-muted-foreground">Rank</p>
-            </div>
-          )}
         </div>
+
+        {rankings.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {rankings.map((r, i) => (
+              <Badge key={i} variant="outline" className="text-xs gap-1.5 py-1">
+                <Trophy className="w-3 h-3 text-rank-gold" />
+                <span className="font-medium">{r.categoryName}</span>
+                <span className="text-foreground font-semibold">#{r.rank}</span>
+                <span className="text-muted-foreground">{r.points}pts</span>
+              </Badge>
+            ))}
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2">
           {modes.map((m) => {
