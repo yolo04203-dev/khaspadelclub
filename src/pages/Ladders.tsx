@@ -101,7 +101,7 @@ function LaddersContent() {
       <AppHeader
         showBack
         actions={
-          role === "admin" && (
+          (role === "admin" || role === "super_admin") && (
             <Button asChild>
               <Link to="/ladders/create">
                 <Plus className="w-4 h-4 mr-2" />
@@ -155,12 +155,12 @@ function LaddersContent() {
               icon={Trophy}
               title="No ladders yet"
               description={
-                role === "admin"
+                (role === "admin" || role === "super_admin")
                   ? "Create your first ladder to get started!"
                   : "Check back later for upcoming ladder competitions."
               }
               action={
-                role === "admin"
+                (role === "admin" || role === "super_admin")
                   ? { label: "Create Ladder", href: "/ladders/create" }
                   : undefined
               }

@@ -487,7 +487,7 @@ export default function LadderDetail() {
               />
             )}
 
-            {role === "admin" && (
+            {(role === "admin" || role === "super_admin") && (
               <Button variant="outline" asChild>
                 <Link to={`/ladders/${id}/manage`}>
                   <Settings className="w-4 h-4 mr-2" />
@@ -516,7 +516,7 @@ export default function LadderDetail() {
                 <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold text-foreground mb-2">No categories yet</h3>
                 <p className="text-muted-foreground">
-                  {role === "admin"
+                  {(role === "admin" || role === "super_admin")
                     ? "Add categories to this ladder to get started."
                     : "This ladder has no categories configured yet."}
                 </p>
