@@ -1,23 +1,32 @@
 
-# Replace Logo and Favicon with New KP Image
+# Enlarge Logo Across the App
 
-## What will change
+## What changes
 
-The uploaded "KP Padel Club" logo image will replace the current logo and favicon across the entire app.
+Increase all logo sizes throughout the app by bumping up the dimensions in the `Logo` component, and use the `lg` size on the Auth screen for a more prominent brand presence.
 
-## Files to update
+## Changes
 
-### 1. Copy the image to project assets
-- Copy `user-uploads://SOUTH_CITY_STATICS_2.jpg` to `src/assets/logo.png` (replacing the current logo used in React components)
-- Copy it to `public/favicon.png` (replacing the current favicon)
-- Copy it to `public/icon-192.png` and `public/icon-512.png` (replacing PWA icons and apple-touch-icon)
+### 1. Update size classes in `src/components/Logo.tsx`
+Increase all three size tiers:
 
-### 2. No code changes needed
-The `Logo` component (`src/components/Logo.tsx`) already imports from `@/assets/logo.png`, and `index.html` already references `/favicon.png`, `/icon-192.png`, and `/icon-512.png`. Since we're replacing files at the same paths, everything will pick up the new image automatically.
+| Size | Current | New |
+|------|---------|-----|
+| sm   | 32px (w-8 h-8) | 40px (w-10 h-10) |
+| md   | 40px (w-10 h-10) | 52px (w-13 h-13) |
+| lg   | 56px (w-14 h-14) | 72px (w-18 h-18) |
 
-### 3. Update SVG icons (optional cleanup)
-The `public/icon-192.svg` and `public/icon-512.svg` files contain the old icon as SVG. These can be left as-is since the manifest and HTML reference the PNG versions, not SVGs.
+Also bump the text sizes to match:
+- sm: text-lg -> text-xl
+- md: text-xl -> text-2xl
+- lg: text-2xl -> text-3xl
 
-## Notes
-- The image has a white background which works well for favicons and PWA icons
-- The brand text "Khas Padel Club" in the `Logo` component will remain alongside the new logo image
+### 2. Use `lg` size on Auth screen (`src/pages/Auth.tsx`)
+Change the Logo on the auth page from `size="md"` to `size="lg"` so the branding is prominent when users sign in or sign up.
+
+### 3. Use `md` size on Landing Header (`src/components/landing/Header.tsx`)
+Bump the landing page header logo from `size="sm"` to `size="md"` for better visibility.
+
+## Impact
+- All ~16 files using `<Logo>` automatically get larger icons through the updated size classes -- no individual file changes needed beyond Auth and the landing header.
+- The Auth screen gets the largest logo for strong brand presence.
