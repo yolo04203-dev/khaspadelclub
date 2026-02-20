@@ -162,7 +162,7 @@ export default function Auth() {
       <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 lg:px-8 py-12">
         <div className="mx-auto w-full max-w-md">
           <Link to="/" className="flex justify-center mb-8">
-            <Logo size="md" />
+            <Logo size="lg" />
           </Link>
 
           <div className="animate-fade-in">
