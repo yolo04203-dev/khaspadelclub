@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -120,6 +121,8 @@ export default function TournamentDetail() {
   const [teamMembersMap, setTeamMembersMap] = useState<Map<string, { player1: string; player2: string }>>(new Map());
   const [registrationDialogOpen, setRegistrationDialogOpen] = useState(false);
   const [bulkRescheduleDialogOpen, setBulkRescheduleDialogOpen] = useState(false);
+  const [inlineKnockoutScores, setInlineKnockoutScores] = useState<Record<string, { team1: string; team2: string }>>({});
+  const [inlineSubmitting, setInlineSubmitting] = useState<string | null>(null);
   const [userTeamMemberCount, setUserTeamMemberCount] = useState(0);
   const [paymentParticipants, setPaymentParticipants] = useState<Array<{
     id: string; team_id: string; team_name: string; registered_at: string;
@@ -728,21 +731,37 @@ export default function TournamentDetail() {
 
     // Apply scheduling config and per-round format to knockout matches
     const roundLabels = computeRoundLabels(totalRounds);
-    knockoutMatches.forEach((match, i) => {
-      const courtNumber = (i % config.numberOfCourts) + 1;
-      const timeSlot = Math.floor(i / config.numberOfCourts);
-      const scheduledAt = new Date(config.startTime.getTime() + timeSlot * config.durationMinutes * 60000);
-      match.court_number = courtNumber;
-      match.duration_minutes = config.durationMinutes;
-      match.scheduled_at = scheduledAt.toISOString();
-      // Set per-match format from roundFormats
-      const label = roundLabels[match.round_number - 1];
-      if (config.roundFormats && label && config.roundFormats[label] !== undefined) {
-        match.sets_per_match = config.roundFormats[label];
-      } else {
-        match.sets_per_match = 1;
-      }
+    // Group knockout matches by round for per-round scheduling
+    const matchesByRound: Record<number, any[]> = {};
+    knockoutMatches.forEach(m => {
+      if (!matchesByRound[m.round_number]) matchesByRound[m.round_number] = [];
+      matchesByRound[m.round_number].push(m);
     });
+
+    for (const [roundNumStr, roundMatchList] of Object.entries(matchesByRound)) {
+      const roundNum = parseInt(roundNumStr);
+      const label = roundLabels[roundNum - 1];
+      const roundSchedule = config.roundSchedules?.[label];
+      const roundStartTime = roundSchedule?.dateTime
+        ? new Date(roundSchedule.dateTime)
+        : new Date(config.startTime.getTime()); // fallback to global start
+      const roundCourts = roundSchedule?.courts || config.numberOfCourts;
+
+      roundMatchList.forEach((match, i) => {
+        const courtNumber = (i % roundCourts) + 1;
+        const timeSlot = Math.floor(i / roundCourts);
+        const scheduledAt = new Date(roundStartTime.getTime() + timeSlot * config.durationMinutes * 60000);
+        match.court_number = courtNumber;
+        match.duration_minutes = config.durationMinutes;
+        match.scheduled_at = scheduledAt.toISOString();
+        // Set per-match format from roundFormats
+        if (config.roundFormats && label && config.roundFormats[label] !== undefined) {
+          match.sets_per_match = config.roundFormats[label];
+        } else {
+          match.sets_per_match = 1;
+        }
+      });
+    }
 
     const { error } = await supabase.from("tournament_matches").insert(knockoutMatches);
     if (error) { sonnerToast.error("Failed to start knockout stage"); } 
@@ -1030,6 +1049,62 @@ export default function TournamentDetail() {
                                         </div>
                                         {match.team2_score !== null && <span className="font-mono font-semibold">{match.team2_score}</span>}
                                       </div>
+                                      {/* Admin score entry for knockout matches */}
+                                      {isAdmin && !match.winner_team_id && match.team1_id && match.team2_id && (
+                                        <div className="flex items-center gap-2 pt-2 border-t mt-2">
+                                          <Input
+                                            type="number"
+                                            min={0}
+                                            placeholder="0"
+                                            className="w-16 text-center"
+                                            value={inlineKnockoutScores[match.id]?.team1 || ""}
+                                            onChange={(e) =>
+                                              setInlineKnockoutScores(prev => ({
+                                                ...prev,
+                                                [match.id]: { ...prev[match.id], team1: e.target.value },
+                                              }))
+                                            }
+                                          />
+                                          <span className="text-muted-foreground">-</span>
+                                          <Input
+                                            type="number"
+                                            min={0}
+                                            placeholder="0"
+                                            className="w-16 text-center"
+                                            value={inlineKnockoutScores[match.id]?.team2 || ""}
+                                            onChange={(e) =>
+                                              setInlineKnockoutScores(prev => ({
+                                                ...prev,
+                                                [match.id]: { ...prev[match.id], team2: e.target.value },
+                                              }))
+                                            }
+                                          />
+                                          <Button
+                                            size="sm"
+                                            disabled={inlineSubmitting === match.id || !inlineKnockoutScores[match.id]?.team1 || !inlineKnockoutScores[match.id]?.team2}
+                                            onClick={async () => {
+                                              const s = inlineKnockoutScores[match.id];
+                                              if (!s) return;
+                                              const t1 = parseInt(s.team1);
+                                              const t2 = parseInt(s.team2);
+                                              if (isNaN(t1) || isNaN(t2) || t1 === t2) return;
+                                              setInlineSubmitting(match.id);
+                                              try {
+                                                await submitKnockoutScore(match.id, t1, t2);
+                                                setInlineKnockoutScores(prev => {
+                                                  const updated = { ...prev };
+                                                  delete updated[match.id];
+                                                  return updated;
+                                                });
+                                              } finally {
+                                                setInlineSubmitting(null);
+                                              }
+                                            }}
+                                          >
+                                            {inlineSubmitting === match.id ? "..." : "Save"}
+                                          </Button>
+                                        </div>
+                                      )}
                                     </div>
                                   </CardContent>
                                 </Card>
