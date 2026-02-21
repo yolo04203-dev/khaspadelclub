@@ -95,6 +95,7 @@ interface TournamentMatch {
   scheduled_at: string | null;
   court_number: number | null;
   duration_minutes: number | null;
+  sets_per_match: number | null;
 }
 
 interface UserTeam {
@@ -668,9 +669,24 @@ export default function TournamentDetail() {
       });
     }
 
+    // Compute round labels to map round_number -> sets_per_match
+    const computeRoundLabels = (totalRounds: number) => {
+      const labels: string[] = [];
+      for (let r = 1; r <= totalRounds; r++) {
+        const fromEnd = totalRounds - r;
+        if (fromEnd === 0) labels.push("Finals");
+        else if (fromEnd === 1) labels.push("Semi-Finals");
+        else if (fromEnd === 2) labels.push("Quarter-Finals");
+        else labels.push(`Round ${r}`);
+      }
+      return labels;
+    };
+
     const knockoutMatches: any[] = [];
+    let totalRounds = 0;
     
     if (relevantGroups.length === 2) {
+      totalRounds = 2;
       const groupA = relevantGroups[0];
       const groupB = relevantGroups[1];
       const a1 = qualifiedTeams.find(t => t.group_id === groupA.id && t.rank === 1);
@@ -682,6 +698,7 @@ export default function TournamentDetail() {
       knockoutMatches.push({ tournament_id: tournament.id, round_number: 1, match_number: 2, team1_id: b1?.team_id || null, team2_id: a2?.team_id || null, stage: "knockout", category_id: categoryId });
       knockoutMatches.push({ tournament_id: tournament.id, round_number: 2, match_number: 1, team1_id: null, team2_id: null, stage: "knockout", category_id: categoryId });
     } else if (relevantGroups.length === 4) {
+      totalRounds = 3;
       const groupsSorted = [...relevantGroups].sort((a, b) => a.display_order - b.display_order);
       const crossMatch = [[0, 3], [1, 2], [2, 1], [3, 0]];
       
@@ -698,7 +715,8 @@ export default function TournamentDetail() {
       knockoutMatches.push({ tournament_id: tournament.id, round_number: 3, match_number: 1, team1_id: null, team2_id: null, stage: "knockout", category_id: categoryId });
     }
 
-    // Apply scheduling config to knockout matches
+    // Apply scheduling config and per-round format to knockout matches
+    const roundLabels = computeRoundLabels(totalRounds);
     knockoutMatches.forEach((match, i) => {
       const courtNumber = (i % config.numberOfCourts) + 1;
       const timeSlot = Math.floor(i / config.numberOfCourts);
@@ -706,6 +724,13 @@ export default function TournamentDetail() {
       match.court_number = courtNumber;
       match.duration_minutes = config.durationMinutes;
       match.scheduled_at = scheduledAt.toISOString();
+      // Set per-match format from roundFormats
+      const label = roundLabels[match.round_number - 1];
+      if (config.roundFormats && label && config.roundFormats[label] !== undefined) {
+        match.sets_per_match = config.roundFormats[label];
+      } else {
+        match.sets_per_match = 1;
+      }
     });
 
     const { error } = await supabase.from("tournament_matches").insert(knockoutMatches);
@@ -962,6 +987,11 @@ export default function TournamentDetail() {
                               <Badge variant="outline" className="text-xs ml-2">
                                 {roundsGrouped[roundNum].filter(m => m.winner_team_id).length}/{roundsGrouped[roundNum].length}
                               </Badge>
+                              {roundsGrouped[roundNum][0]?.sets_per_match && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {roundsGrouped[roundNum][0].sets_per_match === 1 ? "Single Set" : `Best of ${roundsGrouped[roundNum][0].sets_per_match}`}
+                                </Badge>
+                              )}
                             </div>
                           </AccordionTrigger>
                           <AccordionContent className="px-4 pb-4">
@@ -1174,6 +1204,12 @@ export default function TournamentDetail() {
                 else { sonnerToast.success(`Match format set to best of ${sets}`); fetchData(); }
               }}
               categoryName={categories.find(c => c.id === selectedCategoryId)?.name}
+              knockoutRoundLabels={(() => {
+                const numGroups = filteredGroups.length;
+                if (numGroups === 2) return ["Semi-Finals", "Finals"];
+                if (numGroups === 4) return ["Quarter-Finals", "Semi-Finals", "Finals"];
+                return [];
+              })()}
             />
             </Suspense>
           )}

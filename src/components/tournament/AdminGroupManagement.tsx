@@ -36,6 +36,7 @@ interface AdminGroupManagementProps {
   setsPerMatch?: number;
   onSetsPerMatchChange?: (sets: number) => Promise<void>;
   categoryName?: string;
+  knockoutRoundLabels?: string[];
 }
 
 export function AdminGroupManagement({
@@ -52,6 +53,7 @@ export function AdminGroupManagement({
   setsPerMatch = 3,
   onSetsPerMatchChange,
   categoryName,
+  knockoutRoundLabels,
 }: AdminGroupManagementProps) {
   const [newGroupName, setNewGroupName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
@@ -275,6 +277,7 @@ export function AdminGroupManagement({
               onConfirm={onStartKnockout}
               title="Schedule Knockout Matches"
               description="Set the start time, match duration, and number of courts for knockout stage matches."
+              roundLabels={knockoutRoundLabels}
             />
           </div>
         )}
