@@ -977,6 +977,7 @@ export type Database = {
           next_match_id: string | null
           round_number: number
           scheduled_at: string | null
+          sets_per_match: number | null
           stage: string
           team1_id: string | null
           team1_score: number | null
@@ -998,6 +999,7 @@ export type Database = {
           next_match_id?: string | null
           round_number: number
           scheduled_at?: string | null
+          sets_per_match?: number | null
           stage?: string
           team1_id?: string | null
           team1_score?: number | null
@@ -1019,6 +1021,7 @@ export type Database = {
           next_match_id?: string | null
           round_number?: number
           scheduled_at?: string | null
+          sets_per_match?: number | null
           stage?: string
           team1_id?: string | null
           team1_score?: number | null

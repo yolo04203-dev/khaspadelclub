@@ -10,12 +10,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Clock, MapPin } from "lucide-react";
 
 export interface SchedulingConfig {
   startTime: Date;
   durationMinutes: number;
   numberOfCourts: number;
+  roundFormats?: Record<string, number>; // roundLabel -> sets_per_match
 }
 
 interface GenerateMatchesDialogProps {
@@ -24,6 +26,7 @@ interface GenerateMatchesDialogProps {
   onConfirm: (config: SchedulingConfig) => void;
   title: string;
   description?: string;
+  roundLabels?: string[];
 }
 
 export function GenerateMatchesDialog({
@@ -32,6 +35,7 @@ export function GenerateMatchesDialog({
   onConfirm,
   title,
   description,
+  roundLabels,
 }: GenerateMatchesDialogProps) {
   const now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -40,11 +44,17 @@ export function GenerateMatchesDialog({
   const [startTime, setStartTime] = useState(defaultDateTime);
   const [durationMinutes, setDurationMinutes] = useState(30);
   const [numberOfCourts, setNumberOfCourts] = useState(1);
+  const [roundFormats, setRoundFormats] = useState<Record<string, number>>(() => {
+    if (!roundLabels) return {};
+    const defaults: Record<string, number> = {};
+    roundLabels.forEach(label => { defaults[label] = 1; });
+    return defaults;
+  });
 
   const handleConfirm = () => {
     const date = new Date(startTime);
     if (isNaN(date.getTime())) return;
-    onConfirm({ startTime: date, durationMinutes, numberOfCourts });
+    onConfirm({ startTime: date, durationMinutes, numberOfCourts, roundFormats: roundLabels ? roundFormats : undefined });
     onOpenChange(false);
   };
 
@@ -96,6 +106,31 @@ export function GenerateMatchesDialog({
               onChange={(e) => setNumberOfCourts(parseInt(e.target.value) || 1)}
             />
           </div>
+
+          {roundLabels && roundLabels.length > 0 && (
+            <div className="space-y-3 pt-2 border-t">
+              <Label className="text-sm font-medium">Match Format per Round</Label>
+              {roundLabels.map((label) => (
+                <div key={label} className="flex items-center justify-between gap-4">
+                  <span className="text-sm">{label}</span>
+                  <Select
+                    value={String(roundFormats[label] ?? 1)}
+                    onValueChange={(val) =>
+                      setRoundFormats(prev => ({ ...prev, [label]: Number(val) }))
+                    }
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Single Set</SelectItem>
+                      <SelectItem value="3">Best of 3 Sets</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <DialogFooter>

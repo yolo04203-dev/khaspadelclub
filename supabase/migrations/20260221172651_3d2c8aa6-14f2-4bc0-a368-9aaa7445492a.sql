@@ -1,0 +1,1 @@
+ALTER TABLE tournament_matches ADD COLUMN sets_per_match INTEGER DEFAULT 3;

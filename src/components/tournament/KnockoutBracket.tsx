@@ -22,6 +22,7 @@ interface KnockoutMatch {
   winner_team_id: string | null;
   scheduled_at?: string | null;
   court_number?: number | null;
+  sets_per_match?: number | null;
 }
 
 interface KnockoutBracketProps {
@@ -107,6 +108,11 @@ export function KnockoutBracket({ matches, isAdmin, onSubmitScore, onReschedule,
                     <Badge variant="outline" className="text-xs">
                       {roundMatches.filter(m => m.winner_team_id).length}/{roundMatches.length}
                     </Badge>
+                    {roundMatches[0]?.sets_per_match && (
+                      <Badge variant="secondary" className="text-xs">
+                        {roundMatches[0].sets_per_match === 1 ? "Single Set" : `Best of ${roundMatches[0].sets_per_match}`}
+                      </Badge>
+                    )}
                   </h4>
                   <div className="grid gap-3 md:grid-cols-2">
                     {roundMatches.map((match) => (
