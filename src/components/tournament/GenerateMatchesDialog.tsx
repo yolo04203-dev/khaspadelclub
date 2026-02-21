@@ -18,6 +18,7 @@ export interface SchedulingConfig {
   durationMinutes: number;
   numberOfCourts: number;
   roundFormats?: Record<string, number>; // roundLabel -> sets_per_match
+  roundSchedules?: Record<string, { dateTime: string; courts: number }>; // per-round date/time & courts
 }
 
 interface GenerateMatchesDialogProps {
@@ -50,11 +51,21 @@ export function GenerateMatchesDialog({
     roundLabels.forEach(label => { defaults[label] = 1; });
     return defaults;
   });
+  const [roundSchedules, setRoundSchedules] = useState<Record<string, { dateTime: string; courts: number }>>(() => {
+    if (!roundLabels) return {};
+    const defaults: Record<string, { dateTime: string; courts: number }> = {};
+    roundLabels.forEach(label => { defaults[label] = { dateTime: "", courts: 1 }; });
+    return defaults;
+  });
 
   const handleConfirm = () => {
     const date = new Date(startTime);
     if (isNaN(date.getTime())) return;
-    onConfirm({ startTime: date, durationMinutes, numberOfCourts, roundFormats: roundLabels ? roundFormats : undefined });
+    onConfirm({
+      startTime: date, durationMinutes, numberOfCourts,
+      roundFormats: roundLabels ? roundFormats : undefined,
+      roundSchedules: roundLabels ? roundSchedules : undefined,
+    });
     onOpenChange(false);
   };
 
@@ -109,24 +120,58 @@ export function GenerateMatchesDialog({
 
           {roundLabels && roundLabels.length > 0 && (
             <div className="space-y-3 pt-2 border-t">
-              <Label className="text-sm font-medium">Match Format per Round</Label>
+              <Label className="text-sm font-medium">Per-Round Settings</Label>
               {roundLabels.map((label) => (
-                <div key={label} className="flex items-center justify-between gap-4">
-                  <span className="text-sm">{label}</span>
-                  <Select
-                    value={String(roundFormats[label] ?? 1)}
-                    onValueChange={(val) =>
-                      setRoundFormats(prev => ({ ...prev, [label]: Number(val) }))
-                    }
-                  >
-                    <SelectTrigger className="w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">Single Set</SelectItem>
-                      <SelectItem value="3">Best of 3 Sets</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div key={label} className="space-y-2 p-3 rounded-lg border bg-muted/30">
+                  <span className="text-sm font-medium">{label}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs text-muted-foreground shrink-0">Format</Label>
+                    <Select
+                      value={String(roundFormats[label] ?? 1)}
+                      onValueChange={(val) =>
+                        setRoundFormats(prev => ({ ...prev, [label]: Number(val) }))
+                      }
+                    >
+                      <SelectTrigger className="w-36 h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">Single Set</SelectItem>
+                        <SelectItem value="3">Best of 3 Sets</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs text-muted-foreground shrink-0">Date & Time</Label>
+                    <Input
+                      type="datetime-local"
+                      className="w-44 h-8 text-xs"
+                      value={roundSchedules[label]?.dateTime || ""}
+                      onChange={(e) =>
+                        setRoundSchedules(prev => ({
+                          ...prev,
+                          [label]: { ...prev[label], dateTime: e.target.value },
+                        }))
+                      }
+                      placeholder="Use default"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs text-muted-foreground shrink-0">Courts</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={20}
+                      className="w-20 h-8 text-xs"
+                      value={roundSchedules[label]?.courts ?? 1}
+                      onChange={(e) =>
+                        setRoundSchedules(prev => ({
+                          ...prev,
+                          [label]: { ...prev[label], courts: parseInt(e.target.value) || 1 },
+                        }))
+                      }
+                    />
+                  </div>
                 </div>
               ))}
             </div>
