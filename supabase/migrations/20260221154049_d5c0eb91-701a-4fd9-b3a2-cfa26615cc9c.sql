@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Team members can update own ranking" ON public.ladder_rankings;
