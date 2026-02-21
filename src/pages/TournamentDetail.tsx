@@ -19,6 +19,7 @@ import { RegistrationDialog } from "@/components/tournament/RegistrationDialog";
 import { TournamentCategoryCard } from "@/components/tournament/TournamentCategoryCard";
 import type { TournamentCategory } from "@/components/tournament/CategoryManagement";
 import type { SchedulingConfig } from "@/components/tournament/GenerateMatchesDialog";
+import { formatMatchDateTime } from "@/components/tournament/matchDateFormat";
 
 // Lazy-load admin-only components
 const AdminGroupManagement = lazy(() => import("@/components/tournament/AdminGroupManagement").then(m => ({ default: m.AdminGroupManagement })));
@@ -592,6 +593,19 @@ export default function TournamentDetail() {
     fetchData();
   };
 
+  const rescheduleMatch = async (matchId: string, scheduledAt: string | null, courtNumber: number | null) => {
+    const { error } = await supabase
+      .from("tournament_matches")
+      .update({ scheduled_at: scheduledAt, court_number: courtNumber })
+      .eq("id", matchId);
+    if (error) {
+      sonnerToast.error("Failed to reschedule match");
+    } else {
+      sonnerToast.success("Match rescheduled");
+      fetchData();
+    }
+  };
+
   const startKnockoutStage = async (config: SchedulingConfig) => {
     if (!tournament) return;
 
@@ -911,7 +925,7 @@ export default function TournamentDetail() {
                                         <div className="text-xs text-muted-foreground flex items-center gap-1">
                                           {match.court_number && <><MapPin className="w-3 h-3" />Court {match.court_number}</>}
                                           {match.court_number && match.scheduled_at && <span>—</span>}
-                                          {match.scheduled_at && new Date(match.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                          {match.scheduled_at && formatMatchDateTime(match.scheduled_at)}
                                         </div>
                                       )}
                                       <div className="flex items-center justify-between">
@@ -965,6 +979,7 @@ export default function TournamentDetail() {
                               matches={gMatches}
                               isAdmin={isAdmin}
                               onSubmitScore={submitGroupMatchScore}
+                              onReschedule={isAdmin ? rescheduleMatch : undefined}
                               setsPerMatch={tournament.sets_per_match}
                             />
                           </AccordionContent>
@@ -1292,8 +1307,9 @@ export default function TournamentDetail() {
                   team1_name: getTeamName(m.team1_id), team2_name: getTeamName(m.team2_id),
                   team1_players: getTeamPlayers(m.team1_id), team2_players: getTeamPlayers(m.team2_id),
                   team1_score: m.team1_score, team2_score: m.team2_score, winner_team_id: m.winner_team_id,
+                  scheduled_at: m.scheduled_at, court_number: m.court_number,
                 }));
-                return <GroupMatchList key={group.id} groupName={group.name} matches={gMatches} isAdmin={isAdmin} onSubmitScore={submitGroupMatchScore} setsPerMatch={tournament.sets_per_match} />;
+                return <GroupMatchList key={group.id} groupName={group.name} matches={gMatches} isAdmin={isAdmin} onSubmitScore={submitGroupMatchScore} onReschedule={isAdmin ? rescheduleMatch : undefined} setsPerMatch={tournament.sets_per_match} />;
               })}
             </div>
           )}
@@ -1302,7 +1318,8 @@ export default function TournamentDetail() {
         <TabsContent value="knockout">
           <KnockoutBracket
             matches={knockoutMatches.map(m => ({ ...m, team1_name: getTeamName(m.team1_id), team2_name: getTeamName(m.team2_id), team1_players: getTeamPlayers(m.team1_id), team2_players: getTeamPlayers(m.team2_id) }))}
-            isAdmin={isAdmin} onSubmitScore={submitKnockoutScore} winnerTeamId={tournament.winner_team_id}
+            isAdmin={isAdmin} onSubmitScore={submitKnockoutScore} onReschedule={isAdmin ? rescheduleMatch : undefined}
+            winnerTeamId={tournament.winner_team_id}
             winnerTeamName={tournament.winner_team_id ? getTeamName(tournament.winner_team_id) : undefined}
           />
         </TabsContent>
