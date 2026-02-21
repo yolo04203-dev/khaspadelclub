@@ -11,10 +11,14 @@ import { OfflineBanner, SlowConnectionBanner } from "@/components/ui/error-state
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useStatusBar } from "@/hooks/useStatusBar";
 import { logger } from "@/lib/logger";
-import { PerfOverlay } from "@/components/dev/PerfOverlay";
-import { useCapacitorAnalytics } from "@/hooks/useCapacitorAnalytics";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
+import { useCapacitorAnalytics } from "@/hooks/useCapacitorAnalytics";
 import { AuthProvider } from "@/contexts/AuthContext";
+
+// Dev-only: lazy-loaded so it's fully tree-shaken in production
+const PerfOverlay = import.meta.env.DEV
+  ? lazyWithRetry(() => import("@/components/dev/PerfOverlay").then(m => ({ default: m.PerfOverlay })))
+  : () => null;
 
 // Eager load only the landing page — everything else is lazy
 import Index from "./pages/Index";
@@ -184,7 +188,7 @@ const App = () => {
           </BrowserRouter>
         </TooltipProvider>
       </QueryClientProvider>
-      {import.meta.env.DEV && <PerfOverlay />}
+      {import.meta.env.DEV && <Suspense fallback={null}><PerfOverlay /></Suspense>}
     </ErrorBoundary>
   );
 };
