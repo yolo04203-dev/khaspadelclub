@@ -597,6 +597,17 @@ export default function TournamentDetail() {
     fetchData();
   };
 
+  const assignKnockoutTeam = async (matchId: string, slot: "team1" | "team2", teamId: string) => {
+    const update = slot === "team1" ? { team1_id: teamId } : { team2_id: teamId };
+    const { error } = await supabase.from("tournament_matches").update(update).eq("id", matchId);
+    if (error) {
+      sonnerToast.error("Failed to assign team");
+    } else {
+      sonnerToast.success("Team assigned to bracket");
+      fetchData();
+    }
+  };
+
   const rescheduleMatch = async (matchId: string, scheduledAt: string | null, courtNumber: number | null) => {
     const { error } = await supabase
       .from("tournament_matches")
@@ -1412,6 +1423,8 @@ export default function TournamentDetail() {
           <KnockoutBracket
             matches={knockoutMatches.map(m => ({ ...m, team1_name: getTeamName(m.team1_id), team2_name: getTeamName(m.team2_id), team1_players: getTeamPlayers(m.team1_id), team2_players: getTeamPlayers(m.team2_id) }))}
             isAdmin={isAdmin} onSubmitScore={submitKnockoutScore} onReschedule={isAdmin ? rescheduleMatch : undefined}
+            onAssignTeam={isAdmin ? assignKnockoutTeam : undefined}
+            availableTeams={registeredParticipants.map(p => ({ team_id: p.team_id, team_name: p.custom_team_name || p.team_name || "Unknown" }))}
             winnerTeamId={tournament.winner_team_id}
             winnerTeamName={tournament.winner_team_id ? getTeamName(tournament.winner_team_id) : undefined}
           />
