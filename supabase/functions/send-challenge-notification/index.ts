@@ -81,6 +81,21 @@ const handler = async (req: Request): Promise<Response> => {
     // Create service client for privileged operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Rate limit: 20 challenge notifications per hour per user
+    const { data: allowed } = await supabase.rpc("check_rate_limit", {
+      p_user_id: userId,
+      p_action: "challenge_notification",
+      p_max_requests: 20,
+      p_window_seconds: 3600,
+    });
+
+    if (!allowed) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Too many requests. Please try again later." }),
+        { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     const payload: ChallengeNotificationRequest = await req.json();
 
     const type = payload.type;

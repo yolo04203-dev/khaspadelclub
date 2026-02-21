@@ -76,6 +76,21 @@ const handler = async (req: Request): Promise<Response> => {
     // Create service client for privileged operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Rate limit: 10 freeze notifications per hour per admin
+    const { data: allowed } = await supabase.rpc("check_rate_limit", {
+      p_user_id: userId,
+      p_action: "freeze_notification",
+      p_max_requests: 10,
+      p_window_seconds: 3600,
+    });
+
+    if (!allowed) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Too many requests. Please try again later." }),
+        { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     // Verify user is an admin
     const { data: isAdmin } = await supabase.rpc("is_admin", { _user_id: userId });
     

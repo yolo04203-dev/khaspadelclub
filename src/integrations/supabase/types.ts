@@ -732,6 +732,27 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limits: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       team_invitations: {
         Row: {
           created_at: string
@@ -1414,6 +1435,15 @@ export type Database = {
     }
     Functions: {
       auto_name_team: { Args: { _team_id: string }; Returns: undefined }
+      check_rate_limit: {
+        Args: {
+          p_action: string
+          p_max_requests: number
+          p_user_id: string
+          p_window_seconds: number
+        }
+        Returns: boolean
+      }
       create_team_with_captain: {
         Args: { _avatar_url?: string; _name: string }
         Returns: string
