@@ -70,6 +70,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    function escapeHtml(str: string): string {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
     const RESEND_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL");
 
@@ -81,6 +90,11 @@ Deno.serve(async (req) => {
       });
     }
 
+    const safeName = escapeHtml(name);
+    const safeEmail = escapeHtml(email);
+    const safeSubject = escapeHtml(subject);
+    const safeMessage = escapeHtml(message);
+
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -91,13 +105,13 @@ Deno.serve(async (req) => {
         from: RESEND_FROM_EMAIL,
         to: RESEND_FROM_EMAIL,
         reply_to: email,
-        subject: `[Contact] ${subject}`,
+        subject: `[Contact] ${safeSubject}`,
         html: `
           <h2>New Contact Message</h2>
-          <p><strong>From:</strong> ${name} (${email})</p>
-          <p><strong>Subject:</strong> ${subject}</p>
+          <p><strong>From:</strong> ${safeName} (${safeEmail})</p>
+          <p><strong>Subject:</strong> ${safeSubject}</p>
           <hr />
-          <p>${message.replace(/\n/g, "<br />")}</p>
+          <p>${safeMessage.replace(/\n/g, "<br />")}</p>
         `,
       }),
     });
