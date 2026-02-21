@@ -1,97 +1,75 @@
 
 
-# Security Audit: Comprehensive Review
+# Security Hardening: SRI, CSP, Clickjacking & Cookie Attributes
 
-## 1. Password Requirements
+## Context
 
-**Current state**: The client-side Zod schema only requires 6 characters (`min(6)`). There is no enforcement of uppercase, lowercase, or numeric characters -- either client-side or server-side.
+You've raised four specific security scanner findings. Here's the reality of what we can and cannot fix in this project:
 
-**Fix**:
-- Update the `signupSchema` and `loginSchema` in `src/pages/Auth.tsx` to require min 8 characters with regex validation for uppercase, lowercase, and number.
-- The login schema only needs `min(1)` (since we validate on signup); but updating to `min(8)` is fine for UX consistency.
+## 1. Subresource Integrity (SRI) on External Resources
 
----
+**Issue**: The Google Fonts stylesheet loaded from `fonts.googleapis.com` lacks an `integrity` attribute, which would protect against a compromised CDN serving malicious content.
 
-## 2. Exposed API Keys / Secrets
+**What we can do**: Add `integrity` and `crossorigin` attributes to the Google Fonts link tags in `index.html`.
 
-**Finding: CLEAN** -- No issues found.
-- No `service_role` key in frontend code.
-- The Supabase anon key and URL are public/publishable keys -- this is expected and safe.
-- Sentry DSN is loaded via `VITE_SENTRY_DSN` (publishable).
-- PostHog key is loaded via `VITE_POSTHOG_KEY` (publishable).
-- All sensitive keys (RESEND_API_KEY, SERVICE_ROLE_KEY) are only used inside Edge Functions via `Deno.env.get()`.
-- `errorReporting.ts` actively scrubs tokens, passwords, and PII before sending to Sentry.
+**Challenge**: Google Fonts CSS responses are dynamic -- they vary based on the requesting browser's User-Agent header (serving different font formats). This means the hash changes per browser, making traditional SRI impractical for Google Fonts specifically.
 
----
+**Recommended fix**: Switch to self-hosting the fonts instead. Download the Space Grotesk and Inter font files, place them in `public/fonts/`, and use `@font-face` declarations in CSS. This eliminates the external dependency entirely -- which is stronger than SRI since there is no third-party server involved at all.
 
-## 3. Form Submission Security
+## 2. Content Security Policy (CSP)
 
-**Finding: XSS vulnerability in `send-contact-message` Edge Function.**
-- Line 100: `${message.replace(/\n/g, "<br />")}` -- user-provided `name`, `email`, `subject`, and `message` are interpolated directly into HTML without escaping. This allows HTML/script injection in the email body.
-- The `send-challenge-notification` and `send-team-freeze-notification` functions correctly use `escapeHtml()` for all user inputs.
-- The contact message function does NOT use `escapeHtml()`.
+**Issue**: No CSP header or meta tag is present, leaving the app without a declared allowlist of content sources.
 
-**Fix**: Add the `escapeHtml` utility to `send-contact-message/index.ts` and escape `name`, `email`, `subject`, and `message` before HTML interpolation.
+**What we can do**: Add a `<meta http-equiv="Content-Security-Policy">` tag in `index.html`. While a meta tag CSP is less powerful than an HTTP header (no `frame-ancestors`, no `report-uri`), it still provides significant XSS mitigation.
 
-**Other forms reviewed (no issues)**:
-- Auth forms use Zod validation with proper schemas.
-- `SetScoreDialog` validates padel set scores with strict numeric bounds.
-- `AvatarUpload` validates file type and size (5MB limit).
-- `ReportProblemDialog` limits input to 500 chars.
-- Contact form has server-side length validation and email regex.
-- No `dangerouslySetInnerHTML` with user content (chart.tsx usage is internal theme CSS only).
-- All database operations use the Supabase SDK with parameterized queries -- no raw SQL injection risk.
+**Policy to implement**:
+- `default-src 'self'`
+- `script-src 'self'` (Vite bundles everything, no inline scripts needed)
+- `style-src 'self' 'unsafe-inline'` (Tailwind/Radix inject inline styles)
+- `font-src 'self'` (after self-hosting fonts)
+- `img-src 'self' data: blob: https://rarkpesqxjpdfvxslllv.supabase.co`
+- `connect-src 'self' https://rarkpesqxjpdfvxslllv.supabase.co https://*.sentry.io https://*.posthog.com`
 
----
+## 3. Clickjacking / X-Frame-Options
 
-## 4. Rate Limiting
+**Issue**: No `frame-ancestors` directive or `X-Frame-Options` header prevents the app from being embedded in malicious iframes.
 
-**Finding: No server-side rate limiting on any Edge Function.**
+**What we can do**: The `frame-ancestors` directive does NOT work in meta tag CSP (per the spec). `X-Frame-Options` is an HTTP response header that cannot be set from HTML.
 
-Rate limiting on Lovable Cloud Edge Functions is not directly configurable via code (no built-in middleware). However, practical mitigations are already in place:
-- **Login/signup/password reset**: These go through Supabase Auth, which has built-in rate limiting at the infrastructure level (e.g., rate limits on `signInWithPassword`, `signUp`, `resetPasswordForEmail`).
-- **Contact form** (`send-contact-message`): Requires JWT authentication (validates claims), so only logged-in users can send. This inherently limits abuse to registered accounts.
-- **Client-side logger**: Already has rate limiting (20 errors/minute, dedup, batching).
+**Reality**: Both of these are HTTP response headers that must be set by the hosting server. On Lovable Cloud, these are managed at the infrastructure level and cannot be configured via application code. This is a platform-level concern, not an application-level one.
 
-**No actionable changes** -- Supabase Auth handles rate limiting for auth endpoints. The Edge Functions are already auth-gated. Adding in-function rate limiting would require external state (database or KV store) which adds complexity without proportional benefit for the current scale.
+## 4. SameSite Cookie Attribute
+
+**Issue**: Cookies are set without the `SameSite` attribute.
+
+**Reality**: The cookies in question are set by Supabase Auth (authentication tokens) and by analytics services (PostHog, Sentry). These are set by their respective SDKs and infrastructure -- not by application code. The Supabase JS client stores auth tokens in `localStorage`, not cookies. Any cookies without `SameSite` are coming from third-party services whose behavior we cannot control from frontend code.
 
 ---
 
-## 5. Security Headers
+## Summary of Actionable Changes
 
-**Finding: Limited control -- headers are managed by the hosting platform (Lovable Cloud / Netlify).**
-
-What is already configured:
-- `_redirects` handles SPA routing.
-- Service Worker correctly excludes Supabase API calls and OAuth redirects from caching.
-- CORS headers on Edge Functions use `Access-Control-Allow-Origin: *` (standard for SPA-to-API calls).
-
-What cannot be configured via code:
-- `Content-Security-Policy`, `X-Frame-Options`, `Strict-Transport-Security`, `X-Content-Type-Options` are all set by the hosting infrastructure and cannot be overridden via `_redirects` or `index.html` meta tags in a meaningful way on Lovable Cloud.
-- CSP via meta tag is limited (no control over `frame-ancestors`, no report-uri support).
-
-**No actionable changes** -- these headers are managed at the infrastructure level by Lovable Cloud.
-
----
-
-## Summary of Changes
-
-| Area | Status | Action |
-|------|--------|--------|
-| Password requirements | Weak | Strengthen to 8+ chars, 1 upper, 1 lower, 1 number |
-| Exposed secrets | Clean | No changes needed |
-| XSS in contact email | Vulnerable | Add HTML escaping to send-contact-message |
-| SQL injection | Clean | No changes needed |
-| Rate limiting | Adequate | Supabase Auth handles auth endpoints |
-| Security headers | Platform-managed | No changes possible |
+| Finding | Actionable? | Fix |
+|---------|-------------|-----|
+| Missing SRI on fonts | Yes | Self-host Google Fonts (eliminates external dependency entirely) |
+| Missing CSP | Partially | Add meta tag CSP in index.html (covers most protections except frame-ancestors) |
+| Missing clickjacking protection | No | Requires HTTP headers set by hosting platform |
+| Missing SameSite on cookies | No | Cookies are set by third-party SDKs/infrastructure |
 
 ## Technical Implementation
 
-### File 1: `src/pages/Auth.tsx`
-- Update `signupSchema.password` to: `z.string().min(8).regex(/[A-Z]/).regex(/[a-z]/).regex(/[0-9]/)`
-- Add user-friendly error messages for each regex rule.
+### Step 1: Self-host Google Fonts
+- Download Space Grotesk (500, 600, 700) and Inter (400, 500, 600) woff2 files
+- Place in `public/fonts/`
+- Add `@font-face` declarations in `src/index.css`
+- Remove the Google Fonts `<link>` tags from `index.html`
+- Remove the `preconnect` to `fonts.googleapis.com` and `fonts.gstatic.com`
 
-### File 2: `supabase/functions/send-contact-message/index.ts`
-- Add `escapeHtml()` helper function (same pattern as the other edge functions).
-- Escape `name`, `email`, `subject`, and `message` before embedding in the HTML email template.
+### Step 2: Add CSP meta tag to `index.html`
+- Add a `<meta http-equiv="Content-Security-Policy">` tag with a strict policy allowing only necessary sources
+- This will block any injected scripts from unauthorized origins
+
+### Files to modify
+- `index.html` -- remove Google Fonts links, add CSP meta tag
+- `src/index.css` -- add `@font-face` declarations
+- `public/fonts/` -- new directory with self-hosted font files
 
