@@ -1,27 +1,11 @@
 
-
-# Add Match Scheduling (Time, Duration, Court) for All Tournament Matches
+# Per-Round Match Format for Knockout Stages
 
 ## What Changes
 
-When an admin clicks **"Generate Group Matches"** or **"Start Knockout Stage"**, a dialog will appear asking for:
+When an admin clicks **"Start Knockout Stage"**, the scheduling dialog will now also show a **match format selector for each knockout round** (e.g., Quarter-Finals: Single Set, Semi-Finals: Best of 3, Finals: Best of 3). Each round can independently be configured.
 
-- **Start date and time** of the first match
-- **Duration per match** in minutes (e.g., 30, 45, 60)
-- **Number of courts** available
-
-The system auto-assigns each match a scheduled time and court number, staggering them across courts. This applies to **all stages**: group, knockout (quarters, semis, finals).
-
-**Example** with 2 courts and 30-minute matches starting at 10:00 AM:
-
-| Match | Court | Time |
-|-------|-------|------|
-| Match 1 | Court 1 | 10:00 AM |
-| Match 2 | Court 2 | 10:00 AM |
-| Match 3 | Court 1 | 10:30 AM |
-| Match 4 | Court 2 | 10:30 AM |
-
-Match cards will display the assigned court and scheduled time for both group and knockout stages.
+The knockout bracket and match cards will display the correct format per match, and score entry will adapt accordingly (single score input vs set-by-set entry).
 
 ---
 
@@ -29,46 +13,38 @@ Match cards will display the assigned court and scheduled time for both group an
 
 ### 1. Database Migration
 
-Add `court_number` and `duration_minutes` columns to `tournament_matches`:
+Add a `sets_per_match` column to `tournament_matches` so each match stores its own format:
 
 ```sql
-ALTER TABLE tournament_matches ADD COLUMN court_number INTEGER;
-ALTER TABLE tournament_matches ADD COLUMN duration_minutes INTEGER DEFAULT 30;
+ALTER TABLE tournament_matches ADD COLUMN sets_per_match INTEGER DEFAULT 3;
 ```
 
-### 2. New Component: `GenerateMatchesDialog.tsx`
+### 2. Update `GenerateMatchesDialog.tsx`
 
-A reusable dialog with three inputs:
-- Date + time picker (using native `datetime-local` input for simplicity)
-- Duration in minutes (number input, default 30)
-- Number of courts (number input, default 1)
+- Add an optional `roundLabels` prop (e.g., `["Quarter-Finals", "Semi-Finals", "Finals"]`) that triggers per-round format selectors
+- When `roundLabels` is provided, render a format dropdown (Single Set / Best of 3) for each round
+- Export the round formats as part of `SchedulingConfig`
 
-Used by both "Generate Group Matches" and "Start Knockout Stage" buttons.
+### 3. Update `TournamentDetail.tsx`
 
-### 3. Modified Files
+- In `startKnockoutStage`, compute the round labels and pass them to the dialog
+- When inserting knockout matches, set `sets_per_match` on each match based on the admin's per-round selection
+- In the inline knockout match cards (category view), pass the match's `sets_per_match` to control score entry behavior
 
-- **`src/components/tournament/GenerateMatchesDialog.tsx`** (new) -- scheduling dialog
-- **`src/components/tournament/AdminGroupManagement.tsx`** -- wrap both "Generate Group Matches" and "Start Knockout Stage" buttons with the dialog; update callback signatures to accept scheduling config
-- **`src/pages/TournamentDetail.tsx`**:
-  - Update `TournamentMatch` interface to include `court_number`, `duration_minutes`, `scheduled_at`
-  - Update `generateGroupMatches()` to accept and apply scheduling config
-  - Update `startKnockoutStage()` to accept and apply scheduling config
-  - Update match card rendering in the Matches tab to show court number and time
-- **`src/components/tournament/GroupMatchList.tsx`** -- display court and scheduled time on match cards
-- **`src/components/tournament/KnockoutBracket.tsx`** -- display court and scheduled time on match cards
+### 4. Update `KnockoutBracket.tsx`
 
-### 4. Scheduling Logic
+- Accept `setsPerMatch` from each match's data (not a single prop)
+- Use per-match `sets_per_match` to determine score input style (single input vs set-by-set)
+- Display format badge per round
 
-```
-for each match (index i):
-  court_number = (i % numberOfCourts) + 1
-  timeSlot = floor(i / numberOfCourts)
-  scheduled_at = startTime + (timeSlot * durationMinutes * 60000ms)
-```
+### 5. Update `GroupMatchList.tsx`
 
-### 5. Display Format
+- No changes needed -- group matches continue using the tournament-level `sets_per_match` setting
 
-Each match card will show a small line like:
-- "Court 1 -- 10:30 AM" for pending matches
-- Same info retained for completed matches
+### Files to Modify
 
+- **Database migration** -- add `sets_per_match` column to `tournament_matches`
+- **`src/components/tournament/GenerateMatchesDialog.tsx`** -- add optional per-round format selectors
+- **`src/pages/TournamentDetail.tsx`** -- pass round labels to knockout dialog, save per-match format, use it in score entry
+- **`src/components/tournament/KnockoutBracket.tsx`** -- read per-match `sets_per_match` for score entry and display
+- **`src/components/tournament/AdminGroupManagement.tsx`** -- pass round count info to the knockout dialog
