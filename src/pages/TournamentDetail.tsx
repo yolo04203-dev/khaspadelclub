@@ -18,6 +18,7 @@ import { KnockoutBracket } from "@/components/tournament/KnockoutBracket";
 import { RegistrationDialog } from "@/components/tournament/RegistrationDialog";
 import { TournamentCategoryCard } from "@/components/tournament/TournamentCategoryCard";
 import type { TournamentCategory } from "@/components/tournament/CategoryManagement";
+import type { SchedulingConfig } from "@/components/tournament/GenerateMatchesDialog";
 
 // Lazy-load admin-only components
 const AdminGroupManagement = lazy(() => import("@/components/tournament/AdminGroupManagement").then(m => ({ default: m.AdminGroupManagement })));
@@ -89,6 +90,9 @@ interface TournamentMatch {
   group_id: string | null;
   category_id: string | null;
   stage: string;
+  scheduled_at: string | null;
+  court_number: number | null;
+  duration_minutes: number | null;
 }
 
 interface UserTeam {
@@ -484,7 +488,7 @@ export default function TournamentDetail() {
     fetchData();
   };
 
-  const generateGroupMatches = async () => {
+  const generateGroupMatches = async (config: SchedulingConfig) => {
     if (!tournament) return;
     
     const categoryId = categories.length > 0 && selectedCategoryId ? selectedCategoryId : null;
@@ -495,6 +499,7 @@ export default function TournamentDetail() {
     if (existingGroupMatches.length > 0) { sonnerToast.error("Group matches already generated"); return; }
     
     const matchesToCreate: any[] = [];
+    let matchIndex = 0;
     
     for (const group of relevantGroups) {
       const groupTeams = participants.filter(p => p.group_id === group.id);
@@ -502,11 +507,18 @@ export default function TournamentDetail() {
       
       for (let i = 0; i < groupTeams.length; i++) {
         for (let j = i + 1; j < groupTeams.length; j++) {
+          const courtNumber = (matchIndex % config.numberOfCourts) + 1;
+          const timeSlot = Math.floor(matchIndex / config.numberOfCourts);
+          const scheduledAt = new Date(config.startTime.getTime() + timeSlot * config.durationMinutes * 60000);
+
           matchesToCreate.push({
             tournament_id: tournament.id, group_id: group.id, category_id: categoryId,
             round_number: 1, match_number: matchNum++,
             team1_id: groupTeams[i].team_id, team2_id: groupTeams[j].team_id, stage: "group",
+            court_number: courtNumber, duration_minutes: config.durationMinutes,
+            scheduled_at: scheduledAt.toISOString(),
           });
+          matchIndex++;
         }
       }
     }
@@ -580,7 +592,7 @@ export default function TournamentDetail() {
     fetchData();
   };
 
-  const startKnockoutStage = async () => {
+  const startKnockoutStage = async (config: SchedulingConfig) => {
     if (!tournament) return;
 
     const categoryId = categories.length > 0 && selectedCategoryId ? selectedCategoryId : null;
@@ -631,6 +643,16 @@ export default function TournamentDetail() {
       knockoutMatches.push({ tournament_id: tournament.id, round_number: 2, match_number: 2, team1_id: null, team2_id: null, stage: "knockout", category_id: categoryId });
       knockoutMatches.push({ tournament_id: tournament.id, round_number: 3, match_number: 1, team1_id: null, team2_id: null, stage: "knockout", category_id: categoryId });
     }
+
+    // Apply scheduling config to knockout matches
+    knockoutMatches.forEach((match, i) => {
+      const courtNumber = (i % config.numberOfCourts) + 1;
+      const timeSlot = Math.floor(i / config.numberOfCourts);
+      const scheduledAt = new Date(config.startTime.getTime() + timeSlot * config.durationMinutes * 60000);
+      match.court_number = courtNumber;
+      match.duration_minutes = config.durationMinutes;
+      match.scheduled_at = scheduledAt.toISOString();
+    });
 
     const { error } = await supabase.from("tournament_matches").insert(knockoutMatches);
     if (error) { sonnerToast.error("Failed to start knockout stage"); } 
@@ -885,6 +907,13 @@ export default function TournamentDetail() {
                                 <Card key={match.id} className={match.winner_team_id ? "bg-muted/50" : ""}>
                                   <CardContent className="py-3">
                                     <div className="space-y-2">
+                                      {(match.court_number || match.scheduled_at) && (
+                                        <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                          {match.court_number && <><MapPin className="w-3 h-3" />Court {match.court_number}</>}
+                                          {match.court_number && match.scheduled_at && <span>—</span>}
+                                          {match.scheduled_at && new Date(match.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
+                                      )}
                                       <div className="flex items-center justify-between">
                                         <div className={`flex-1 ${match.winner_team_id === match.team1_id ? "font-bold text-success" : ""}`}>
                                           {getTeamName(match.team1_id)}
@@ -920,6 +949,7 @@ export default function TournamentDetail() {
                           team1_name: getTeamName(m.team1_id), team2_name: getTeamName(m.team2_id),
                           team1_players: getTeamPlayers(m.team1_id), team2_players: getTeamPlayers(m.team2_id),
                           team1_score: m.team1_score, team2_score: m.team2_score, winner_team_id: m.winner_team_id,
+                          scheduled_at: m.scheduled_at, court_number: m.court_number,
                         }));
 
                       if (gMatches.length === 0) return null;
