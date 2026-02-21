@@ -1,37 +1,41 @@
 
 
-# Optimize Favicon for Better Clarity
+# Fix Privilege Escalation in Ladder Rankings RLS
 
-## What Changes
+## Problem Found
 
-Add multiple favicon sizes (16x16, 32x32, 48x48) to `index.html` so browsers can pick the best resolution for the tab icon, plus an SVG version for sharp scaling on all displays.
+The `ladder_rankings` table has an overly broad UPDATE policy called **"Team members can update own ranking"** that allows any team member to directly modify their ranking row -- including `rank`, `points`, `wins`, `losses`, and `streak` fields -- without any match context. Since this is a PERMISSIVE policy (OR logic with other policies), it bypasses the more restrictive "Match participants can update rankings" policy that properly scopes updates to completed match scenarios.
 
-## Steps
+**Impact**: A player could use the browser console or any API client to directly set their rank to #1, inflate their win count, or manipulate points -- effectively cheating the ladder system.
 
-1. **Create sized PNG favicons** -- Use an edge function or manual approach to generate `favicon-16.png`, `favicon-32.png`, and `favicon-48.png` from the existing `favicon.png`. Since we can't run image processing in the browser, we'll create a simple HTML utility page that uses a canvas to resize the logo and let you download the sized versions. Alternatively, we can reference the single high-res PNG with explicit `sizes` attributes so browsers know what's available.
+## Fix
 
-2. **Update `index.html`** -- Replace the single favicon link with multiple entries:
-   ```html
-   <link rel="icon" type="image/png" sizes="48x48" href="/favicon.png" />
-   <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
-   <link rel="icon" type="image/png" sizes="16x16" href="/favicon.png" />
-   ```
-   Using the same high-res source with explicit `sizes` hints lets browsers scale from the best available image.
+Drop the overly broad "Team members can update own ranking" policy. The existing "Match participants can update rankings" policy already correctly allows ranking updates only when a completed match exists involving that team, and the "Admins can manage rankings" policy covers admin operations.
 
-3. **Add an SVG favicon** for modern browsers (renders perfectly at any size):
-   - Create a simple `public/favicon.svg` that wraps the logo image
-   - Add to `index.html`:
-     ```html
-     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-     ```
-   - SVG favicons are supported by Chrome, Firefox, Edge, and Safari 15+
+## Technical Details
 
-## Files Modified
+**Migration SQL:**
+```sql
+DROP POLICY IF EXISTS "Team members can update own ranking" ON public.ladder_rankings;
+```
 
-- `index.html` -- update favicon `<link>` tags (add sizes attributes and SVG reference)
-- `public/favicon.svg` -- new file, SVG version of the logo for crisp rendering
+**Policies that remain (sufficient for all operations):**
+- "Admins can manage rankings" (ALL) -- admin full access
+- "Anyone can view ladder rankings" (SELECT) -- public leaderboard
+- "Match participants can update rankings" (UPDATE) -- scoped to completed matches only
 
-## Result
+## No Code Changes Required
 
-The favicon will appear sharper and larger in browser tabs, especially on high-DPI displays, by giving browsers proper size hints and an SVG alternative.
+The client code in `ScoreConfirmationCard.tsx` already updates rankings in the context of a completed match, so it will continue to work under the "Match participants can update rankings" policy.
+
+## Other Policies Reviewed (No Issues)
+
+All other tables were reviewed and found to be properly configured:
+- **profiles**: Own profile + admin only (no public PII leak)
+- **public_profiles view**: SECURITY DEFINER intentionally excludes phone_number
+- **user_roles / user_permissions**: Admin/super_admin only for writes, own-record reads
+- **team_invitations**: Properly scoped to invited user + captain + admin
+- **tournament_participants**: Stakeholder-only SELECT, creator-only writes
+- **matches/challenges**: Team-member scoped writes, public reads (competition data)
+- **client_errors**: Recently tightened with user_id enforcement
 
