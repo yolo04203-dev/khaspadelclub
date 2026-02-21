@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Clock, MapPin, Pencil } from "lucide-react";
+import { CheckCircle, Clock, MapPin, Pencil, RotateCcw } from "lucide-react";
 import { RescheduleMatchDialog } from "./RescheduleMatchDialog";
 import { formatMatchDateTime } from "./matchDateFormat";
 
@@ -28,10 +28,11 @@ interface GroupMatchListProps {
   isAdmin: boolean;
   onSubmitScore: (matchId: string, team1Score: number, team2Score: number) => Promise<void>;
   onReschedule?: (matchId: string, scheduledAt: string | null, courtNumber: number | null) => Promise<void>;
+  onResetScore?: (matchId: string) => Promise<void>;
   setsPerMatch?: number;
 }
 
-export function GroupMatchList({ groupName, matches, isAdmin, onSubmitScore, onReschedule, setsPerMatch = 3 }: GroupMatchListProps) {
+export function GroupMatchList({ groupName, matches, isAdmin, onSubmitScore, onReschedule, onResetScore, setsPerMatch = 3 }: GroupMatchListProps) {
   const [scores, setScores] = useState<Record<string, { sets: { team1: string; team2: string }[] }>>({});
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [rescheduleMatch, setRescheduleMatch] = useState<GroupMatch | null>(null);
@@ -252,6 +253,13 @@ export function GroupMatchList({ groupName, matches, isAdmin, onSubmitScore, onR
                       </div>
                     </div>
                   </div>
+                  {isAdmin && onResetScore && (
+                    <div className="pt-2 mt-2 border-t flex gap-2">
+                      <Button variant="outline" size="sm" className="text-xs" onClick={() => onResetScore(match.id)}>
+                        <RotateCcw className="w-3 h-3 mr-1" />Reset Score
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </>

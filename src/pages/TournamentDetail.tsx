@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock, Banknote, Tag, Info, MapPin, Calendar, FileText, ChevronLeft, RotateCcw } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock, Banknote, Tag, Info, MapPin, Calendar, FileText, ChevronLeft, RotateCcw, Pencil } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -24,6 +24,7 @@ import type { TournamentCategory } from "@/components/tournament/CategoryManagem
 import type { SchedulingConfig } from "@/components/tournament/GenerateMatchesDialog";
 import { formatMatchDateTime } from "@/components/tournament/matchDateFormat";
 import { BulkRescheduleDialog } from "@/components/tournament/BulkRescheduleDialog";
+import { RescheduleMatchDialog } from "@/components/tournament/RescheduleMatchDialog";
 
 // Lazy-load admin-only components
 const AdminGroupManagement = lazy(() => import("@/components/tournament/AdminGroupManagement").then(m => ({ default: m.AdminGroupManagement })));
@@ -123,6 +124,7 @@ export default function TournamentDetail() {
   const [teamMembersMap, setTeamMembersMap] = useState<Map<string, { player1: string; player2: string }>>(new Map());
   const [registrationDialogOpen, setRegistrationDialogOpen] = useState(false);
   const [bulkRescheduleDialogOpen, setBulkRescheduleDialogOpen] = useState(false);
+  const [knockoutRescheduleMatch, setKnockoutRescheduleMatch] = useState<TournamentMatch | null>(null);
   const [inlineKnockoutScores, setInlineKnockoutScores] = useState<Record<string, { team1: string; team2: string }>>({});
   const [inlineSetsData, setInlineSetsData] = useState<Record<string, { team1Games: string; team2Games: string }[]>>({});
   const [inlineSubmitting, setInlineSubmitting] = useState<string | null>(null);
@@ -574,6 +576,43 @@ export default function TournamentDetail() {
     }
 
     sonnerToast.success("Match result saved");
+    fetchData();
+  };
+
+  const resetGroupMatchScore = async (matchId: string) => {
+    const match = matches.find(m => m.id === matchId);
+    if (!match || match.winner_team_id === null) return;
+
+    // Reverse standings: undo the winner's win and loser's loss
+    const winnerId = match.winner_team_id;
+    const loserId = winnerId === match.team1_id ? match.team2_id : match.team1_id;
+    const winnerScore = winnerId === match.team1_id ? (match.team1_score || 0) : (match.team2_score || 0);
+    const loserScore = loserId === match.team1_id ? (match.team1_score || 0) : (match.team2_score || 0);
+
+    const winner = participants.find(p => p.team_id === winnerId);
+    if (winner) {
+      await supabase.from("tournament_participants").update({
+        group_wins: Math.max(0, winner.group_wins - 1),
+        group_points_for: Math.max(0, winner.group_points_for - winnerScore),
+        group_points_against: Math.max(0, winner.group_points_against - loserScore),
+      }).eq("id", winner.id);
+    }
+
+    const loser = participants.find(p => p.team_id === loserId);
+    if (loser) {
+      await supabase.from("tournament_participants").update({
+        group_losses: Math.max(0, loser.group_losses - 1),
+        group_points_for: Math.max(0, loser.group_points_for - loserScore),
+        group_points_against: Math.max(0, loser.group_points_against - winnerScore),
+      }).eq("id", loser.id);
+    }
+
+    // Clear match score
+    await supabase.from("tournament_matches").update({
+      team1_score: null, team2_score: null, winner_team_id: null, completed_at: null,
+    }).eq("id", matchId);
+
+    sonnerToast.success("Group match score reset");
     fetchData();
   };
 
@@ -1073,7 +1112,17 @@ export default function TournamentDetail() {
                                           {match.court_number && <><MapPin className="w-3 h-3" />Court {match.court_number}</>}
                                           {match.court_number && match.scheduled_at && <span>—</span>}
                                           {match.scheduled_at && formatMatchDateTime(match.scheduled_at)}
+                                          {isAdmin && (
+                                            <Button variant="ghost" size="icon" className="h-5 w-5 ml-1" onClick={(e) => { e.stopPropagation(); setKnockoutRescheduleMatch(match); }}>
+                                              <Pencil className="w-3 h-3" />
+                                            </Button>
+                                          )}
                                         </div>
+                                      )}
+                                      {isAdmin && !match.court_number && !match.scheduled_at && (
+                                        <Button variant="ghost" size="sm" className="text-xs h-6 px-2" onClick={() => setKnockoutRescheduleMatch(match)}>
+                                          <Calendar className="w-3 h-3 mr-1" />Schedule
+                                        </Button>
                                       )}
                                       {/* Team 1 row */}
                                       {(() => {
@@ -1297,6 +1346,7 @@ export default function TournamentDetail() {
                               isAdmin={isAdmin}
                               onSubmitScore={submitGroupMatchScore}
                               onReschedule={isAdmin ? rescheduleMatch : undefined}
+                              onResetScore={isAdmin ? resetGroupMatchScore : undefined}
                               setsPerMatch={tournament.sets_per_match}
                             />
                           </AccordionContent>
@@ -1640,7 +1690,7 @@ export default function TournamentDetail() {
                   team1_score: m.team1_score, team2_score: m.team2_score, winner_team_id: m.winner_team_id,
                   scheduled_at: m.scheduled_at, court_number: m.court_number,
                 }));
-                return <GroupMatchList key={group.id} groupName={group.name} matches={gMatches} isAdmin={isAdmin} onSubmitScore={submitGroupMatchScore} onReschedule={isAdmin ? rescheduleMatch : undefined} setsPerMatch={tournament.sets_per_match} />;
+                return <GroupMatchList key={group.id} groupName={group.name} matches={gMatches} isAdmin={isAdmin} onSubmitScore={submitGroupMatchScore} onReschedule={isAdmin ? rescheduleMatch : undefined} onResetScore={isAdmin ? resetGroupMatchScore : undefined} setsPerMatch={tournament.sets_per_match} />;
               })}
             </div>
           )}
@@ -1807,6 +1857,21 @@ export default function TournamentDetail() {
         onConfirm={bulkRescheduleMatches}
         matchCount={scheduledMatchCount}
       />
+
+      {knockoutRescheduleMatch && (
+        <RescheduleMatchDialog
+          open={!!knockoutRescheduleMatch}
+          onOpenChange={(open) => { if (!open) setKnockoutRescheduleMatch(null); }}
+          onConfirm={async (scheduledAt, courtNumber) => {
+            await rescheduleMatch(knockoutRescheduleMatch.id, scheduledAt, courtNumber);
+            setKnockoutRescheduleMatch(null);
+          }}
+          currentScheduledAt={knockoutRescheduleMatch.scheduled_at}
+          currentCourtNumber={knockoutRescheduleMatch.court_number}
+          team1Name={getTeamName(knockoutRescheduleMatch.team1_id)}
+          team2Name={getTeamName(knockoutRescheduleMatch.team2_id)}
+        />
+      )}
     </div>
   );
 }
