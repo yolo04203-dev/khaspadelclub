@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Clock } from "lucide-react";
+import { CheckCircle, Clock, MapPin } from "lucide-react";
 
 interface GroupMatch {
   id: string;
@@ -16,6 +16,8 @@ interface GroupMatch {
   team1_score: number | null;
   team2_score: number | null;
   winner_team_id: string | null;
+  scheduled_at?: string | null;
+  court_number?: number | null;
 }
 
 interface GroupMatchListProps {
@@ -142,6 +144,13 @@ export function GroupMatchList({ groupName, matches, isAdmin, onSubmitScore, set
                   <div className="flex items-center gap-2 text-sm mb-2">
                     <Clock className="w-3 h-3 text-warning" />
                     <span className="text-muted-foreground">Pending</span>
+                    {(match.court_number || match.scheduled_at) && (
+                      <span className="ml-auto text-xs text-muted-foreground flex items-center gap-1">
+                        {match.court_number && <><MapPin className="w-3 h-3" />Court {match.court_number}</>}
+                        {match.court_number && match.scheduled_at && <span>—</span>}
+                        {match.scheduled_at && new Date(match.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
                   </div>
                   <div className="mb-3">
                     <div className="font-medium">
@@ -219,6 +228,13 @@ export function GroupMatchList({ groupName, matches, isAdmin, onSubmitScore, set
                     <div className="flex items-center gap-2 text-sm">
                       <CheckCircle className="w-3 h-3 text-success" />
                       <span className="text-muted-foreground">Completed</span>
+                      {(match.court_number || match.scheduled_at) && (
+                        <span className="ml-auto text-xs text-muted-foreground flex items-center gap-1">
+                          {match.court_number && <><MapPin className="w-3 h-3" />Court {match.court_number}</>}
+                          {match.court_number && match.scheduled_at && <span>—</span>}
+                          {match.scheduled_at && new Date(match.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
                     </div>
                     <div className="mt-1 flex items-center gap-3">
                       <div className={match.winner_team_id === match.team1_id ? "font-bold text-success" : ""}>

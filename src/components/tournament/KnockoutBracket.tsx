@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Crown } from "lucide-react";
+import { Trophy, Crown, MapPin } from "lucide-react";
 
 interface KnockoutMatch {
   id: string;
@@ -18,6 +18,8 @@ interface KnockoutMatch {
   team1_score: number | null;
   team2_score: number | null;
   winner_team_id: string | null;
+  scheduled_at?: string | null;
+  court_number?: number | null;
 }
 
 interface KnockoutBracketProps {
@@ -108,6 +110,13 @@ export function KnockoutBracket({ matches, isAdmin, onSubmitScore, winnerTeamId,
                     <Card key={match.id} className={match.winner_team_id ? "bg-muted/50" : ""}>
                       <CardContent className="py-3">
                         <div className="space-y-2">
+                          {(match.court_number || match.scheduled_at) && (
+                            <div className="text-xs text-muted-foreground flex items-center gap-1">
+                              {match.court_number && <><MapPin className="w-3 h-3" />Court {match.court_number}</>}
+                              {match.court_number && match.scheduled_at && <span>—</span>}
+                              {match.scheduled_at && new Date(match.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          )}
                           <div className="flex items-center justify-between">
                             <div className={`flex-1 ${match.winner_team_id === match.team1_id ? "font-bold text-success" : ""}`}>
                               {match.team1_name || "TBD"}

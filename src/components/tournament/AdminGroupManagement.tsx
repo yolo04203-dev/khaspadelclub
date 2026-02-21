@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Shuffle, Plus, Users, Trash2, Play, UserX } from "lucide-react";
+import { GenerateMatchesDialog, type SchedulingConfig } from "./GenerateMatchesDialog";
 import { toast } from "sonner";
 
 interface Team {
@@ -28,9 +29,9 @@ interface AdminGroupManagementProps {
   onDeleteGroup: (groupId: string) => Promise<void>;
   onAssignTeam: (teamId: string, groupId: string | null) => Promise<void>;
   onRandomAssign: () => Promise<void>;
-  onGenerateGroupMatches: () => Promise<void>;
+  onGenerateGroupMatches: (config: SchedulingConfig) => Promise<void>;
   canStartKnockout: boolean;
-  onStartKnockout: () => Promise<void>;
+  onStartKnockout: (config: SchedulingConfig) => Promise<void>;
   onKickTeam?: (participantId: string, teamName: string) => Promise<void>;
   setsPerMatch?: number;
   onSetsPerMatchChange?: (sets: number) => Promise<void>;
@@ -54,6 +55,8 @@ export function AdminGroupManagement({
 }: AdminGroupManagementProps) {
   const [newGroupName, setNewGroupName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [groupMatchesDialogOpen, setGroupMatchesDialogOpen] = useState(false);
+  const [knockoutDialogOpen, setKnockoutDialogOpen] = useState(false);
 
   const handleCreateGroup = async () => {
     if (!newGroupName.trim()) {
@@ -249,15 +252,30 @@ export function AdminGroupManagement({
         {/* Generate Matches & Start Knockout */}
         {groups.length > 0 && unassignedTeams.length === 0 && (
           <div className="flex gap-2 flex-wrap pt-4 border-t">
-            <Button onClick={onGenerateGroupMatches}>
+            <Button onClick={() => setGroupMatchesDialogOpen(true)}>
               <Play className="w-4 h-4 mr-2" />
               Generate Group Matches
             </Button>
             {canStartKnockout && (
-              <Button variant="default" onClick={onStartKnockout}>
+              <Button variant="default" onClick={() => setKnockoutDialogOpen(true)}>
                 Start Knockout Stage
               </Button>
             )}
+
+            <GenerateMatchesDialog
+              open={groupMatchesDialogOpen}
+              onOpenChange={setGroupMatchesDialogOpen}
+              onConfirm={onGenerateGroupMatches}
+              title="Schedule Group Matches"
+              description="Set the start time, match duration, and number of courts for group stage matches."
+            />
+            <GenerateMatchesDialog
+              open={knockoutDialogOpen}
+              onOpenChange={setKnockoutDialogOpen}
+              onConfirm={onStartKnockout}
+              title="Schedule Knockout Matches"
+              description="Set the start time, match duration, and number of courts for knockout stage matches."
+            />
           </div>
         )}
       </CardContent>

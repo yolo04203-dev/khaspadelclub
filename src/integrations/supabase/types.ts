@@ -967,7 +967,9 @@ export type Database = {
         Row: {
           category_id: string | null
           completed_at: string | null
+          court_number: number | null
           created_at: string
+          duration_minutes: number | null
           group_id: string | null
           id: string
           is_losers_bracket: boolean
@@ -986,7 +988,9 @@ export type Database = {
         Insert: {
           category_id?: string | null
           completed_at?: string | null
+          court_number?: number | null
           created_at?: string
+          duration_minutes?: number | null
           group_id?: string | null
           id?: string
           is_losers_bracket?: boolean
@@ -1005,7 +1009,9 @@ export type Database = {
         Update: {
           category_id?: string | null
           completed_at?: string | null
+          court_number?: number | null
           created_at?: string
+          duration_minutes?: number | null
           group_id?: string | null
           id?: string
           is_losers_bracket?: boolean
