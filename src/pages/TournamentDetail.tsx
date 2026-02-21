@@ -101,6 +101,7 @@ interface UserTeam {
   id: string;
   name: string;
 }
+
 export default function TournamentDetail() {
   const { id } = useParams<{ id: string }>();
   const { user, role } = useAuth();
@@ -645,6 +646,7 @@ export default function TournamentDetail() {
   };
 
 
+  const startKnockoutStage = async (config: SchedulingConfig) => {
     if (!tournament) return;
 
     const categoryId = categories.length > 0 && selectedCategoryId ? selectedCategoryId : null;
