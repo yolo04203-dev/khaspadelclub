@@ -257,7 +257,7 @@ export default function FindOpponents() {
           challengedTeamName: challengingTeam.team_name,
         },
       }).then(({ error }) => {
-        if (error) console.error("Failed to send challenge notification email:", error);
+        if (error) logger.apiError("sendChallengeNotificationEmail", error);
       });
 
       toast({

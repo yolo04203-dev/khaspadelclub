@@ -31,6 +31,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 interface Tournament {
   id: string;
@@ -70,7 +71,7 @@ export function TournamentsTab({ tournaments, onRefresh }: TournamentsTabProps) 
       toast.success("Tournament deleted successfully");
       onRefresh();
     } catch (error) {
-      console.error("Error deleting tournament:", error);
+      logger.apiError("deleteTournament", error);
       toast.error("Failed to delete tournament");
     } finally {
       setIsDeleting(false);
