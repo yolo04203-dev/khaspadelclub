@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, lazy, Suspense } from "react";
+import { cn } from "@/lib/utils";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock, Banknote, Tag, Info, MapPin, Calendar, FileText, ChevronLeft } from "lucide-react";
@@ -122,6 +123,7 @@ export default function TournamentDetail() {
   const [registrationDialogOpen, setRegistrationDialogOpen] = useState(false);
   const [bulkRescheduleDialogOpen, setBulkRescheduleDialogOpen] = useState(false);
   const [inlineKnockoutScores, setInlineKnockoutScores] = useState<Record<string, { team1: string; team2: string }>>({});
+  const [inlineSetsData, setInlineSetsData] = useState<Record<string, { team1Games: string; team2Games: string }[]>>({});
   const [inlineSubmitting, setInlineSubmitting] = useState<string | null>(null);
   const [userTeamMemberCount, setUserTeamMemberCount] = useState(0);
   const [paymentParticipants, setPaymentParticipants] = useState<Array<{
@@ -1050,61 +1052,130 @@ export default function TournamentDetail() {
                                         {match.team2_score !== null && <span className="font-mono font-semibold">{match.team2_score}</span>}
                                       </div>
                                       {/* Admin score entry for knockout matches */}
-                                      {isAdmin && !match.winner_team_id && match.team1_id && match.team2_id && (
-                                        <div className="flex items-center gap-2 pt-2 border-t mt-2">
-                                          <Input
-                                            type="number"
-                                            min={0}
-                                            placeholder="0"
-                                            className="w-16 text-center"
-                                            value={inlineKnockoutScores[match.id]?.team1 || ""}
-                                            onChange={(e) =>
-                                              setInlineKnockoutScores(prev => ({
-                                                ...prev,
-                                                [match.id]: { ...prev[match.id], team1: e.target.value },
-                                              }))
-                                            }
-                                          />
-                                          <span className="text-muted-foreground">-</span>
-                                          <Input
-                                            type="number"
-                                            min={0}
-                                            placeholder="0"
-                                            className="w-16 text-center"
-                                            value={inlineKnockoutScores[match.id]?.team2 || ""}
-                                            onChange={(e) =>
-                                              setInlineKnockoutScores(prev => ({
-                                                ...prev,
-                                                [match.id]: { ...prev[match.id], team2: e.target.value },
-                                              }))
-                                            }
-                                          />
-                                          <Button
-                                            size="sm"
-                                            disabled={inlineSubmitting === match.id || !inlineKnockoutScores[match.id]?.team1 || !inlineKnockoutScores[match.id]?.team2}
-                                            onClick={async () => {
-                                              const s = inlineKnockoutScores[match.id];
-                                              if (!s) return;
-                                              const t1 = parseInt(s.team1);
-                                              const t2 = parseInt(s.team2);
-                                              if (isNaN(t1) || isNaN(t2) || t1 === t2) return;
-                                              setInlineSubmitting(match.id);
-                                              try {
-                                                await submitKnockoutScore(match.id, t1, t2);
-                                                setInlineKnockoutScores(prev => {
-                                                  const updated = { ...prev };
-                                                  delete updated[match.id];
-                                                  return updated;
-                                                });
-                                              } finally {
-                                                setInlineSubmitting(null);
-                                              }
-                                            }}
-                                          >
-                                            {inlineSubmitting === match.id ? "..." : "Save"}
-                                          </Button>
-                                        </div>
-                                      )}
+                                      {isAdmin && !match.winner_team_id && match.team1_id && match.team2_id && (() => {
+                                        const setsPerMatch = match.sets_per_match ?? 1;
+                                        const isBo3 = setsPerMatch === 3;
+
+                                        if (isBo3) {
+                                          const matchSets = inlineSetsData[match.id] || [
+                                            { team1Games: "", team2Games: "" },
+                                            { team1Games: "", team2Games: "" },
+                                            { team1Games: "", team2Games: "" },
+                                          ];
+                                          const isValidSet = (a: number, b: number) => {
+                                            const w = (x: number, y: number) => (x === 6 && y <= 4) || (x === 7 && y === 5) || (x === 7 && y === 6);
+                                            return w(a, b) || w(b, a);
+                                          };
+                                          const getSetWinner = (a: number, b: number) => {
+                                            if (a > b && (a === 6 || a === 7)) return "t1";
+                                            if (b > a && (b === 6 || b === 7)) return "t2";
+                                            return null;
+                                          };
+                                          let t1Won = 0, t2Won = 0;
+                                          for (const s of matchSets) {
+                                            if (s.team1Games === "" || s.team2Games === "") continue;
+                                            const w = getSetWinner(parseInt(s.team1Games), parseInt(s.team2Games));
+                                            if (w === "t1") t1Won++;
+                                            if (w === "t2") t2Won++;
+                                          }
+                                          const decided = t1Won === 2 || t2Won === 2;
+
+                                          return (
+                                            <div className="pt-2 border-t mt-2 space-y-2">
+                                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                                <span>Sets: {t1Won} - {t2Won}</span>
+                                                <span className="text-[10px]">Valid: 6-0…6-4, 7-5, 7-6</span>
+                                              </div>
+                                              {matchSets.map((set, idx) => {
+                                                const filled = set.team1Games !== "" && set.team2Games !== "";
+                                                const valid = filled ? isValidSet(parseInt(set.team1Games), parseInt(set.team2Games)) : true;
+                                                const disabled = decided && !filled;
+                                                return (
+                                                  <div key={idx} className="flex items-center gap-2">
+                                                    <span className="w-8 text-xs text-muted-foreground">S{idx+1}</span>
+                                                    <Input
+                                                      type="text" inputMode="numeric" maxLength={1}
+                                                      value={set.team1Games}
+                                                      onChange={(e) => {
+                                                        const v = e.target.value;
+                                                        if (v && !/^[0-7]$/.test(v)) return;
+                                                        const updated = [...matchSets];
+                                                        updated[idx] = { ...updated[idx], team1Games: v };
+                                                        setInlineSetsData(prev => ({ ...prev, [match.id]: updated }));
+                                                      }}
+                                                      disabled={disabled}
+                                                      placeholder="0"
+                                                      className={cn("w-12 h-9 text-center text-sm font-mono", filled && !valid && "border-destructive")}
+                                                    />
+                                                    <span className="text-muted-foreground text-xs">-</span>
+                                                    <Input
+                                                      type="text" inputMode="numeric" maxLength={1}
+                                                      value={set.team2Games}
+                                                      onChange={(e) => {
+                                                        const v = e.target.value;
+                                                        if (v && !/^[0-7]$/.test(v)) return;
+                                                        const updated = [...matchSets];
+                                                        updated[idx] = { ...updated[idx], team2Games: v };
+                                                        setInlineSetsData(prev => ({ ...prev, [match.id]: updated }));
+                                                      }}
+                                                      disabled={disabled}
+                                                      placeholder="0"
+                                                      className={cn("w-12 h-9 text-center text-sm font-mono", filled && !valid && "border-destructive")}
+                                                    />
+                                                  </div>
+                                                );
+                                              })}
+                                              <Button
+                                                size="sm" className="w-full"
+                                                disabled={inlineSubmitting === match.id || !decided}
+                                                onClick={async () => {
+                                                  setInlineSubmitting(match.id);
+                                                  try {
+                                                    await submitKnockoutScore(match.id, t1Won, t2Won);
+                                                    setInlineSetsData(prev => { const u = { ...prev }; delete u[match.id]; return u; });
+                                                  } finally { setInlineSubmitting(null); }
+                                                }}
+                                              >
+                                                {inlineSubmitting === match.id ? "..." : "Save Result"}
+                                              </Button>
+                                            </div>
+                                          );
+                                        }
+
+                                        // Single set entry
+                                        return (
+                                          <div className="flex items-center gap-2 pt-2 border-t mt-2">
+                                            <Input
+                                              type="number" min={0} placeholder="0" className="w-16 text-center"
+                                              value={inlineKnockoutScores[match.id]?.team1 || ""}
+                                              onChange={(e) => setInlineKnockoutScores(prev => ({ ...prev, [match.id]: { ...prev[match.id], team1: e.target.value } }))}
+                                            />
+                                            <span className="text-muted-foreground">-</span>
+                                            <Input
+                                              type="number" min={0} placeholder="0" className="w-16 text-center"
+                                              value={inlineKnockoutScores[match.id]?.team2 || ""}
+                                              onChange={(e) => setInlineKnockoutScores(prev => ({ ...prev, [match.id]: { ...prev[match.id], team2: e.target.value } }))}
+                                            />
+                                            <Button
+                                              size="sm"
+                                              disabled={inlineSubmitting === match.id || !inlineKnockoutScores[match.id]?.team1 || !inlineKnockoutScores[match.id]?.team2}
+                                              onClick={async () => {
+                                                const s = inlineKnockoutScores[match.id];
+                                                if (!s) return;
+                                                const t1 = parseInt(s.team1), t2 = parseInt(s.team2);
+                                                if (isNaN(t1) || isNaN(t2) || t1 === t2) return;
+                                                setInlineSubmitting(match.id);
+                                                try {
+                                                  await submitKnockoutScore(match.id, t1, t2);
+                                                  setInlineKnockoutScores(prev => { const u = { ...prev }; delete u[match.id]; return u; });
+                                                } finally { setInlineSubmitting(null); }
+                                              }}
+                                            >
+                                              {inlineSubmitting === match.id ? "..." : "Save"}
+                                            </Button>
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   </CardContent>
                                 </Card>
