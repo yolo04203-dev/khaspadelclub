@@ -3,10 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trophy, Crown, MapPin, Pencil } from "lucide-react";
+import { Trophy, Crown, MapPin, Pencil, Check } from "lucide-react";
 import { RescheduleMatchDialog } from "./RescheduleMatchDialog";
 import { formatMatchDateTime } from "./matchDateFormat";
+import { cn } from "@/lib/utils";
 
 interface KnockoutMatch {
   id: string;
@@ -42,31 +44,97 @@ interface KnockoutBracketProps {
   winnerTeamName?: string;
 }
 
+interface SetScore {
+  team1Games: string;
+  team2Games: string;
+}
+
+function isValidSetScore(a: number, b: number): boolean {
+  const wins = (x: number, y: number) =>
+    (x === 6 && y <= 4) || (x === 7 && y === 5) || (x === 7 && y === 6);
+  return wins(a, b) || wins(b, a);
+}
+
+function getSetWinner(a: number, b: number): "team1" | "team2" | null {
+  if (a > b && (a === 6 || a === 7)) return "team1";
+  if (b > a && (b === 6 || b === 7)) return "team2";
+  return null;
+}
+
 export function KnockoutBracket({ matches, isAdmin, onSubmitScore, onReschedule, onAssignTeam, availableTeams, winnerTeamId, winnerTeamName }: KnockoutBracketProps) {
   const [scores, setScores] = useState<Record<string, { team1: string; team2: string }>>({});
+  const [setsData, setSetsData] = useState<Record<string, SetScore[]>>({});
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [rescheduleMatch, setRescheduleMatch] = useState<KnockoutMatch | null>(null);
   const [assigning, setAssigning] = useState<string | null>(null);
 
+  const isBestOf3 = (match: KnockoutMatch) => (match.sets_per_match ?? 1) === 3;
+
+  const getMatchSets = (matchId: string): SetScore[] => {
+    return setsData[matchId] || [
+      { team1Games: "", team2Games: "" },
+      { team1Games: "", team2Games: "" },
+      { team1Games: "", team2Games: "" },
+    ];
+  };
+
+  const updateSetScore = (matchId: string, setIndex: number, field: "team1Games" | "team2Games", value: string) => {
+    if (value && !/^[0-7]$/.test(value)) return;
+    const current = getMatchSets(matchId);
+    const updated = [...current];
+    updated[setIndex] = { ...updated[setIndex], [field]: value };
+    setSetsData(prev => ({ ...prev, [matchId]: updated }));
+  };
+
+  const computeSetsWon = (matchId: string) => {
+    const matchSets = getMatchSets(matchId);
+    let team1 = 0, team2 = 0;
+    for (const s of matchSets) {
+      if (s.team1Games === "" || s.team2Games === "") continue;
+      const w = getSetWinner(parseInt(s.team1Games), parseInt(s.team2Games));
+      if (w === "team1") team1++;
+      if (w === "team2") team2++;
+    }
+    return { team1, team2 };
+  };
+
+  const canSubmitBo3 = (matchId: string) => {
+    const { team1, team2 } = computeSetsWon(matchId);
+    return team1 === 2 || team2 === 2;
+  };
+
   const handleSubmit = async (match: KnockoutMatch) => {
-    const scoreData = scores[match.id];
-    if (!scoreData) return;
-
-    const team1Score = parseInt(scoreData.team1);
-    const team2Score = parseInt(scoreData.team2);
-
-    if (isNaN(team1Score) || isNaN(team2Score) || team1Score === team2Score) return;
-
-    setSubmitting(match.id);
-    try {
-      await onSubmitScore(match.id, team1Score, team2Score);
-      setScores(prev => {
-        const updated = { ...prev };
-        delete updated[match.id];
-        return updated;
-      });
-    } finally {
-      setSubmitting(null);
+    if (isBestOf3(match)) {
+      const { team1, team2 } = computeSetsWon(match.id);
+      if (team1 < 2 && team2 < 2) return;
+      setSubmitting(match.id);
+      try {
+        await onSubmitScore(match.id, team1, team2);
+        setSetsData(prev => {
+          const updated = { ...prev };
+          delete updated[match.id];
+          return updated;
+        });
+      } finally {
+        setSubmitting(null);
+      }
+    } else {
+      const scoreData = scores[match.id];
+      if (!scoreData) return;
+      const team1Score = parseInt(scoreData.team1);
+      const team2Score = parseInt(scoreData.team2);
+      if (isNaN(team1Score) || isNaN(team2Score) || team1Score === team2Score) return;
+      setSubmitting(match.id);
+      try {
+        await onSubmitScore(match.id, team1Score, team2Score);
+        setScores(prev => {
+          const updated = { ...prev };
+          delete updated[match.id];
+          return updated;
+        });
+      } finally {
+        setSubmitting(null);
+      }
     }
   };
 
@@ -80,7 +148,6 @@ export function KnockoutBracket({ matches, isAdmin, onSubmitScore, onReschedule,
     }
   };
 
-  // Collect team IDs already assigned in knockout matches
   const assignedTeamIds = new Set(
     matches.flatMap(m => [m.team1_id, m.team2_id]).filter(Boolean) as string[]
   );
@@ -148,6 +215,111 @@ export function KnockoutBracket({ matches, isAdmin, onSubmitScore, onReschedule,
     );
   };
 
+  const renderSingleSetEntry = (match: KnockoutMatch) => (
+    <div className="flex items-center gap-2 pt-2 border-t mt-2">
+      <Input
+        type="number"
+        min={0}
+        placeholder="0"
+        className="w-16 text-center"
+        value={scores[match.id]?.team1 || ""}
+        onChange={(e) =>
+          setScores(prev => ({
+            ...prev,
+            [match.id]: { ...prev[match.id], team1: e.target.value },
+          }))
+        }
+      />
+      <span className="text-muted-foreground">-</span>
+      <Input
+        type="number"
+        min={0}
+        placeholder="0"
+        className="w-16 text-center"
+        value={scores[match.id]?.team2 || ""}
+        onChange={(e) =>
+          setScores(prev => ({
+            ...prev,
+            [match.id]: { ...prev[match.id], team2: e.target.value },
+          }))
+        }
+      />
+      <Button
+        size="sm"
+        onClick={() => handleSubmit(match)}
+        disabled={submitting === match.id || !scores[match.id]?.team1 || !scores[match.id]?.team2}
+      >
+        {submitting === match.id ? "..." : "Save"}
+      </Button>
+    </div>
+  );
+
+  const renderBestOf3Entry = (match: KnockoutMatch) => {
+    const matchSets = getMatchSets(match.id);
+    const { team1, team2 } = computeSetsWon(match.id);
+    const matchDecided = team1 === 2 || team2 === 2;
+
+    return (
+      <div className="pt-2 border-t mt-2 space-y-2">
+        {/* Sets won summary */}
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Sets: {match.team1_name.split(" ")[0]} {team1} - {team2} {match.team2_name.split(" ")[0]}</span>
+          <span className="text-[10px]">Valid: 6-0…6-4, 7-5, 7-6</span>
+        </div>
+        {matchSets.map((set, idx) => {
+          const isFilled = set.team1Games !== "" && set.team2Games !== "";
+          const setWinner = isFilled ? getSetWinner(parseInt(set.team1Games), parseInt(set.team2Games)) : null;
+          const valid = isFilled ? isValidSetScore(parseInt(set.team1Games), parseInt(set.team2Games)) : true;
+          const isDisabled = matchDecided && !isFilled;
+
+          return (
+            <div key={idx} className="flex items-center gap-2">
+              <Label className="w-10 text-xs text-muted-foreground shrink-0">S{idx + 1}</Label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                value={set.team1Games}
+                onChange={(e) => updateSetScore(match.id, idx, "team1Games", e.target.value)}
+                disabled={isDisabled}
+                placeholder="0"
+                className={cn(
+                  "w-12 h-9 text-center text-sm font-mono",
+                  setWinner === "team1" && "border-accent bg-accent/10",
+                  isFilled && !valid && "border-destructive"
+                )}
+              />
+              <span className="text-muted-foreground text-xs">-</span>
+              <Input
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                value={set.team2Games}
+                onChange={(e) => updateSetScore(match.id, idx, "team2Games", e.target.value)}
+                disabled={isDisabled}
+                placeholder="0"
+                className={cn(
+                  "w-12 h-9 text-center text-sm font-mono",
+                  setWinner === "team2" && "border-accent bg-accent/10",
+                  isFilled && !valid && "border-destructive"
+                )}
+              />
+              {setWinner && valid && <Check className="w-3 h-3 text-accent shrink-0" />}
+            </div>
+          );
+        })}
+        <Button
+          size="sm"
+          className="w-full"
+          onClick={() => handleSubmit(match)}
+          disabled={submitting === match.id || !canSubmitBo3(match.id)}
+        >
+          {submitting === match.id ? "..." : "Save Result"}
+        </Button>
+      </div>
+    );
+  };
+
   return (
     <>
       <Card>
@@ -211,46 +383,7 @@ export function KnockoutBracket({ matches, isAdmin, onSubmitScore, onReschedule,
                             {renderTeamSlot(match, "team2")}
 
                             {isAdmin && !match.winner_team_id && match.team1_id && match.team2_id && (
-                              <div className="flex items-center gap-2 pt-2 border-t mt-2">
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  placeholder="0"
-                                  className="w-16 text-center"
-                                  value={scores[match.id]?.team1 || ""}
-                                  onChange={(e) =>
-                                    setScores(prev => ({
-                                      ...prev,
-                                      [match.id]: { ...prev[match.id], team1: e.target.value },
-                                    }))
-                                  }
-                                />
-                                <span className="text-muted-foreground">-</span>
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  placeholder="0"
-                                  className="w-16 text-center"
-                                  value={scores[match.id]?.team2 || ""}
-                                  onChange={(e) =>
-                                    setScores(prev => ({
-                                      ...prev,
-                                      [match.id]: { ...prev[match.id], team2: e.target.value },
-                                    }))
-                                  }
-                                />
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleSubmit(match)}
-                                  disabled={
-                                    submitting === match.id ||
-                                    !scores[match.id]?.team1 ||
-                                    !scores[match.id]?.team2
-                                  }
-                                >
-                                  {submitting === match.id ? "..." : "Save"}
-                                </Button>
-                              </div>
+                              isBestOf3(match) ? renderBestOf3Entry(match) : renderSingleSetEntry(match)
                             )}
                           </div>
                         </CardContent>
