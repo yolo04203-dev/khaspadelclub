@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trophy, Crown, MapPin, Pencil, Check } from "lucide-react";
+import { Trophy, Crown, MapPin, Pencil, Check, RotateCcw } from "lucide-react";
 import { RescheduleMatchDialog } from "./RescheduleMatchDialog";
 import { formatMatchDateTime } from "./matchDateFormat";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,7 @@ interface KnockoutBracketProps {
   onSubmitScore: (matchId: string, team1Score: number, team2Score: number) => Promise<void>;
   onReschedule?: (matchId: string, scheduledAt: string | null, courtNumber: number | null) => Promise<void>;
   onAssignTeam?: (matchId: string, slot: "team1" | "team2", teamId: string) => Promise<void>;
+  onResetScore?: (matchId: string) => Promise<void>;
   availableTeams?: AvailableTeam[];
   winnerTeamId?: string | null;
   winnerTeamName?: string;
@@ -61,7 +62,7 @@ function getSetWinner(a: number, b: number): "team1" | "team2" | null {
   return null;
 }
 
-export function KnockoutBracket({ matches, isAdmin, onSubmitScore, onReschedule, onAssignTeam, availableTeams, winnerTeamId, winnerTeamName }: KnockoutBracketProps) {
+export function KnockoutBracket({ matches, isAdmin, onSubmitScore, onReschedule, onAssignTeam, onResetScore, availableTeams, winnerTeamId, winnerTeamName }: KnockoutBracketProps) {
   const [scores, setScores] = useState<Record<string, { team1: string; team2: string }>>({});
   const [setsData, setSetsData] = useState<Record<string, SetScore[]>>({});
   const [submitting, setSubmitting] = useState<string | null>(null);
@@ -185,16 +186,17 @@ export function KnockoutBracket({ matches, isAdmin, onSubmitScore, onReschedule,
     return (
       <div className="flex items-center justify-between">
         <div className={`flex-1 ${isWinner ? "font-bold text-success" : ""}`}>
-          {isTBD && isAdmin && onAssignTeam && unassignedTeams.length > 0 && !match.winner_team_id ? (
+          {isAdmin && onAssignTeam && !match.winner_team_id && availableTeams && availableTeams.length > 0 ? (
             <Select
+              value={teamId || ""}
               onValueChange={(val) => handleAssignTeam(match.id, slot, val)}
               disabled={assigning === `${match.id}-${slot}`}
             >
               <SelectTrigger className="h-8 text-xs w-full max-w-[180px]">
-                <SelectValue placeholder="Assign team…" />
+                <SelectValue placeholder="Assign team…">{teamName || "Assign team…"}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {unassignedTeams.map(t => (
+                {availableTeams.map(t => (
                   <SelectItem key={t.team_id} value={t.team_id}>
                     {t.team_name}
                   </SelectItem>
@@ -384,6 +386,13 @@ export function KnockoutBracket({ matches, isAdmin, onSubmitScore, onReschedule,
 
                             {isAdmin && !match.winner_team_id && match.team1_id && match.team2_id && (
                               isBestOf3(match) ? renderBestOf3Entry(match) : renderSingleSetEntry(match)
+                            )}
+                            {isAdmin && match.winner_team_id && onResetScore && (
+                              <div className="pt-2 border-t mt-2">
+                                <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => onResetScore(match.id)}>
+                                  <RotateCcw className="w-3 h-3 mr-1" />Reset Score
+                                </Button>
+                              </div>
                             )}
                           </div>
                         </CardContent>

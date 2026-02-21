@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock, Banknote, Tag, Info, MapPin, Calendar, FileText, ChevronLeft } from "lucide-react";
+import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock, Banknote, Tag, Info, MapPin, Calendar, FileText, ChevronLeft, RotateCcw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { GroupStandings } from "@/components/tournament/GroupStandings";
 import { GroupMatchList } from "@/components/tournament/GroupMatchList";
@@ -602,6 +603,41 @@ export default function TournamentDetail() {
     fetchData();
   };
 
+  const resetKnockoutScore = async (matchId: string) => {
+    const match = matches.find(m => m.id === matchId);
+    if (!match || !tournament) return;
+
+    // Reset this match
+    await supabase.from("tournament_matches").update({
+      team1_score: null, team2_score: null, winner_team_id: null, completed_at: null,
+    }).eq("id", matchId);
+
+    // Clear winner propagation to next round
+    const knockoutAll = matches.filter(m => m.stage === "knockout");
+    const nextRoundMatches = knockoutAll.filter(m => m.round_number === match.round_number + 1);
+    if (nextRoundMatches.length > 0) {
+      const nextMatchIndex = Math.floor((match.match_number - 1) / 2);
+      const nextMatch = nextRoundMatches[nextMatchIndex];
+      if (nextMatch) {
+        const isTeam1 = match.match_number % 2 === 1;
+        // Only clear if the propagated team was the winner of this match
+        if (isTeam1 && nextMatch.team1_id === match.winner_team_id) {
+          await supabase.from("tournament_matches").update({ team1_id: null }).eq("id", nextMatch.id);
+        } else if (!isTeam1 && nextMatch.team2_id === match.winner_team_id) {
+          await supabase.from("tournament_matches").update({ team2_id: null }).eq("id", nextMatch.id);
+        }
+      }
+    }
+
+    // If tournament was completed by this match, revert
+    if (nextRoundMatches.length === 0 && tournament.status === "completed") {
+      await supabase.from("tournaments").update({ status: "in_progress", winner_team_id: null, completed_at: null }).eq("id", tournament.id);
+    }
+
+    sonnerToast.success("Match score reset");
+    fetchData();
+  };
+
   const assignKnockoutTeam = async (matchId: string, slot: "team1" | "team2", teamId: string) => {
     const update = slot === "team1" ? { team1_id: teamId } : { team2_id: teamId };
     const { error } = await supabase.from("tournament_matches").update(update).eq("id", matchId);
@@ -1039,18 +1075,50 @@ export default function TournamentDetail() {
                                           {match.scheduled_at && formatMatchDateTime(match.scheduled_at)}
                                         </div>
                                       )}
+                                      {/* Team 1 row */}
                                       <div className="flex items-center justify-between">
                                         <div className={`flex-1 ${match.winner_team_id === match.team1_id ? "font-bold text-success" : ""}`}>
-                                          {getTeamName(match.team1_id)}
+                                          {isAdmin && !match.winner_team_id ? (
+                                            <Select value={match.team1_id || ""} onValueChange={(val) => assignKnockoutTeam(match.id, "team1", val)}>
+                                              <SelectTrigger className="h-8 text-xs w-full max-w-[180px]">
+                                                <SelectValue placeholder="Assign team…">{getTeamName(match.team1_id)}</SelectValue>
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                {registeredParticipants.map(p => (
+                                                  <SelectItem key={p.team_id} value={p.team_id}>{p.custom_team_name || p.team_name || "Unknown"}</SelectItem>
+                                                ))}
+                                              </SelectContent>
+                                            </Select>
+                                          ) : getTeamName(match.team1_id)}
                                         </div>
                                         {match.team1_score !== null && <span className="font-mono font-semibold">{match.team1_score}</span>}
                                       </div>
+                                      {/* Team 2 row */}
                                       <div className="flex items-center justify-between">
                                         <div className={`flex-1 ${match.winner_team_id === match.team2_id ? "font-bold text-success" : ""}`}>
-                                          {getTeamName(match.team2_id)}
+                                          {isAdmin && !match.winner_team_id ? (
+                                            <Select value={match.team2_id || ""} onValueChange={(val) => assignKnockoutTeam(match.id, "team2", val)}>
+                                              <SelectTrigger className="h-8 text-xs w-full max-w-[180px]">
+                                                <SelectValue placeholder="Assign team…">{getTeamName(match.team2_id)}</SelectValue>
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                {registeredParticipants.map(p => (
+                                                  <SelectItem key={p.team_id} value={p.team_id}>{p.custom_team_name || p.team_name || "Unknown"}</SelectItem>
+                                                ))}
+                                              </SelectContent>
+                                            </Select>
+                                          ) : getTeamName(match.team2_id)}
                                         </div>
                                         {match.team2_score !== null && <span className="font-mono font-semibold">{match.team2_score}</span>}
                                       </div>
+                                      {/* Admin: Reset score button for completed matches */}
+                                      {isAdmin && match.winner_team_id && (
+                                        <div className="pt-2 border-t mt-2">
+                                          <Button variant="outline" size="sm" className="w-full text-xs" onClick={() => resetKnockoutScore(match.id)}>
+                                            <RotateCcw className="w-3 h-3 mr-1" />Reset Score
+                                          </Button>
+                                        </div>
+                                      )}
                                       {/* Admin score entry for knockout matches */}
                                       {isAdmin && !match.winner_team_id && match.team1_id && match.team2_id && (() => {
                                         const setsPerMatch = match.sets_per_match ?? 1;
@@ -1570,6 +1638,7 @@ export default function TournamentDetail() {
             matches={knockoutMatches.map(m => ({ ...m, team1_name: getTeamName(m.team1_id), team2_name: getTeamName(m.team2_id), team1_players: getTeamPlayers(m.team1_id), team2_players: getTeamPlayers(m.team2_id) }))}
             isAdmin={isAdmin} onSubmitScore={submitKnockoutScore} onReschedule={isAdmin ? rescheduleMatch : undefined}
             onAssignTeam={isAdmin ? assignKnockoutTeam : undefined}
+            onResetScore={isAdmin ? resetKnockoutScore : undefined}
             availableTeams={registeredParticipants.map(p => ({ team_id: p.team_id, team_name: p.custom_team_name || p.team_name || "Unknown" }))}
             winnerTeamId={tournament.winner_team_id}
             winnerTeamName={tournament.winner_team_id ? getTeamName(tournament.winner_team_id) : undefined}
