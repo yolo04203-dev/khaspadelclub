@@ -47,7 +47,7 @@ const REPLAYS_ERROR_RATE = IS_DEV ? 1.0 : 0.5; // Moderate crash-only sampling
 
 export function initErrorReporting() {
   if (!SENTRY_DSN) {
-    console.warn("[ErrorReporting] No VITE_SENTRY_DSN configured, skipping Sentry init");
+    if (import.meta.env.DEV) console.warn("[ErrorReporting] No VITE_SENTRY_DSN configured, skipping Sentry init");
     return;
   }
 

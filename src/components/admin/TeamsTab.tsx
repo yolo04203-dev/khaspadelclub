@@ -192,7 +192,7 @@ export function TeamsTab({ teams, onRefresh }: TeamsTabProps) {
       toast.success("Ranks updated");
       onRefresh();
     } catch (error) {
-      console.error("Error updating ranks:", error);
+      logger.apiError("updateTeamRanks", error);
       toast.error("Failed to update ranks");
     }
   };

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { logger } from "@/lib/logger";
 
 interface NotificationCounts {
   incomingChallenges: number;
@@ -116,7 +117,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
       setCounts(newCounts);
     } catch (error) {
-      console.error("Error fetching notification counts:", error);
+      logger.apiError("fetchNotificationCounts", error);
     } finally {
       setIsLoading(false);
     }

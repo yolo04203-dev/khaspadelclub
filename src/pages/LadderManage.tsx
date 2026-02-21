@@ -53,6 +53,7 @@ export default function LadderManage() {
   const [availableTeams, setAvailableTeams] = useState<AvailableTeam[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<string>("");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -145,7 +146,7 @@ export default function LadderManage() {
     };
 
     fetchData();
-  }, [id]);
+  }, [id, refreshKey]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -403,7 +404,7 @@ export default function LadderManage() {
                 categoryIds={categories.map((c) => c.id)}
                 onRequestHandled={() => {
                   // Refresh data when a request is handled
-                  window.location.reload();
+                  setRefreshKey(k => k + 1);
                 }}
               />
             )}

@@ -63,7 +63,7 @@ if ("serviceWorker" in navigator) {
         });
       })
       .catch((err) => {
-        console.warn("SW registration failed:", err);
+        logger.warn("SW registration failed", { error: String(err) });
       });
   });
 }
