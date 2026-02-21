@@ -17,17 +17,18 @@
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
 
+    <!-- Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https://rarkpesqxjpdfvxslllv.supabase.co; connect-src 'self' https://rarkpesqxjpdfvxslllv.supabase.co wss://rarkpesqxjpdfvxslllv.supabase.co https://*.sentry.io https://*.posthog.com; media-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';" />
+
     <!-- Preconnect to critical origins -->
     <link rel="preconnect" href="https://rarkpesqxjpdfvxslllv.supabase.co" crossorigin />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
     <!-- DNS-prefetch for Sentry -->
     <link rel="dns-prefetch" href="https://o4509364906778624.ingest.us.sentry.io" />
 
-    <!-- Non-blocking font loading -->
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" media="print" onload="this.media='all'" />
+    <!-- Preload self-hosted fonts -->
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/Inter-Latin.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/SpaceGrotesk-Latin.woff2" crossorigin />
 
     <meta property="og:title" content="Khas Padel Club" />
     <meta property="og:description" content="Padel ladder, tournaments & americano sessions" />
