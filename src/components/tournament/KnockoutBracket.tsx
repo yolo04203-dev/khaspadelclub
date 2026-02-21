@@ -149,13 +149,15 @@ export function KnockoutBracket({ matches, isAdmin, onSubmitScore, onReschedule,
     }
   };
 
-  const assignedTeamIds = new Set(
-    matches.flatMap(m => [m.team1_id, m.team2_id]).filter(Boolean) as string[]
-  );
-
-  const getUnassignedTeams = () => {
+  const getTeamsForRound = (roundNumber: number) => {
     if (!availableTeams) return [];
-    return availableTeams.filter(t => !assignedTeamIds.has(t.team_id));
+    if (roundNumber === 1) return availableTeams;
+    // For round 2+, only show teams that participated in the previous round
+    const prevRoundMatches = roundsGrouped[roundNumber - 1] || [];
+    const prevRoundTeamIds = new Set(
+      prevRoundMatches.flatMap(m => [m.team1_id, m.team2_id]).filter(Boolean) as string[]
+    );
+    return availableTeams.filter(t => prevRoundTeamIds.has(t.team_id));
   };
 
   const roundsGrouped = matches.reduce((acc, match) => {
@@ -181,12 +183,12 @@ export function KnockoutBracket({ matches, isAdmin, onSubmitScore, onReschedule,
     const teamScore = slot === "team1" ? match.team1_score : match.team2_score;
     const isWinner = match.winner_team_id === teamId;
     const isTBD = !teamId;
-    const unassignedTeams = getUnassignedTeams();
+    const roundTeams = getTeamsForRound(match.round_number);
 
     return (
       <div className="flex items-center justify-between">
         <div className={`flex-1 ${isWinner ? "font-bold text-success" : ""}`}>
-          {isAdmin && onAssignTeam && !match.winner_team_id && availableTeams && availableTeams.length > 0 ? (
+          {isAdmin && onAssignTeam && !match.winner_team_id && roundTeams.length > 0 ? (
             <Select
               value={teamId || ""}
               onValueChange={(val) => handleAssignTeam(match.id, slot, val)}
@@ -196,7 +198,7 @@ export function KnockoutBracket({ matches, isAdmin, onSubmitScore, onReschedule,
                 <SelectValue placeholder="Assign team…">{teamName || "Assign team…"}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {availableTeams.map(t => (
+                {roundTeams.map(t => (
                   <SelectItem key={t.team_id} value={t.team_id}>
                     {t.team_name}
                   </SelectItem>

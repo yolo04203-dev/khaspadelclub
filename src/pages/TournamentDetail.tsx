@@ -1076,41 +1076,54 @@ export default function TournamentDetail() {
                                         </div>
                                       )}
                                       {/* Team 1 row */}
-                                      <div className="flex items-center justify-between">
-                                        <div className={`flex-1 ${match.winner_team_id === match.team1_id ? "font-bold text-success" : ""}`}>
-                                          {isAdmin && !match.winner_team_id ? (
-                                            <Select value={match.team1_id || ""} onValueChange={(val) => assignKnockoutTeam(match.id, "team1", val)}>
-                                              <SelectTrigger className="h-8 text-xs w-full max-w-[180px]">
-                                                <SelectValue placeholder="Assign team…">{getTeamName(match.team1_id)}</SelectValue>
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                {registeredParticipants.map(p => (
-                                                  <SelectItem key={p.team_id} value={p.team_id}>{p.custom_team_name || p.team_name || "Unknown"}</SelectItem>
-                                                ))}
-                                              </SelectContent>
-                                            </Select>
-                                          ) : getTeamName(match.team1_id)}
-                                        </div>
-                                        {match.team1_score !== null && <span className="font-mono font-semibold">{match.team1_score}</span>}
-                                      </div>
-                                      {/* Team 2 row */}
-                                      <div className="flex items-center justify-between">
-                                        <div className={`flex-1 ${match.winner_team_id === match.team2_id ? "font-bold text-success" : ""}`}>
-                                          {isAdmin && !match.winner_team_id ? (
-                                            <Select value={match.team2_id || ""} onValueChange={(val) => assignKnockoutTeam(match.id, "team2", val)}>
-                                              <SelectTrigger className="h-8 text-xs w-full max-w-[180px]">
-                                                <SelectValue placeholder="Assign team…">{getTeamName(match.team2_id)}</SelectValue>
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                {registeredParticipants.map(p => (
-                                                  <SelectItem key={p.team_id} value={p.team_id}>{p.custom_team_name || p.team_name || "Unknown"}</SelectItem>
-                                                ))}
-                                              </SelectContent>
-                                            </Select>
-                                          ) : getTeamName(match.team2_id)}
-                                        </div>
-                                        {match.team2_score !== null && <span className="font-mono font-semibold">{match.team2_score}</span>}
-                                      </div>
+                                      {(() => {
+                                        // Filter teams for this round: round 1 = all, round 2+ = only teams from previous round
+                                        const getInlineTeamsForRound = (rn: number) => {
+                                          if (rn === 1) return registeredParticipants;
+                                          const prevMatches = knockoutMatches.filter(m => m.round_number === rn - 1);
+                                          const prevIds = new Set(prevMatches.flatMap(m => [m.team1_id, m.team2_id]).filter(Boolean));
+                                          return registeredParticipants.filter(p => prevIds.has(p.team_id));
+                                        };
+                                        const roundTeams = getInlineTeamsForRound(match.round_number);
+                                        return (
+                                          <>
+                                            <div className="flex items-center justify-between">
+                                              <div className={`flex-1 ${match.winner_team_id === match.team1_id ? "font-bold text-success" : ""}`}>
+                                                {isAdmin && !match.winner_team_id ? (
+                                                  <Select value={match.team1_id || ""} onValueChange={(val) => assignKnockoutTeam(match.id, "team1", val)}>
+                                                    <SelectTrigger className="h-8 text-xs w-full max-w-[180px]">
+                                                      <SelectValue placeholder="Assign team…">{getTeamName(match.team1_id)}</SelectValue>
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                      {roundTeams.map(p => (
+                                                        <SelectItem key={p.team_id} value={p.team_id}>{p.custom_team_name || p.team_name || "Unknown"}</SelectItem>
+                                                      ))}
+                                                    </SelectContent>
+                                                  </Select>
+                                                ) : getTeamName(match.team1_id)}
+                                              </div>
+                                              {match.team1_score !== null && <span className="font-mono font-semibold">{match.team1_score}</span>}
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                              <div className={`flex-1 ${match.winner_team_id === match.team2_id ? "font-bold text-success" : ""}`}>
+                                                {isAdmin && !match.winner_team_id ? (
+                                                  <Select value={match.team2_id || ""} onValueChange={(val) => assignKnockoutTeam(match.id, "team2", val)}>
+                                                    <SelectTrigger className="h-8 text-xs w-full max-w-[180px]">
+                                                      <SelectValue placeholder="Assign team…">{getTeamName(match.team2_id)}</SelectValue>
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                      {roundTeams.map(p => (
+                                                        <SelectItem key={p.team_id} value={p.team_id}>{p.custom_team_name || p.team_name || "Unknown"}</SelectItem>
+                                                      ))}
+                                                    </SelectContent>
+                                                  </Select>
+                                                ) : getTeamName(match.team2_id)}
+                                              </div>
+                                              {match.team2_score !== null && <span className="font-mono font-semibold">{match.team2_score}</span>}
+                                            </div>
+                                          </>
+                                        );
+                                      })()}
                                       {/* Admin: Reset score button for completed matches */}
                                       {isAdmin && match.winner_team_id && (
                                         <div className="pt-2 border-t mt-2">
