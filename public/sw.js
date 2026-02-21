@@ -1,6 +1,6 @@
 // Service Worker v3
-const CACHE_NAME = 'khas-padel-v3';
-const FONT_CACHE = 'khas-fonts-v1';
+const CACHE_NAME = 'khas-padel-v4';
+const FONT_CACHE = 'khas-fonts-v2';
 
 const PRECACHE_ASSETS = [
   '/',
@@ -46,11 +46,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for Google Fonts
-  if (
-    url.hostname === 'fonts.googleapis.com' ||
-    url.hostname === 'fonts.gstatic.com'
-  ) {
+  // Cache-first for self-hosted fonts
+  if (url.pathname.startsWith('/fonts/')) {
     event.respondWith(
       caches.open(FONT_CACHE).then((cache) =>
         cache.match(event.request).then((cached) => {
