@@ -20,6 +20,7 @@ import { TournamentCategoryCard } from "@/components/tournament/TournamentCatego
 import type { TournamentCategory } from "@/components/tournament/CategoryManagement";
 import type { SchedulingConfig } from "@/components/tournament/GenerateMatchesDialog";
 import { formatMatchDateTime } from "@/components/tournament/matchDateFormat";
+import { BulkRescheduleDialog } from "@/components/tournament/BulkRescheduleDialog";
 
 // Lazy-load admin-only components
 const AdminGroupManagement = lazy(() => import("@/components/tournament/AdminGroupManagement").then(m => ({ default: m.AdminGroupManagement })));
@@ -116,6 +117,7 @@ export default function TournamentDetail() {
   const [loading, setLoading] = useState(true);
   const [teamMembersMap, setTeamMembersMap] = useState<Map<string, { player1: string; player2: string }>>(new Map());
   const [registrationDialogOpen, setRegistrationDialogOpen] = useState(false);
+  const [bulkRescheduleDialogOpen, setBulkRescheduleDialogOpen] = useState(false);
   const [userTeamMemberCount, setUserTeamMemberCount] = useState(0);
   const [paymentParticipants, setPaymentParticipants] = useState<Array<{
     id: string; team_id: string; team_name: string; registered_at: string;
@@ -606,7 +608,43 @@ export default function TournamentDetail() {
     }
   };
 
-  const startKnockoutStage = async (config: SchedulingConfig) => {
+  const bulkRescheduleMatches = async (shiftMinutes: number) => {
+    if (!tournament) return;
+    
+    const relevantMatches = selectedCategoryId
+      ? matches.filter(m => m.category_id === selectedCategoryId)
+      : matches;
+    const scheduledMatches = relevantMatches.filter(m => m.scheduled_at);
+    if (scheduledMatches.length === 0) {
+      sonnerToast.error("No scheduled matches to shift");
+      return;
+    }
+
+    const shiftMs = shiftMinutes * 60000;
+    const updates = scheduledMatches.map(m => ({
+      id: m.id,
+      scheduled_at: new Date(new Date(m.scheduled_at!).getTime() + shiftMs).toISOString(),
+    }));
+
+    let failed = 0;
+    for (const u of updates) {
+      const { error } = await supabase
+        .from("tournament_matches")
+        .update({ scheduled_at: u.scheduled_at })
+        .eq("id", u.id);
+      if (error) failed++;
+    }
+
+    if (failed > 0) {
+      sonnerToast.error(`Failed to update ${failed} matches`);
+    } else {
+      const dir = shiftMinutes > 0 ? "delayed" : "advanced";
+      sonnerToast.success(`${scheduledMatches.length} matches ${dir} by ${Math.abs(shiftMinutes)} minutes`);
+    }
+    fetchData();
+  };
+
+
     if (!tournament) return;
 
     const categoryId = categories.length > 0 && selectedCategoryId ? selectedCategoryId : null;
@@ -738,6 +776,7 @@ export default function TournamentDetail() {
   const knockoutMatches = filteredMatches.filter(m => m.stage === "knockout");
   const allGroupMatchesComplete = groupMatches.length > 0 && groupMatches.every(m => m.winner_team_id !== null);
   const canStartKnockout = allGroupMatchesComplete && knockoutMatches.length === 0;
+  const scheduledMatchCount = filteredMatches.filter(m => m.scheduled_at).length;
 
   const userGroup = userParticipant?.group_id ? groups.find(g => g.id === userParticipant.group_id) : null;
 
@@ -891,6 +930,14 @@ export default function TournamentDetail() {
               </Card>
             ) : (
               <div className="space-y-4">
+                {isAdmin && scheduledMatchCount > 0 && (
+                  <div className="flex justify-end">
+                    <Button variant="outline" size="sm" onClick={() => setBulkRescheduleDialogOpen(true)}>
+                      <Clock className="w-4 h-4 mr-2" />
+                      Shift All Times
+                    </Button>
+                  </div>
+                )}
                 {/* Knockout rounds (reverse order: Final first) */}
                 {knockoutMatches.length > 0 && (() => {
                   const roundsGrouped = knockoutMatches.reduce((acc, match) => {
@@ -1301,6 +1348,14 @@ export default function TournamentDetail() {
             <Card><CardContent className="py-8 text-center text-muted-foreground"><Trophy className="w-12 h-12 mx-auto mb-4 opacity-50" /><p>Matches will appear after groups are created</p></CardContent></Card>
           ) : (
             <div className="space-y-6">
+              {isAdmin && scheduledMatchCount > 0 && (
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => setBulkRescheduleDialogOpen(true)}>
+                    <Clock className="w-4 h-4 mr-2" />
+                    Shift All Times
+                  </Button>
+                </div>
+              )}
               {filteredGroups.map(group => {
                 const gMatches = groupMatches.filter(m => m.group_id === group.id).map(m => ({
                   id: m.id, team1_id: m.team1_id, team2_id: m.team2_id,
@@ -1466,6 +1521,13 @@ export default function TournamentDetail() {
           )}
         </motion.div>
       </main>
+
+      <BulkRescheduleDialog
+        open={bulkRescheduleDialogOpen}
+        onOpenChange={setBulkRescheduleDialogOpen}
+        onConfirm={bulkRescheduleMatches}
+        matchCount={scheduledMatchCount}
+      />
     </div>
   );
 }
