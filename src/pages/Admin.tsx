@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap, Shuffle, Shield, Bug, UserPlus } from "lucide-react";
+import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap, Shuffle, Shield, Bug, UserPlus, History } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import { AmericanoTab } from "@/components/admin/AmericanoTab";
 import { PermissionsTab } from "@/components/admin/PermissionsTab";
 import { ErrorsTab } from "@/components/admin/ErrorsTab";
 import { JoinRequestsTab } from "@/components/admin/JoinRequestsTab";
+import { AuditLogTab } from "@/components/admin/AuditLogTab";
 import { logger } from "@/lib/logger";
 
 interface Player {
@@ -335,6 +336,10 @@ export default function Admin() {
                   </span>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="audit-log" className="text-xs sm:text-sm shrink-0">
+                <History className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline" />
+                Audit Log
+              </TabsTrigger>
               <TabsTrigger value="errors" className="text-xs sm:text-sm shrink-0 relative">
                 <Bug className="w-4 h-4 mr-1 sm:mr-2 hidden sm:inline" />
                 Errors
@@ -386,6 +391,10 @@ export default function Admin() {
 
             <TabsContent value="errors">
               <ErrorsTab onUnresolvedCountChange={setUnresolvedErrorCount} />
+            </TabsContent>
+
+            <TabsContent value="audit-log">
+              <AuditLogTab />
             </TabsContent>
           </Tabs>
         </motion.div>
