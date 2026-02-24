@@ -402,6 +402,57 @@ export type Database = {
         }
         Relationships: []
       }
+      ladder_audit_log: {
+        Row: {
+          action: string
+          admin_user_id: string
+          created_at: string
+          id: string
+          ladder_category_id: string | null
+          new_values: Json | null
+          notes: string | null
+          old_values: Json | null
+          team_id: string | null
+        }
+        Insert: {
+          action: string
+          admin_user_id: string
+          created_at?: string
+          id?: string
+          ladder_category_id?: string | null
+          new_values?: Json | null
+          notes?: string | null
+          old_values?: Json | null
+          team_id?: string | null
+        }
+        Update: {
+          action?: string
+          admin_user_id?: string
+          created_at?: string
+          id?: string
+          ladder_category_id?: string | null
+          new_values?: Json | null
+          notes?: string | null
+          old_values?: Json | null
+          team_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ladder_audit_log_ladder_category_id_fkey"
+            columns: ["ladder_category_id"]
+            isOneToOne: false
+            referencedRelation: "ladder_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ladder_audit_log_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ladder_categories: {
         Row: {
           challenge_range: number
