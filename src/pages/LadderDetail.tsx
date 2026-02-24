@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Trophy, ArrowLeft, Users, TrendingDown, Flame, Swords, Loader2, Settings, Snowflake, Clock, ChevronDown } from "lucide-react";
+import { Trophy, ArrowLeft, Users, TrendingDown, Flame, Swords, Loader2, Settings, Snowflake, Clock, ChevronDown, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Logo } from "@/components/Logo";
@@ -19,6 +19,7 @@ import { VirtualizedRankingsList } from "@/components/ladder/VirtualizedRankings
 import { LadderRowSkeleton } from "@/components/ui/skeleton-card";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { logger } from "@/lib/logger";
+import { AdminModeIndicator } from "@/components/ladder/AdminRankingControls";
 
 interface TeamMember {
   user_id: string;
@@ -409,11 +410,27 @@ export default function LadderDetail() {
     }
   };
 
+  const isAdmin = role === "admin" || role === "super_admin";
+
   useEffect(() => {
     fetchLadderData();
-    // Removed overly broad realtime subscriptions that triggered full refetches
-    // on ANY change to rankings/challenges/teams globally.
-    // Users can pull-to-refresh for updates instead.
+
+    // Subscribe to realtime ranking changes for instant admin edit sync
+    if (!id) return;
+    const channel = supabase
+      .channel(`ladder-rankings-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ladder_rankings" },
+        () => {
+          fetchLadderData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [id, user]);
 
   const handleRefresh = useCallback(async () => {
@@ -522,6 +539,9 @@ export default function LadderDetail() {
             <div className="mb-6 sm:mb-8 text-center">
               <h1 className="text-2xl sm:text-4xl font-bold text-foreground mb-2">{ladder.name}</h1>
               <p className="text-sm sm:text-base text-muted-foreground">{ladder.description || "Compete and climb the rankings"}</p>
+              <div className="mt-3 flex justify-center">
+                <AdminModeIndicator isAdmin={isAdmin} />
+              </div>
             </div>
 
           {/* Categories Tabs */}
@@ -601,6 +621,8 @@ export default function LadderDetail() {
                       handleChallenge={handleChallenge}
                       challengingTeamId={challengingTeamId}
                       pendingChallenges={pendingChallenges}
+                      isAdmin={isAdmin}
+                      onAdminRankChanged={fetchLadderData}
                     />
                   )}
                 </TabsContent>
