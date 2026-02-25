@@ -16,7 +16,7 @@ export function Hero() {
   };
 
   return (
-    <section className="relative min-h-[90vh] flex items-center overflow-hidden">
+    <section className="relative min-h-[90svh] flex items-center overflow-hidden pt-24 sm:pt-28">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-hero" />
       

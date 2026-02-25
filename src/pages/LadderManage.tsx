@@ -315,7 +315,7 @@ export default function LadderManage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card sticky top-0 z-40">
+      <header className="border-b border-border bg-card sticky top-0 z-40 safe-top">
         <div className="container flex items-center justify-between h-16">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" asChild>

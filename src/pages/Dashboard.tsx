@@ -258,7 +258,7 @@ export default function Dashboard() {
       </FABContainer>
 
       {/* Main Content */}
-      <PullToRefresh onRefresh={handleRefresh} className="min-h-[calc(100vh-4rem)]">
+      <PullToRefresh onRefresh={handleRefresh} className="min-h-[calc(100dvh-4rem)]">
         <main className="container py-4 sm:py-8 pb-safe-nav sm:pb-8">
           <div>
             <div className="mb-5 sm:mb-8">
