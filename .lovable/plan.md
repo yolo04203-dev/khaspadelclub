@@ -1,45 +1,41 @@
 
 
-## Replace Category Tabs with Dropdown Select
+## Fix: "Pending" Badge Overlapping Points on Mobile
 
 ### Problem
-The horizontal scrollable tabs for categories are hard to use on mobile. The user wants a dropdown button instead.
+The "Pending" badge on mobile ranking cards is positioned as an absolute element in the top-right corner, overlapping the points display ("1000 pts") as visible in the screenshot.
 
-### Change — `src/pages/LadderDetail.tsx` (lines 562-576)
+### Solution
+Replace the text "Pending" badge on mobile with a small `Clock` icon that takes up minimal space. This avoids the overlap entirely while still clearly indicating a pending challenge.
 
-Replace the entire scrollable `TabsList` wrapper (the `relative` div containing the scrollable tabs and fade gradient) with a `Select` dropdown component.
+### Changes — `src/components/ladder/VirtualizedRankingsList.tsx`
 
-**Before (lines 562-576):**
+**1. Import `Clock` icon** (add to existing lucide-react import)
+
+**2. Line 98-100 — Replace mobile absolute "Pending" badge with a small icon**
+
+Before:
 ```tsx
-<div className="relative w-full mb-6">
-  <div className="overflow-x-auto scrollbar-hide touch-pan-x ...">
-    <TabsList>...</TabsList>
-  </div>
-  <div className="pointer-events-none ..." />
-</div>
+{ranking.team && pendingSet.has(ranking.team.id) && (
+  <Badge variant="secondary" className="absolute top-2 right-2 text-xs sm:hidden z-10">Pending</Badge>
+)}
 ```
 
-**After:**
+After:
 ```tsx
-<div className="w-full mb-6">
-  <Select value={activeCategory || undefined} onValueChange={setActiveCategory}>
-    <SelectTrigger className="w-full">
-      <SelectValue placeholder="Select category" />
-    </SelectTrigger>
-    <SelectContent>
-      {categories.map((cat) => (
-        <SelectItem key={cat.id} value={cat.id}>
-          {cat.name} ({cat.rankings.length})
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-</div>
+{ranking.team && pendingSet.has(ranking.team.id) && (
+  <TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="absolute top-2 right-2 sm:hidden z-10">
+          <Clock className="w-4 h-4 text-muted-foreground" />
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>Challenge Pending</TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+)}
 ```
 
-The `Tabs` wrapper stays for managing `TabsContent` rendering, but the visible `TabsList` is removed and replaced by the `Select`. The `onValueChange` on `Select` calls `setActiveCategory` directly, keeping the same state flow.
-
-**Imports:** Add `Select, SelectContent, SelectItem, SelectTrigger, SelectValue` from `@/components/ui/select`.
-
-No other files change. The dropdown uses the existing `bg-popover` background so it won't be transparent.
+This replaces the wide "Pending" text badge with a compact 16x16px clock icon. The tooltip provides context on tap/hover. The desktop "Pending" badge (line 172) stays unchanged since it has enough space.
 
