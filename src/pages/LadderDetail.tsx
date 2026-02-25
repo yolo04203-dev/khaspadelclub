@@ -560,10 +560,10 @@ export default function LadderDetail() {
           ) : (
             <Tabs value={activeCategory || undefined} onValueChange={setActiveCategory}>
               <div className="relative w-full mb-6">
-                <div className="overflow-x-auto scrollbar-hide">
-                  <TabsList className="inline-flex w-full min-w-max mx-auto">
+                <div className="overflow-x-auto scrollbar-hide touch-pan-x [-webkit-overflow-scrolling:touch]">
+                  <TabsList className="inline-flex w-max min-w-full">
                     {categories.map((cat) => (
-                      <TabsTrigger key={cat.id} value={cat.id} className="text-sm px-4 py-2.5 whitespace-nowrap">
+                      <TabsTrigger key={cat.id} value={cat.id} className="shrink-0 text-sm px-4 py-2.5 whitespace-nowrap">
                         {cat.name}
                         <Badge variant="secondary" className="ml-2 text-xs">
                           {cat.rankings.length}
