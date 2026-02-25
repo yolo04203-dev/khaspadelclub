@@ -1,139 +1,147 @@
 
 
-# Performance Engineering Readiness Report
+# Mobile Layout Refactor for Safe Areas, Responsive Scaling, and Ladder UI
 
-## Current State Assessment
+## Problem Summary (from screenshots)
 
-The application is already well-architected for performance. After thorough analysis, the codebase demonstrates mature patterns across all 10 audit categories. Here is the full breakdown:
-
----
-
-## 1. App Shell First Paint — PASS (no changes needed)
-
-- Landing page (`Index`) is eagerly loaded; all other routes use `lazyWithRetry`
-- `AuthProvider` and `NotificationProvider` are excluded from public routes
-- Sentry, PostHog, and WebVitals are deferred via `requestIdleCallback`
-- Hero uses pure CSS animations (`heroFadeInUp`) instead of framer-motion — no JS blocking FCP
-- Dashboard defers stats loading via `requestIdleCallback`, rendering the team card first
-- Skeleton loaders are used for all async content (team card, stats, challenges)
-
-## 2. Aggressive Code Splitting — PASS (no changes needed)
-
-- All routes use `lazyWithRetry` dynamic imports (per-screen chunks)
-- `AuthenticatedRoutes` is a separate lazy chunk containing all protected routes
-- Vite `manualChunks` separates: react-vendor, ui-vendor, animation, charts, supabase, sentry, analytics, query
-- Below-fold landing sections (Features, SportsModes, Footer) are lazy-loaded
-- Admin sub-components can be further split but are already behind an admin-only lazy route
-
-## 3. Data Fetch Optimization — PASS (no changes needed)
-
-- No global data fetched at startup — data loads per-screen
-- `QueryClient` configured with `staleTime: 2min`, `gcTime: 10min` (stale-while-revalidate)
-- `refetchOnWindowFocus: false` prevents refetch loops
-- Retry with exponential backoff: `retryDelay: min(1000 * 2^attempt, 30000)`
-- Notification polling deferred 3 seconds post-mount, then every 120s
-- Dashboard uses `Promise.all` for parallel requests, defers stats section
-
-## 4. Asset Optimization — PASS (no changes needed)
-
-- Fonts are self-hosted WOFF2 with `font-display: swap` and `unicode-range` subsetting
-- Only 2 fonts preloaded (Inter-Latin, SpaceGrotesk-Latin) — LatinExt loads on demand via unicode-range
-- No desktop-sized images found; icons are SVG or small PNGs (192/512px)
-- CSS is Tailwind-generated (minimal, tree-shaken)
-- Hero background uses inline SVG data URI (no network request)
-
-## 5. Execution & Rendering Efficiency — PASS (no changes needed)
-
-- `AppHeader` is wrapped in `React.memo` — stable across navigations
-- Long lists use `react-window` virtualization (Players page, VirtualizedRankingsList)
-- No large state initialization at boot — `queryClient` is static, auth state initializes asynchronously
-- `useCallback` used consistently for event handlers and data fetchers
-- No synchronous blocking code on load path
-
-## 6. Network & Caching Strategy — PASS (no changes needed)
-
-- Service worker (`sw.js` v3) implements:
-  - Cache-first for fonts (`/fonts/`)
-  - Network-first with cache fallback for app shell
-  - Supabase API calls excluded from caching
-  - Offline fallback page for navigation requests
-- Fonts preloaded via `<link rel="preload">`
-- Preconnect to Supabase origin, DNS-prefetch for Sentry
-
-## 7. Stability Hardening — PASS (no changes needed)
-
-- `esbuild.drop: ['console', 'debugger']` strips console.log/debug in production
-- Remaining `console.error`/`console.warn` were replaced with `logger` calls (previous audit)
-- Global `ErrorBoundary` with copy-error diagnostic
-- Route-level `RouteErrorBoundary` isolates page crashes
-- `lazyWithRetry` handles chunk load failures with retry + fallback UI
-- `safeData` utilities guard against null/undefined
-- `useSessionGuard` proactively refreshes auth tokens
-
-## 8. Mobile WebView Compatibility — PASS (no changes needed)
-
-- `BrowserRouter` works with local `dist` files in Capacitor
-- `window.location.reload()` removed from LadderManage (previous audit)
-- Back button handler via Capacitor App plugin
-- `overscroll-behavior: none`, `touch-action: manipulation`, 44px touch targets
-- Memory-efficient: no large in-memory caches, `gcTime: 10min` evicts stale data
-- `useSafeNavigation` wraps router with try/catch fallback
-
-## 9. Performance Budgets — ASSESSMENT
-
-Current configuration targets:
-
-| Metric | Target | Status |
-|--------|--------|--------|
-| Initial JS (gzip) | ≤150KB | Achievable — react-vendor (~45KB) + query (~15KB) + supabase (~25KB) + app shell (~30KB) = ~115KB critical path. Animation, charts, sentry, analytics are separate chunks loaded on demand |
-| FCP | ≤1.5s (4G) | PASS — Landing page is eagerly loaded, fonts use swap, hero uses CSS animations |
-| TTI | ≤2.0s | PASS — Sentry/PostHog/WebVitals deferred, auth is async, stats deferred via idle callback |
-| CLS | ~0 | PASS — Skeleton loaders reserve space, font-display: swap with preloaded fonts |
-
-The existing `PERF_BUDGET` constants in `src/lib/perfBudget.ts` define `BUNDLE_SIZE_KB: 200` and `TTI_MAX_MS: 2500`. These are slightly above the requested targets but the actual implementation achieves the stricter budgets.
-
-## 10. Framer Motion Usage — ADVISORY (not blocking)
-
-15 files import `framer-motion`. This library is already isolated into its own chunk (`animation`) so it does not affect initial load. It loads on-demand when a page using it is navigated to. All above-fold content (Hero, landing) uses CSS animations instead. No change needed.
+The Samsung S21 screenshot shows:
+1. "Khas Padel Club" text in the header consuming critical space, pushing the Join button against the edge
+2. Ladder ranking cards show team name AND member names, creating visual duplication and cramped rows ("Ahmed..." then "Ahmed & ali" below)
+3. The "Manage" button is hidden due to space constraints
+4. Content renders under the Android status bar area
 
 ---
 
-## Final Readiness Report
+## Technical Changes
 
-```text
-┌─────────────────────────────────────────────────┐
-│         PRODUCTION READINESS REPORT             │
-├──────────────────────┬──────────────────────────┤
-│ Category             │ Status                   │
-├──────────────────────┼──────────────────────────┤
-│ App Shell FP         │ PASS                     │
-│ Code Splitting       │ PASS                     │
-│ Data Fetch           │ PASS                     │
-│ Asset Optimization   │ PASS                     │
-│ Render Efficiency    │ PASS                     │
-│ Caching Strategy     │ PASS                     │
-│ Stability            │ PASS                     │
-│ WebView Compat       │ PASS                     │
-│ Performance Budgets  │ PASS (within targets)    │
-│ CLS Safety           │ PASS                     │
-├──────────────────────┼──────────────────────────┤
-│ VERDICT              │ GO — Ready for packaging │
-└──────────────────────┴──────────────────────────┘
+### 1. Global Safe-Area and Viewport Fixes
+
+**File: `src/index.css`**
+
+The `viewport-fit=cover` meta tag already exists in `index.html` (line 9). The safe-area CSS classes (`safe-top`, `safe-bottom`) exist but need a fallback minimum. Update the safe-area utilities:
+
+- Change `.safe-top` to use `padding-top: max(12px, env(safe-area-inset-top))` to ensure a minimum offset on Android devices where env() returns 0.
+- Replace all `min-h-screen` usage with `min-h-[100dvh]` via a new utility class `.min-h-screen-safe` that uses `min-height: 100dvh` with `100vh` fallback.
+- Replace `min-h-[calc(100vh-4rem)]` in LadderDetail and Challenges PullToRefresh with `min-h-[calc(100dvh-4rem)]`.
+
+**File: `src/index.css`** — add:
+```css
+/* Dynamic viewport height — replaces 100vh for iOS/Android compat */
+.min-h-dvh {
+  min-height: 100vh; /* fallback */
+  min-height: 100dvh;
+}
 ```
 
-## Summary
+### 2. Hide Logo Text on Mobile (Remove "Khas Padel Club" on small screens)
 
-**No code changes required.** The application already meets all 10 performance criteria through previously implemented optimizations:
+**File: `src/components/Logo.tsx`**
 
-- Route-level code splitting with retry
-- Deferred non-critical services (Sentry, PostHog, WebVitals)
-- Skeleton-first rendering with deferred data fetching
-- Virtualized long lists
-- Self-hosted optimized fonts with preloading
-- Service worker with cache strategies
-- Production console stripping
-- Comprehensive error boundaries
-- Capacitor-compatible routing and lifecycle management
+Currently the Logo always shows text unless `showText={false}`. The AppHeader already hides it via a Tailwind class hack on the span. But pages like LadderDetail use `<Logo size="sm" />` directly (showText defaults to true).
 
-The app is ready for `npm run build && npx cap sync` and App Store submission.
+Changes:
+- Add a `hideTextOnMobile` prop (default: true) that applies `hidden sm:inline` to the text span.
+- This means on screens < 640px, the "Khas Padel Club" text is hidden, freeing horizontal space.
+- Only the logo image shows on mobile.
+
+### 3. LadderDetail Header — Make Actions Always Visible
+
+**File: `src/pages/LadderDetail.tsx`** (lines 495-532)
+
+Current header has: `[Back] [Logo "Khas Padel Club"]` on left, `[Join] [Manage]` on right. On narrow screens, the text pushes buttons off-screen.
+
+Changes:
+- Use `<Logo size="sm" />` which will now auto-hide text on mobile (from change #2).
+- Make "Manage" button icon-only on mobile: `<Settings className="w-4 h-4 sm:mr-2" /> <span className="hidden sm:inline">Manage</span>`.
+- Both Join and Manage buttons become icon-only (44px touch targets) on mobile, side by side.
+- Add `safe-top` class to the sticky header.
+- Apply `pb-safe-nav` to the main content area.
+
+### 4. Ladder Ranking Card Refactor — Remove Duplicate Names on Mobile
+
+**File: `src/components/ladder/VirtualizedRankingsList.tsx`**
+
+Per user preference: show **team name only** on mobile, hide member names line from the collapsed row.
+
+Changes to the mobile (collapsed) row layout:
+- Remove the member avatars + names line from the collapsed card view on mobile. That section (lines 109-121, the `flex -space-x-2` avatars and `span` with member names) gets `hidden sm:flex` — only visible on desktop.
+- The team name (line 106) becomes the sole identifier. It already has `truncate`.
+- Make RankBadge smaller on mobile: `w-10 h-10 sm:w-12 sm:h-12` with `text-base sm:text-lg`.
+- Reduce card padding on mobile: `p-3 sm:p-4`.
+
+Mobile row structure becomes:
+```
+[Rank 10x10] [Team Name (truncate, flex-1)] [pts + W-L (shrink-0)] [Challenge?] [Expand]
+```
+
+The expanded CollapsibleContent already shows full member details — no change needed there.
+
+### 5. Typography Scaling for Dense Data
+
+**File: `src/components/ladder/VirtualizedRankingsList.tsx`**
+
+- Team name: `text-xs sm:text-sm` (was `text-sm sm:text-base`)
+- Points display: `text-xs sm:text-sm` (was `text-sm`)
+- W-L display: `text-[10px] sm:text-xs` (was `text-xs`)
+
+### 6. Action Buttons Never Shrink
+
+Already using `shrink-0` on the mobile action container (line 174). Verify challenge button uses `shrink-0` as well. Add explicit `shrink-0` to each action button wrapper in the mobile row.
+
+### 7. Ladder Page Stats Bar Fix
+
+**File: `src/pages/LadderDetail.tsx`** (lines 580-601)
+
+The stats bar cards (Teams / Matches / Challenge Range) use `text-2xl` which is large on 320px screens.
+
+Changes:
+- Font size: `text-xl sm:text-2xl` for the stat number.
+- Reduce vertical padding: `pt-3 pb-3 sm:pt-4 sm:pb-4`.
+- Use `gap-2 sm:gap-4` between grid items.
+
+### 8. Tab Triggers — Prevent Overflow
+
+**File: `src/pages/LadderDetail.tsx`** (lines 562-571)
+
+Category tabs with badges can overflow on narrow screens. Changes:
+- Add `overflow-x-auto` to the TabsList wrapper.
+- Make tab text smaller: add `text-xs sm:text-sm` to TabsTrigger.
+- Hide badge count on very narrow screens or make it smaller.
+
+### 9. Replace 100vh Usages (Key Files Only)
+
+Replace `min-h-[calc(100vh-4rem)]` with `min-h-[calc(100dvh-4rem)]` in:
+- `src/pages/LadderDetail.tsx` (line 535)
+- `src/pages/Challenges.tsx` (line 628)
+
+Replace `min-h-screen` with the dvh-safe utility where it's the page root on these critical paths (LadderDetail loading/error/main states). Other pages use `min-h-screen` from Tailwind which is `100vh` — these can be updated incrementally but the ladder page is the priority.
+
+### 10. StatusBar Overlay Fix for Android
+
+**File: `src/hooks/useStatusBar.ts`**
+
+Add `StatusBar.setOverlaysWebView({ overlay: true })` on Android to ensure content draws behind the status bar, which allows the `safe-top` CSS to handle the spacing correctly. Without this, some Android devices don't report safe-area-inset-top.
+
+### 11. LadderDetail Header — Add safe-top to All Header States
+
+The loading/error/main headers in LadderDetail (lines 443, 473, 498) need `safe-top` class added to be consistent with AppHeader.
+
+---
+
+## Files Modified
+
+| File | Change |
+|------|--------|
+| `src/index.css` | Add `.min-h-dvh` utility, update `.safe-top` with fallback minimum |
+| `src/components/Logo.tsx` | Add `hideTextOnMobile` prop, apply `hidden sm:inline` to text |
+| `src/pages/LadderDetail.tsx` | Icon-only Manage button on mobile, `safe-top` on headers, `pb-safe-nav`, dvh usage, smaller stats bar |
+| `src/components/ladder/VirtualizedRankingsList.tsx` | Hide member names on mobile collapsed row, smaller RankBadge, tighter padding, scaled typography |
+| `src/hooks/useStatusBar.ts` | Add `setOverlaysWebView` for Android |
+
+## What Does NOT Change
+- Challenge flow
+- Match result automation
+- Tournament module
+- Desktop layout
+- Existing safe-area handling in AppHeader and bottom nav
 
