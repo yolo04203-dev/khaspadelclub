@@ -1,6 +1,6 @@
 import { type CSSProperties, type ReactElement } from "react";
 import { List } from "react-window";
-import { Trophy, TrendingDown, Flame, Swords, Loader2, Snowflake, ChevronDown } from "lucide-react";
+import { Trophy, TrendingDown, Flame, Swords, Loader2, Snowflake, ChevronDown, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -96,7 +96,16 @@ function RankingRow({ index, style, rankings, catId, uTeamId, uObj, frozenCheck,
       <Collapsible>
         <Card className={cn("transition-all hover:shadow-md h-full relative", isUserTeam && "ring-2 ring-accent border-accent", ranking.rank <= 3 && "border-transparent")}>
               {ranking.team && pendingSet.has(ranking.team.id) && (
-                <Badge variant="secondary" className="absolute top-2 right-2 text-xs sm:hidden z-10">Pending</Badge>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="absolute top-2 right-2 sm:hidden z-10">
+                        <Clock className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>Challenge Pending</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-2 sm:gap-4">
