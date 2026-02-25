@@ -1,92 +1,82 @@
 
 
-# QA Validation Report: Responsive & Safe-Area Compliance
+# Ladder Detail: Category Display Refactor
 
-## Test Matrix Results
+## Current State
 
-### Samsung Galaxy Class (360dp width)
-| Device | Viewport | Home | Auth | Header | Scroll | Result |
-|--------|----------|------|------|--------|--------|--------|
-| Galaxy S21 | 360×800 | ✅ | ✅ | ✅ | ✅ | **PASS** |
-| Galaxy S22/S23 | 360×780 | ✅ (same width class) | ✅ | ✅ | ✅ | **PASS** |
-| Galaxy S24 | 360×800 | ✅ | ✅ | ✅ | ✅ | **PASS** |
-| Galaxy S21+/S22+ | 384×854 | ✅ (interpolated) | ✅ | ✅ | ✅ | **PASS** |
-| Galaxy Ultra | 412×915 | ✅ (414px tested) | ✅ | ✅ | ✅ | **PASS** |
+The Ladder Detail page (`src/pages/LadderDetail.tsx`, lines 561-630) displays categories as **horizontal tabs** inside a `TabsList`:
 
-### iPhone Class (390–430dp width)
-| Device | Viewport | Home | Auth | Header | Scroll | Result |
-|--------|----------|------|------|--------|--------|--------|
-| iPhone 14 | 390×844 | ✅ (390px tested) | ✅ | ✅ | ✅ | **PASS** |
-| iPhone 14/15 Pro | 393×852 | ✅ (390px class) | ✅ | ✅ | ✅ | **PASS** |
-| iPhone 14/15 Pro Max | 430×932 | ✅ (414px tested) | ✅ | ✅ | ✅ | **PASS** |
-| iPhone 16/17 class | 390–430 | ✅ | ✅ | ✅ | ✅ | **PASS** |
+```
+[Category A] [Category B] [Category C]  ← compressed horizontal grid
+```
 
-### Minimum Width
-| Device | Viewport | Home | Auth | Footer | Result |
-|--------|----------|------|------|--------|--------|
-| iPhone SE / narrow | 320×568 | ✅ | ✅ | ✅ | **PASS** |
+When there are 3+ categories, each tab trigger is squeezed into a `grid` with `repeat(N, 1fr)` columns inside a `max-w-md` container. On a 360px screen, this means each tab gets ~100px or less — text truncates, badges overlap, and only the first tab looks readable. The user must tap a tiny tab to switch — the other categories' content is completely hidden behind inactive tabs.
 
----
+## Problem
 
-## Screen-by-Screen Validation
+- Tab triggers compress to unreadable widths with 3+ categories
+- Only one category's rankings are visible at a time (tab behavior)
+- The UI feels "height-restricted" because inactive category content is hidden, not scrollable
+- No way to visually scan across categories without tapping each tab
 
-### Home Screen (Before Login)
-- **360px**: Logo (icon only, no text) sits correctly below header safe-top padding. Hero text readable, "Get Started" button full-width and tappable. Stats row (500+ / 50+ / 1000+) evenly spaced. No horizontal scroll.
-- **390px**: Identical clean layout with slightly more breathing room.
-- **414px**: Same structure, no overflow.
-- **320px**: Text wraps correctly ("Elevate Your Padel Game" on 3 lines). Button visible. Stats compressed but readable.
-- **Footer**: Clean at all widths. "Khas Padel Club" copyright, Platform/Support links all visible and tappable.
+## Proposed Fix: Vertical Category Sections (Mobile) + Tabs (Desktop)
 
-### Auth Screen
-- **360px**: Form centered, all inputs visible, "Sign In" button above fold. No vertical clipping.
-- **320px**: Form fits with reduced margins. Password field and button fully visible.
-- **390px**: Clean centered layout with good spacing.
+Replace the tab-based layout with **vertically stacked category sections on mobile** so all categories and their rankings are visible in a single scrollable page. On desktop (md+), keep the tab layout for efficiency.
 
-### Header (All Screens)
-- `safe-top` class applied — content clears the status bar/notch zone
-- Logo text hidden on mobile (`hideTextOnMobile` prop active)
-- Hamburger menu visible and tappable on mobile
-- No collision between logo and menu button at any width
+### Changes to `src/pages/LadderDetail.tsx`
 
----
+**Mobile (< md):** Render all categories as stacked sections:
+```
+── Category A ──────────────
+   [Stats bar: Teams / Matches / Range]
+   [Ranking 1]
+   [Ranking 2]
+   [Ranking 3]
 
-## Checklist Results
+── Category B ──────────────
+   [Stats bar: Teams / Matches / Range]
+   [Ranking 1]
+   [Ranking 2]
 
-| Criteria | Status |
-|----------|--------|
-| UI touches notch/status bar | ✅ No — `safe-top` with `max(16px, env(...))` applied |
-| Horizontal scroll appears | ✅ No — tested 320–414px |
-| Buttons disappear or wrap | ✅ No — all CTAs visible |
-| Text overlaps icons | ✅ No — clean spacing |
-| Layout shifts when scrolling | ✅ No — fixed header stays in place |
-| Content cut off at bottom | ✅ No — footer fully visible |
-| Legacy `100vh` behavior | ✅ Fixed — `min-h-screen` overridden to `100dvh` globally |
+── Category C ──────────────
+   ...
+```
 
----
+Each category section includes:
+- A full-width header with the category name and team count badge
+- The stats bar (Teams / Matches / Challenge Range)
+- The full rankings list via `VirtualizedRankingsList`
+- Natural document flow — no fixed heights, no overflow hidden, no nested scroll containers
 
-## One Issue Noted (Non-blocking)
+**Desktop (md+):** Keep the existing `Tabs` UI unchanged — it works well at wider viewports.
 
-**Desktop header (1280px):** The browser tool's extract reports both the hamburger AND desktop nav as visible simultaneously. In the code, `md:hidden` on the hamburger and `hidden md:flex` on desktop nav are correctly applied — this appears to be a browser-tool rendering artifact, not a real bug. On actual browsers/devices, Tailwind's responsive utilities will correctly toggle visibility at the 768px breakpoint.
+### Implementation Detail
 
----
+Lines 561-630 currently wrap everything in a single `<Tabs>` component. The refactor:
 
-## Architecture Verification
+1. Extract the per-category content (stats bar + rankings list, lines 579-628) into a shared `CategorySection` component
+2. On mobile (`md:hidden`), render a `div` with `flex flex-col gap-8` containing all `CategorySection` components
+3. On desktop (`hidden md:block`), render the existing `Tabs` with `TabsList` and `TabsContent`
+4. Use the `useIsMobile` hook (already exists at `src/hooks/use-mobile.tsx`) to conditionally render, or use Tailwind `hidden/block` classes
 
-| Fix | Implemented | Scope |
-|-----|-------------|-------|
-| `viewport-fit=cover` meta tag | ✅ | `index.html` |
-| Global `min-h-screen` → `100dvh` override | ✅ | `index.css` |
-| Body-level `env(safe-area-inset-*)` padding | ✅ | `index.css` |
-| `.safe-top` with `max(16px, ...)` fallback | ✅ | `index.css` |
-| Landing Header `safe-top` | ✅ | `Header.tsx` |
-| Hero `min-h-[90svh]` | ✅ | `Hero.tsx` |
-| All standalone page headers `safe-top` | ✅ | 9 files |
-| Logo text hidden on mobile | ✅ | `Logo.tsx` |
-| Error banners `safe-top` | ✅ | `error-state.tsx` |
+### What This Does NOT Change
+- Rankings list component (`VirtualizedRankingsList`) — unchanged
+- Challenge flow — unchanged
+- Desktop tab behavior — unchanged
+- Safe-area handling — already implemented
+- No new dependencies needed
 
-## Verdict
+### Files Modified
 
-**All tests pass.** The app renders correctly across the full device matrix from 320px to 430px+. Safe-area insets are globally applied, viewport height uses `100dvh`, and no layout breakage occurs at any tested width. The implementation is forward-compatible with future iPhone/Samsung models in the 390–430px width class.
+| File | Change |
+|------|--------|
+| `src/pages/LadderDetail.tsx` | Replace single Tabs layout with mobile-stacked + desktop-tabbed dual layout |
 
-No code changes needed — the refactor is complete and verified.
+### Expected Result
+- All categories fully visible on mobile via natural vertical scroll
+- Each category has its own stats bar and rankings section
+- No compressed tab triggers on narrow screens
+- Page scrolls naturally — no nested scroll traps
+- Desktop retains efficient tab-switching UI
+- Works from 320px through desktop
 
