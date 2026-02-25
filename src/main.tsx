@@ -38,6 +38,9 @@ window.addEventListener("unhandledrejection", (event) => {
 
 createRoot(document.getElementById("root")!).render(<App />);
 
+// Log startup diagnostic on native platforms for remote Play Store debugging
+logger.logStartupDiagnostic();
+
 // Defer analytics and web-vitals to after first paint
 deferInit(() => import("@/lib/webVitals").then(m => m.initWebVitals()));
 deferInit(() => import("@/lib/analytics/posthog").then(m => m.analytics.init()));
