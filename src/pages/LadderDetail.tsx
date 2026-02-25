@@ -559,17 +559,20 @@ export default function LadderDetail() {
             </Card>
           ) : (
             <Tabs value={activeCategory || undefined} onValueChange={setActiveCategory}>
-              <div className="w-full overflow-x-auto mb-6 scrollbar-hide">
-                <TabsList className="inline-flex w-full min-w-max mx-auto">
-                  {categories.map((cat) => (
-                    <TabsTrigger key={cat.id} value={cat.id} className="text-sm px-4 py-2.5 whitespace-nowrap">
-                      {cat.name}
-                      <Badge variant="secondary" className="ml-2 text-xs">
-                        {cat.rankings.length}
-                      </Badge>
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
+              <div className="relative w-full mb-6">
+                <div className="overflow-x-auto scrollbar-hide">
+                  <TabsList className="inline-flex w-full min-w-max mx-auto">
+                    {categories.map((cat) => (
+                      <TabsTrigger key={cat.id} value={cat.id} className="text-sm px-4 py-2.5 whitespace-nowrap">
+                        {cat.name}
+                        <Badge variant="secondary" className="ml-2 text-xs">
+                          {cat.rankings.length}
+                        </Badge>
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </div>
+                <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent" />
               </div>
 
               {categories.map((category) => (
