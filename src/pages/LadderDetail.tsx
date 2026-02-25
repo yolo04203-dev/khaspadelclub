@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -559,20 +560,19 @@ export default function LadderDetail() {
             </Card>
           ) : (
             <Tabs value={activeCategory || undefined} onValueChange={setActiveCategory}>
-              <div className="relative w-full mb-6">
-                <div className="overflow-x-auto scrollbar-hide touch-pan-x [-webkit-overflow-scrolling:touch]">
-                  <TabsList className="inline-flex w-max min-w-full">
+              <div className="w-full mb-6">
+                <Select value={activeCategory || undefined} onValueChange={setActiveCategory}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
                     {categories.map((cat) => (
-                      <TabsTrigger key={cat.id} value={cat.id} className="shrink-0 text-sm px-4 py-2.5 whitespace-nowrap">
-                        {cat.name}
-                        <Badge variant="secondary" className="ml-2 text-xs">
-                          {cat.rankings.length}
-                        </Badge>
-                      </TabsTrigger>
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name} ({cat.rankings.length})
+                      </SelectItem>
                     ))}
-                  </TabsList>
-                </div>
-                <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background to-transparent" />
+                  </SelectContent>
+                </Select>
               </div>
 
               {categories.map((category) => (
