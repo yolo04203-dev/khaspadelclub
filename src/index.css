@@ -382,6 +382,10 @@ body {
 .hero-animate-delay-4 { animation-delay: 0.45s; }
 .hero-animate-delay-5 { animation-delay: 0.55s; }
 
+/* Hidden scrollbar utility */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
 /* Reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
   *,

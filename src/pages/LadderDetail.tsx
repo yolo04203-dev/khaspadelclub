@@ -559,16 +559,18 @@ export default function LadderDetail() {
             </Card>
           ) : (
             <Tabs value={activeCategory || undefined} onValueChange={setActiveCategory}>
-              <TabsList className="grid w-full max-w-md mx-auto mb-6 overflow-x-auto" style={{ gridTemplateColumns: `repeat(${categories.length}, 1fr)` }}>
-                {categories.map((cat) => (
-                  <TabsTrigger key={cat.id} value={cat.id} className="text-xs sm:text-sm">
-                    {cat.name}
-                    <Badge variant="secondary" className="ml-1 sm:ml-2 text-[10px] sm:text-xs">
-                      {cat.rankings.length}
-                    </Badge>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+              <div className="w-full overflow-x-auto mb-6 scrollbar-hide">
+                <TabsList className="inline-flex w-full min-w-max mx-auto">
+                  {categories.map((cat) => (
+                    <TabsTrigger key={cat.id} value={cat.id} className="text-sm px-4 py-2.5 whitespace-nowrap">
+                      {cat.name}
+                      <Badge variant="secondary" className="ml-2 text-xs">
+                        {cat.rankings.length}
+                      </Badge>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
 
               {categories.map((category) => (
                 <TabsContent key={category.id} value={category.id}>
