@@ -239,6 +239,50 @@ class Logger {
   forceFlush(): void {
     this.flush();
   }
+
+  /** Log a one-time startup diagnostic to aid remote debugging on native */
+  logStartupDiagnostic(): void {
+    try {
+      const cap = (window as any).Capacitor;
+      const isNative = !!cap?.isNativePlatform?.();
+      if (!isNative) return; // only log on native builds
+
+      const info: Record<string, unknown> = {
+        ...getDeviceInfo(),
+        app_version: cap?.Plugins?.App?.getInfo ? "pending" : "unavailable",
+        webview_url: window.location.href,
+        document_ready: document.readyState,
+        timestamp: new Date().toISOString(),
+        has_service_worker: "serviceWorker" in navigator,
+        local_storage_ok: (() => { try { localStorage.setItem("__diag", "1"); localStorage.removeItem("__diag"); return true; } catch { return false; } })(),
+        supabase_url_set: !!import.meta.env.VITE_SUPABASE_URL,
+      };
+
+      // Try to get native app info asynchronously
+      if (cap?.Plugins?.App?.getInfo) {
+        cap.Plugins.App.getInfo().then((appInfo: any) => {
+          this.enqueue(
+            `[Startup Diagnostic] v${appInfo.version} (build ${appInfo.build})`,
+            undefined,
+            "info"
+          );
+        }).catch(() => { /* noop */ });
+      }
+
+      this.enqueue(
+        `[Startup Diagnostic] Native cold start`,
+        undefined,
+        "info"
+      );
+      // Store device info in the queue item — flush will pick it up
+      const lastItem = this.errorQueue[this.errorQueue.length - 1];
+      if (lastItem) {
+        lastItem.device_info = info;
+      }
+    } catch {
+      // Never crash from diagnostics
+    }
+  }
 }
 
 export const logger = new Logger();
