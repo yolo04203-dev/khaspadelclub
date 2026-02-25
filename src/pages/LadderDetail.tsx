@@ -86,7 +86,7 @@ function getStreakDisplay(streak: number) {
 }
 
 function RankBadge({ rank }: { rank: number }) {
-  const baseClasses = "w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg";
+  const baseClasses = "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-base sm:text-lg";
 
   if (rank === 1) {
     return (
@@ -439,8 +439,8 @@ export default function LadderDetail() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <header className="border-b border-border bg-card sticky top-0 z-40">
+      <div className="min-h-dvh bg-background">
+        <header className="border-b border-border bg-card sticky top-0 z-40 safe-top">
           <div className="container flex items-center h-16">
             <Button variant="ghost" size="icon" asChild>
               <Link to="/ladders">
@@ -469,8 +469,8 @@ export default function LadderDetail() {
 
   if (!ladder) {
     return (
-      <div className="min-h-screen bg-background">
-        <header className="border-b border-border bg-card">
+      <div className="min-h-dvh bg-background">
+        <header className="border-b border-border bg-card safe-top">
           <div className="container flex items-center h-16">
             <Button variant="ghost" size="icon" asChild>
               <Link to="/ladders">
@@ -493,9 +493,9 @@ export default function LadderDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-dvh bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card sticky top-0 z-40">
+      <header className="border-b border-border bg-card sticky top-0 z-40 safe-top">
         <div className="container flex items-center justify-between h-16">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" asChild>
@@ -520,10 +520,10 @@ export default function LadderDetail() {
             )}
 
             {(role === "admin" || role === "super_admin") && (
-              <Button variant="outline" asChild>
+              <Button variant="outline" size="icon" className="sm:w-auto sm:px-4" asChild>
                 <Link to={`/ladders/${id}/manage`}>
-                  <Settings className="w-4 h-4 mr-2" />
-                  Manage
+                  <Settings className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Manage</span>
                 </Link>
               </Button>
             )}
@@ -532,8 +532,8 @@ export default function LadderDetail() {
       </header>
 
       {/* Main Content */}
-      <PullToRefresh onRefresh={handleRefresh} className="min-h-[calc(100vh-4rem)]">
-        <main className="container py-6 sm:py-8">
+      <PullToRefresh onRefresh={handleRefresh} className="min-h-[calc(100dvh-4rem)]">
+        <main className="container py-6 sm:py-8 pb-safe-nav sm:pb-8">
           <div className="animate-fade-in">
             {/* Ladder Header */}
             <div className="mb-6 sm:mb-8 text-center">
@@ -559,11 +559,11 @@ export default function LadderDetail() {
             </Card>
           ) : (
             <Tabs value={activeCategory || undefined} onValueChange={setActiveCategory}>
-              <TabsList className="grid w-full max-w-md mx-auto mb-6" style={{ gridTemplateColumns: `repeat(${categories.length}, 1fr)` }}>
+              <TabsList className="grid w-full max-w-md mx-auto mb-6 overflow-x-auto" style={{ gridTemplateColumns: `repeat(${categories.length}, 1fr)` }}>
                 {categories.map((cat) => (
-                  <TabsTrigger key={cat.id} value={cat.id}>
+                  <TabsTrigger key={cat.id} value={cat.id} className="text-xs sm:text-sm">
                     {cat.name}
-                    <Badge variant="secondary" className="ml-2">
+                    <Badge variant="secondary" className="ml-1 sm:ml-2 text-[10px] sm:text-xs">
                       {cat.rankings.length}
                     </Badge>
                   </TabsTrigger>
@@ -577,24 +577,24 @@ export default function LadderDetail() {
                   )}
 
                   {/* Stats Bar */}
-                  <div className="grid grid-cols-3 gap-4 mb-8 max-w-md mx-auto">
+                  <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-8 max-w-md mx-auto">
                     <Card className="text-center">
-                      <CardContent className="pt-4 pb-4">
-                        <div className="text-2xl font-bold text-foreground">{category.rankings.length}</div>
+                      <CardContent className="pt-3 pb-3 sm:pt-4 sm:pb-4">
+                        <div className="text-xl sm:text-2xl font-bold text-foreground">{category.rankings.length}</div>
                         <div className="text-xs text-muted-foreground">Teams</div>
                       </CardContent>
                     </Card>
                     <Card className="text-center">
-                      <CardContent className="pt-4 pb-4">
-                        <div className="text-2xl font-bold text-foreground">
+                      <CardContent className="pt-3 pb-3 sm:pt-4 sm:pb-4">
+                        <div className="text-xl sm:text-2xl font-bold text-foreground">
                           {category.rankings.reduce((sum, r) => sum + r.wins + r.losses, 0)}
                         </div>
                         <div className="text-xs text-muted-foreground">Matches</div>
                       </CardContent>
                     </Card>
                     <Card className="text-center">
-                      <CardContent className="pt-4 pb-4">
-                        <div className="text-2xl font-bold text-foreground">{category.challenge_range}</div>
+                      <CardContent className="pt-3 pb-3 sm:pt-4 sm:pb-4">
+                        <div className="text-xl sm:text-2xl font-bold text-foreground">{category.challenge_range}</div>
                         <div className="text-xs text-muted-foreground">Challenge Range</div>
                       </CardContent>
                     </Card>
