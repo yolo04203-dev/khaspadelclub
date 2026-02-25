@@ -14,7 +14,9 @@ const config: CapacitorConfig = {
     contentInset: 'automatic'
   },
   android: {
-    allowMixedContent: true
+    allowMixedContent: true,
+    backgroundColor: '#0d1a2d',
+    loggingBehavior: 'none'
   },
   plugins: {
     StatusBar: {

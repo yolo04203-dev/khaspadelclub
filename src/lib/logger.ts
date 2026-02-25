@@ -31,38 +31,42 @@ const MAX_ERRORS_PER_WINDOW = 20;
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 
 function getDeviceInfo(): Record<string, unknown> {
-  const ua = navigator.userAgent;
-
-  let platform = "web";
   try {
-    const cap = (window as any).Capacitor;
-    if (cap?.getPlatform) platform = cap.getPlatform();
-  } catch { /* noop */ }
+    const ua = navigator.userAgent;
 
-  let osVersion = "unknown";
-  const iosMatch = ua.match(/OS (\d+[._]\d+[._]?\d*)/);
-  const androidMatch = ua.match(/Android (\d+(\.\d+)*)/);
-  if (iosMatch) osVersion = `iOS ${iosMatch[1].replace(/_/g, ".")}`;
-  else if (androidMatch) osVersion = `Android ${androidMatch[1]}`;
+    let platform = "web";
+    try {
+      const cap = (window as any).Capacitor;
+      if (cap?.getPlatform) platform = cap.getPlatform();
+    } catch { /* noop */ }
 
-  let networkType = "unknown";
-  try {
-    const conn = (navigator as any).connection;
-    if (conn?.effectiveType) networkType = conn.effectiveType;
-  } catch { /* noop */ }
+    let osVersion = "unknown";
+    const iosMatch = ua.match(/OS (\d+[._]\d+[._]?\d*)/);
+    const androidMatch = ua.match(/Android (\d+(\.\d+)*)/);
+    if (iosMatch) osVersion = `iOS ${iosMatch[1].replace(/_/g, ".")}`;
+    else if (androidMatch) osVersion = `Android ${androidMatch[1]}`;
 
-  let isNative = false;
-  try {
-    isNative = !!(window as any).Capacitor?.isNativePlatform?.();
-  } catch { /* noop */ }
+    let networkType = "unknown";
+    try {
+      const conn = (navigator as any).connection;
+      if (conn?.effectiveType) networkType = conn.effectiveType;
+    } catch { /* noop */ }
 
-  return {
-    platform,
-    os_version: osVersion,
-    network_type: networkType,
-    is_native: isNative,
-    screen_size: `${window.innerWidth}x${window.innerHeight}`,
-  };
+    let isNative = false;
+    try {
+      isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+    } catch { /* noop */ }
+
+    return {
+      platform,
+      os_version: osVersion,
+      network_type: networkType,
+      is_native: isNative,
+      screen_size: `${window.innerWidth}x${window.innerHeight}`,
+    };
+  } catch {
+    return { platform: "unknown" };
+  }
 }
 
 class Logger {
@@ -72,13 +76,12 @@ class Logger {
   private rateLimitCount = 0;
   private rateLimitWindowStart = Date.now();
   private dedupMap = new Map<string, { count: number; item: ErrorQueueItem }>();
+  private initialized = false;
 
-  constructor() {
-    this.startFlushTimer();
-  }
-
-  private startFlushTimer() {
-    if (this.flushTimer) return;
+  /** Lazily start the flush timer on first enqueue, not in constructor */
+  private ensureInitialized() {
+    if (this.initialized) return;
+    this.initialized = true;
     this.flushTimer = setInterval(() => this.flush(), FLUSH_INTERVAL_MS);
   }
 
@@ -95,6 +98,9 @@ class Logger {
   private enqueue(message: string, error?: Error | unknown, severity: string = "error") {
     if (this.isRateLimited()) return;
 
+    // Start flush timer lazily on first error
+    this.ensureInitialized();
+
     const dedupKey = `${severity}:${message}`;
     const existing = this.dedupMap.get(dedupKey);
     if (existing) {
@@ -106,8 +112,8 @@ class Logger {
     const item: ErrorQueueItem = {
       message,
       stack: err?.stack || null,
-      page_url: window.location.href,
-      user_agent: navigator.userAgent,
+      page_url: typeof window !== "undefined" ? window.location.href : "",
+      user_agent: typeof navigator !== "undefined" ? navigator.userAgent : "",
       device_info: getDeviceInfo(),
       severity,
     };
@@ -118,22 +124,22 @@ class Logger {
   private async flush() {
     if (this.errorQueue.length === 0) return;
 
-    // Collapse duplicates: append count to message if > 1
-    const collapsed = Array.from(this.dedupMap.values()).map(({ count, item }) => ({
-      ...item,
-      message: count > 1 ? `${item.message} (x${count})` : item.message,
-    }));
-    this.errorQueue.length = 0;
-    this.dedupMap.clear();
-
-    if (collapsed.length === 0) return;
-
     try {
+      // Collapse duplicates: append count to message if > 1
+      const collapsed = Array.from(this.dedupMap.values()).map(({ count, item }) => ({
+        ...item,
+        message: count > 1 ? `${item.message} (x${count})` : item.message,
+      }));
+      this.errorQueue.length = 0;
+      this.dedupMap.clear();
+
+      if (collapsed.length === 0) return;
+
       let userId: string | null = null;
       try {
         const { data } = await supabase.auth.getSession();
         userId = data.session?.user?.id ?? null;
-      } catch { /* noop */ }
+      } catch { /* noop — Supabase may not be ready yet on cold start */ }
 
       const rows = collapsed.map(item => ({
         user_id: userId,
@@ -185,12 +191,14 @@ class Logger {
     this.enqueue(message, undefined, "warn");
 
     // Wire to Sentry breadcrumbs
-    Sentry.addBreadcrumb({
-      category: "logger",
-      message,
-      level: "warning",
-      data: context,
-    });
+    try {
+      Sentry.addBreadcrumb({
+        category: "logger",
+        message,
+        level: "warning",
+        data: context,
+      });
+    } catch { /* noop */ }
   }
 
   error(message: string, error?: Error | unknown, context?: Record<string, unknown>): void {
@@ -206,12 +214,14 @@ class Logger {
     this.enqueue(message, err, "error");
 
     // Wire to Sentry breadcrumbs
-    Sentry.addBreadcrumb({
-      category: "logger",
-      message,
-      level: "error",
-      data: { ...context, errorMessage: err.message },
-    });
+    try {
+      Sentry.addBreadcrumb({
+        category: "logger",
+        message,
+        level: "error",
+        data: { ...context, errorMessage: err.message },
+      });
+    } catch { /* noop */ }
   }
 
   apiError(operation: string, error: unknown, context?: Record<string, unknown>): void {

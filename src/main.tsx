@@ -42,19 +42,18 @@ createRoot(document.getElementById("root")!).render(<App />);
 deferInit(() => import("@/lib/webVitals").then(m => m.initWebVitals()));
 deferInit(() => import("@/lib/analytics/posthog").then(m => m.analytics.init()));
 
-// Register service worker for PWA support
-if ("serviceWorker" in navigator) {
+// Register service worker for PWA support — skip on native Capacitor platforms
+const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+if ("serviceWorker" in navigator && !isNative) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("/sw.js")
       .then((registration) => {
-        // Listen for new SW versions
         registration.addEventListener("updatefound", () => {
           const newWorker = registration.installing;
           if (!newWorker) return;
           newWorker.addEventListener("statechange", () => {
             if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-              // New version available – prompt user
               if (confirm("A new version of Khas Padel Club is available. Reload to update?")) {
                 window.location.reload();
               }
