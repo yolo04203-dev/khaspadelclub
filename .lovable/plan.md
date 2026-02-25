@@ -1,147 +1,119 @@
 
 
-# Mobile Layout Refactor for Safe Areas, Responsive Scaling, and Ladder UI
+# Global Mobile Layout & Safe-Area Refactor
 
-## Problem Summary (from screenshots)
+## Problem Analysis
 
-The Samsung S21 screenshot shows:
-1. "Khas Padel Club" text in the header consuming critical space, pushing the Join button against the edge
-2. Ladder ranking cards show team name AND member names, creating visual duplication and cramped rows ("Ahmed..." then "Ahmed & ali" below)
-3. The "Manage" button is hidden due to space constraints
-4. Content renders under the Android status bar area
+After reviewing the full codebase, the core issues are:
+
+1. **Landing page header** (`Header.tsx`) uses `fixed top-0` without `safe-top` — content renders under notch/status bar on iOS and Android
+2. **Hero section** uses `min-h-[90vh]` — broken on iOS Safari
+3. **24 page files** use `min-h-screen` (Tailwind's `100vh`) — broken on iOS/Android dynamic viewport
+4. **Dashboard** uses `min-h-[calc(100vh-4rem)]` — same issue
+5. **Public page headers** (Privacy, Terms, Contact, LadderCreate, LadderManage, etc.) use `sticky top-0` without `safe-top` — content merges with status bar in Capacitor
+6. **OfflineBanner and SlowConnectionBanner** use `fixed top-0` without safe-area offset
+7. **No global safe-area wrapper** exists — each page must independently handle insets
+
+## Architecture Decision
+
+Instead of patching 24+ individual pages, the fix is applied at **two levels**:
+
+### Level 1: Global CSS — Replace `min-h-screen` behavior
+Add a CSS override so Tailwind's `min-h-screen` utility uses `100dvh` instead of `100vh`. This fixes all 24 pages in one stroke without touching any component files.
+
+### Level 2: Structural safe-area fixes for headers
+The landing `Header.tsx` and all standalone page headers need `safe-top` class. The `AppHeader` already has it, but pages with custom headers (Privacy, Terms, Contact, LadderCreate, LadderManage, CreateTeam, AmericanoCreate, TournamentCreate, AdminHeader) do not.
 
 ---
 
-## Technical Changes
+## Changes
 
-### 1. Global Safe-Area and Viewport Fixes
+### File 1: `src/index.css`
 
-**File: `src/index.css`**
+**What changes:**
+- Override Tailwind's `min-h-screen` to use `min-height: 100dvh` with `100vh` fallback — this globally fixes all 24 pages that use `min-h-screen`
+- Add a `body`-level safe-area wrapper using `padding-left/right/bottom` for `env(safe-area-inset-*)` so the entire app respects horizontal and bottom safe areas
+- Update `.safe-top` fallback from `max(12px, ...)` to `max(16px, ...)` per user requirement
+- Replace `min-h-[90vh]` handling: add a utility `.min-h-hero` that uses `90svh`
 
-The `viewport-fit=cover` meta tag already exists in `index.html` (line 9). The safe-area CSS classes (`safe-top`, `safe-bottom`) exist but need a fallback minimum. Update the safe-area utilities:
+### File 2: `src/components/landing/Header.tsx`
 
-- Change `.safe-top` to use `padding-top: max(12px, env(safe-area-inset-top))` to ensure a minimum offset on Android devices where env() returns 0.
-- Replace all `min-h-screen` usage with `min-h-[100dvh]` via a new utility class `.min-h-screen-safe` that uses `min-height: 100dvh` with `100vh` fallback.
-- Replace `min-h-[calc(100vh-4rem)]` in LadderDetail and Challenges PullToRefresh with `min-h-[calc(100dvh-4rem)]`.
+**What changes:**
+- Add `safe-top` class to the `<header>` element so the landing page header sits below the notch/status bar
+- The header already uses `fixed top-0` — keep that, but add safe-top padding so content inside clears the system UI
 
-**File: `src/index.css`** — add:
+### File 3: `src/components/landing/Hero.tsx`
+
+**What changes:**
+- Replace `min-h-[90vh]` with `min-h-[90svh]` (small viewport height) for correct iOS behavior
+- Add top padding to account for the fixed header + safe area: `pt-24 sm:pt-28`
+
+### File 4: `src/pages/Index.tsx`
+
+**What changes:**
+- Replace `min-h-screen` with `min-h-dvh` (already defined CSS utility)
+
+### File 5: `src/pages/Dashboard.tsx`
+
+**What changes:**
+- Replace `min-h-[calc(100vh-4rem)]` with `min-h-[calc(100dvh-4rem)]`
+
+### File 6: Public page headers — add `safe-top` to all standalone headers
+
+The following files have `sticky top-0 z-40` headers without `safe-top`:
+
+| File | Line | Current | Fix |
+|------|------|---------|-----|
+| `src/pages/Privacy.tsx` | ~10 | `sticky top-0 z-40` | Add `safe-top` |
+| `src/pages/Terms.tsx` | ~10 | `sticky top-0 z-40` | Add `safe-top` |
+| `src/pages/Contact.tsx` | ~53 | `sticky top-0 z-40` | Add `safe-top` |
+| `src/pages/LadderCreate.tsx` | ~175 | `sticky top-0 z-40` | Add `safe-top` |
+| `src/pages/LadderManage.tsx` | ~318 | `sticky top-0 z-40` | Add `safe-top` |
+| `src/pages/CreateTeam.tsx` | ~163 | No sticky, bare header | Add `safe-top sticky top-0 z-40` |
+| `src/pages/AmericanoCreate.tsx` | ~270 | No sticky, bare header | Add `safe-top` |
+| `src/pages/TournamentCreate.tsx` | ~178 | No sticky, bare header | Add `safe-top` |
+| `src/components/admin/AdminHeader.tsx` | ~8 | `sticky top-0 z-40` | Add `safe-top` |
+
+### File 7: `src/components/ui/error-state.tsx`
+
+**What changes:**
+- Add `safe-top` padding to `OfflineBanner` and `SlowConnectionBanner` so they don't render under the notch
+
+### File 8: `src/pages/Auth.tsx`
+
+**What changes:**
+- Replace `min-h-screen` with `min-h-dvh` — the auth page is a full-bleed page that must respect dynamic viewport
+
+---
+
+## What This Does NOT Touch
+- No UI redesign
+- No feature changes
+- No per-device hacks
+- LadderDetail already uses `min-h-dvh` and `safe-top` from the previous refactor
+- AppHeader already has `safe-top`
+- Bottom nav already has `safe-bottom`
+- VirtualizedRankingsList already optimized from previous refactor
+
+## Technical Detail: Why Override `min-h-screen` Globally
+
+Tailwind's `min-h-screen` compiles to `min-height: 100vh`. On iOS Safari and Android Chrome, `100vh` includes the area behind the URL bar, causing content to extend beyond the visible viewport. By overriding this in CSS:
+
 ```css
-/* Dynamic viewport height — replaces 100vh for iOS/Android compat */
-.min-h-dvh {
+.min-h-screen {
   min-height: 100vh; /* fallback */
-  min-height: 100dvh;
+  min-height: 100dvh; /* dynamic viewport height */
 }
 ```
 
-### 2. Hide Logo Text on Mobile (Remove "Khas Padel Club" on small screens)
+All 24 pages that use `min-h-screen` are fixed simultaneously without editing each file. This is a proper architectural fix, not a per-page workaround.
 
-**File: `src/components/Logo.tsx`**
+## Expected Result
 
-Currently the Logo always shows text unless `showText={false}`. The AppHeader already hides it via a Tailwind class hack on the span. But pages like LadderDetail use `<Logo size="sm" />` directly (showText defaults to true).
-
-Changes:
-- Add a `hideTextOnMobile` prop (default: true) that applies `hidden sm:inline` to the text span.
-- This means on screens < 640px, the "Khas Padel Club" text is hidden, freeing horizontal space.
-- Only the logo image shows on mobile.
-
-### 3. LadderDetail Header — Make Actions Always Visible
-
-**File: `src/pages/LadderDetail.tsx`** (lines 495-532)
-
-Current header has: `[Back] [Logo "Khas Padel Club"]` on left, `[Join] [Manage]` on right. On narrow screens, the text pushes buttons off-screen.
-
-Changes:
-- Use `<Logo size="sm" />` which will now auto-hide text on mobile (from change #2).
-- Make "Manage" button icon-only on mobile: `<Settings className="w-4 h-4 sm:mr-2" /> <span className="hidden sm:inline">Manage</span>`.
-- Both Join and Manage buttons become icon-only (44px touch targets) on mobile, side by side.
-- Add `safe-top` class to the sticky header.
-- Apply `pb-safe-nav` to the main content area.
-
-### 4. Ladder Ranking Card Refactor — Remove Duplicate Names on Mobile
-
-**File: `src/components/ladder/VirtualizedRankingsList.tsx`**
-
-Per user preference: show **team name only** on mobile, hide member names line from the collapsed row.
-
-Changes to the mobile (collapsed) row layout:
-- Remove the member avatars + names line from the collapsed card view on mobile. That section (lines 109-121, the `flex -space-x-2` avatars and `span` with member names) gets `hidden sm:flex` — only visible on desktop.
-- The team name (line 106) becomes the sole identifier. It already has `truncate`.
-- Make RankBadge smaller on mobile: `w-10 h-10 sm:w-12 sm:h-12` with `text-base sm:text-lg`.
-- Reduce card padding on mobile: `p-3 sm:p-4`.
-
-Mobile row structure becomes:
-```
-[Rank 10x10] [Team Name (truncate, flex-1)] [pts + W-L (shrink-0)] [Challenge?] [Expand]
-```
-
-The expanded CollapsibleContent already shows full member details — no change needed there.
-
-### 5. Typography Scaling for Dense Data
-
-**File: `src/components/ladder/VirtualizedRankingsList.tsx`**
-
-- Team name: `text-xs sm:text-sm` (was `text-sm sm:text-base`)
-- Points display: `text-xs sm:text-sm` (was `text-sm`)
-- W-L display: `text-[10px] sm:text-xs` (was `text-xs`)
-
-### 6. Action Buttons Never Shrink
-
-Already using `shrink-0` on the mobile action container (line 174). Verify challenge button uses `shrink-0` as well. Add explicit `shrink-0` to each action button wrapper in the mobile row.
-
-### 7. Ladder Page Stats Bar Fix
-
-**File: `src/pages/LadderDetail.tsx`** (lines 580-601)
-
-The stats bar cards (Teams / Matches / Challenge Range) use `text-2xl` which is large on 320px screens.
-
-Changes:
-- Font size: `text-xl sm:text-2xl` for the stat number.
-- Reduce vertical padding: `pt-3 pb-3 sm:pt-4 sm:pb-4`.
-- Use `gap-2 sm:gap-4` between grid items.
-
-### 8. Tab Triggers — Prevent Overflow
-
-**File: `src/pages/LadderDetail.tsx`** (lines 562-571)
-
-Category tabs with badges can overflow on narrow screens. Changes:
-- Add `overflow-x-auto` to the TabsList wrapper.
-- Make tab text smaller: add `text-xs sm:text-sm` to TabsTrigger.
-- Hide badge count on very narrow screens or make it smaller.
-
-### 9. Replace 100vh Usages (Key Files Only)
-
-Replace `min-h-[calc(100vh-4rem)]` with `min-h-[calc(100dvh-4rem)]` in:
-- `src/pages/LadderDetail.tsx` (line 535)
-- `src/pages/Challenges.tsx` (line 628)
-
-Replace `min-h-screen` with the dvh-safe utility where it's the page root on these critical paths (LadderDetail loading/error/main states). Other pages use `min-h-screen` from Tailwind which is `100vh` — these can be updated incrementally but the ladder page is the priority.
-
-### 10. StatusBar Overlay Fix for Android
-
-**File: `src/hooks/useStatusBar.ts`**
-
-Add `StatusBar.setOverlaysWebView({ overlay: true })` on Android to ensure content draws behind the status bar, which allows the `safe-top` CSS to handle the spacing correctly. Without this, some Android devices don't report safe-area-inset-top.
-
-### 11. LadderDetail Header — Add safe-top to All Header States
-
-The loading/error/main headers in LadderDetail (lines 443, 473, 498) need `safe-top` class added to be consistent with AppHeader.
-
----
-
-## Files Modified
-
-| File | Change |
-|------|--------|
-| `src/index.css` | Add `.min-h-dvh` utility, update `.safe-top` with fallback minimum |
-| `src/components/Logo.tsx` | Add `hideTextOnMobile` prop, apply `hidden sm:inline` to text |
-| `src/pages/LadderDetail.tsx` | Icon-only Manage button on mobile, `safe-top` on headers, `pb-safe-nav`, dvh usage, smaller stats bar |
-| `src/components/ladder/VirtualizedRankingsList.tsx` | Hide member names on mobile collapsed row, smaller RankBadge, tighter padding, scaled typography |
-| `src/hooks/useStatusBar.ts` | Add `setOverlaysWebView` for Android |
-
-## What Does NOT Change
-- Challenge flow
-- Match result automation
-- Tournament module
-- Desktop layout
-- Existing safe-area handling in AppHeader and bottom nav
+- Nothing renders under notch/status bar on any page
+- Landing page header clears system UI on Samsung S21 and all iPhones
+- All pages use dynamic viewport height (no iOS Safari jumping)
+- Horizontal safe areas respected globally via body padding
+- No layout shifts, no horizontal scroll
+- Works across 320px–desktop
 
