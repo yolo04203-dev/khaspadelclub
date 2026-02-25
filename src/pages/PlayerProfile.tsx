@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { motion } from "framer-motion";
+
 import { User, Users, Trophy, Calendar, Loader2, UserPlus, Swords } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -194,11 +194,7 @@ export default function PlayerProfile() {
       <AppHeader showBack />
 
       <main className="container py-8 max-w-2xl">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
+        <div className="hero-animate">
           {/* Profile Header */}
           <Card className="mb-6">
             <CardContent className="pt-6">
@@ -341,7 +337,7 @@ export default function PlayerProfile() {
               )}
             </CardContent>
           </Card>
-        </motion.div>
+        </div>
       </main>
 
       {/* Invite Dialog */}

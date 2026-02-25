@@ -52,10 +52,12 @@ export default defineConfig(({ mode }) => ({
     dedupe: ["react", "react-dom", "react/jsx-runtime"],
   },
   build: {
-    sourcemap: true,
-    target: 'es2020',
+    sourcemap: !!process.env.SENTRY_AUTH_TOKEN,
+    target: 'es2019',
     minify: 'esbuild',
     cssMinify: true,
+    cssCodeSplit: true,
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
         manualChunks: {

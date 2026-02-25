@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+
 import { Plus, Shuffle, Users, Trophy, Play, CheckCircle } from "lucide-react";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { useAuth } from "@/contexts/AuthContext";
@@ -131,11 +131,7 @@ export default function Americano() {
 
       <PullToRefresh onRefresh={async () => { await fetchSessions(); }} className="flex-1 overflow-auto">
         <main className="container py-8 pb-safe-nav sm:pb-8">
-          <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.15 }}
-        >
+          <div className="hero-animate">
           {/* Header Section */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2">
@@ -274,7 +270,7 @@ export default function Americano() {
               </div>
             )}
           </div>
-          </motion.div>
+          </div>
         </main>
       </PullToRefresh>
     </div>

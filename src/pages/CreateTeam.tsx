@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Navigate, Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -175,11 +175,7 @@ export default function CreateTeam() {
 
       {/* Main Content */}
       <main className="container py-8 max-w-lg">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
+        <div className="hero-animate">
           {existingTeam ? (
             // User already has a team
             <Card>
@@ -285,7 +281,7 @@ export default function CreateTeam() {
               </CardContent>
             </Card>
           )}
-        </motion.div>
+        </div>
 
         {createdTeam && (
           <AddPartnerDialog

@@ -382,6 +382,11 @@ body {
 .hero-animate-delay-4 { animation-delay: 0.45s; }
 .hero-animate-delay-5 { animation-delay: 0.55s; }
 
+/* Contain paint for card-heavy lists — reduces layout recalc scope */
+.contain-card {
+  contain: content;
+}
+
 /* Hidden scrollbar utility */
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }

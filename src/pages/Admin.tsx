@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Navigate } from "react-router-dom";
-import { motion } from "framer-motion";
+
 import { Users, Trophy, Swords, Search, Loader2, Layers, LayoutGrid, Zap, Shuffle, Shield, Bug, UserPlus, History } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -262,11 +262,7 @@ export default function Admin() {
       <AdminHeader />
 
       <main className="container py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
+        <div className="hero-animate">
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">Admin Portal</h1>
             <p className="text-muted-foreground mb-4">Manage players, teams, ladders, and tournaments</p>
@@ -397,7 +393,7 @@ export default function Admin() {
               <AuditLogTab />
             </TabsContent>
           </Tabs>
-        </motion.div>
+        </div>
       </main>
     </div>
   );

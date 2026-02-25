@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+
 import { 
   Loader2, 
   Trophy, 
@@ -324,11 +324,7 @@ export default function FindOpponents() {
 
       {/* Main Content */}
       <main className="container py-8 max-w-3xl pb-safe-nav">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.15 }}
-        >
+        <div className="hero-animate">
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold text-foreground mb-2">Find Opponents</h1>
             <p className="text-muted-foreground">
@@ -539,7 +535,7 @@ export default function FindOpponents() {
               })}
             </Tabs>
           )}
-        </motion.div>
+        </div>
       </main>
 
       {/* Challenge Dialog */}

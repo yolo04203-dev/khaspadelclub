@@ -85,7 +85,7 @@ self.addEventListener('fetch', (event) => {
 // Background sync foundation
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-data') {
-    console.log('[SW] Background sync triggered');
+    // Future: replay queued mutations
     // Future: replay queued mutations here
   }
 });

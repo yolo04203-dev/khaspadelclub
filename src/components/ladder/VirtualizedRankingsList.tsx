@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactElement } from "react";
+import { type CSSProperties, type ReactElement, memo, useMemo } from "react";
 import { List } from "react-window";
 import { Trophy, TrendingDown, Flame, Swords, Loader2, Snowflake, ChevronDown, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -50,13 +50,13 @@ export interface VirtualizedRankingsListProps {
   onAdminRankChanged?: () => void;
 }
 
-function RankBadge({ rank }: { rank: number }) {
+const RankBadge = memo(function RankBadge({ rank }: { rank: number }) {
   const baseClasses = "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-base sm:text-lg shrink-0";
   if (rank === 1) return <div className={cn(baseClasses, "bg-rank-gold/20 text-rank-gold border-2 border-rank-gold/30")}><Trophy className="w-4 h-4 sm:w-5 sm:h-5" /></div>;
   if (rank === 2) return <div className={cn(baseClasses, "bg-rank-silver/20 text-rank-silver border-2 border-rank-silver/30")}><Trophy className="w-4 h-4 sm:w-5 sm:h-5" /></div>;
   if (rank === 3) return <div className={cn(baseClasses, "bg-rank-bronze/20 text-rank-bronze border-2 border-rank-bronze/30")}><Trophy className="w-4 h-4 sm:w-5 sm:h-5" /></div>;
   return <div className={cn(baseClasses, "bg-muted text-muted-foreground")}>{rank}</div>;
-}
+});
 
 function getStreakDisplay(streak: number) {
   if (streak === 0) return null;
@@ -80,7 +80,7 @@ interface RowExtraProps {
   onAdminRankChanged?: () => void;
 }
 
-function RankingRow({ index, style, rankings, catId, uTeamId, uObj, frozenCheck, frozenDate, challengeCheck, challengeAction, challengingId, pendingSet, isAdmin, onAdminRankChanged }: {
+const RankingRow = memo(function RankingRow({ index, style, rankings, catId, uTeamId, uObj, frozenCheck, frozenDate, challengeCheck, challengeAction, challengingId, pendingSet, isAdmin, onAdminRankChanged }: {
   index: number;
   style: CSSProperties;
   ariaAttributes: any;
@@ -253,14 +253,14 @@ function RankingRow({ index, style, rankings, catId, uTeamId, uObj, frozenCheck,
       </Collapsible>
     </div>
   );
-}
+});
 
 const ROW_HEIGHT = 88;
 
 export function VirtualizedRankingsList(props: VirtualizedRankingsListProps) {
   const { rankings } = props;
 
-  const rowExtraProps: RowExtraProps = {
+  const rowExtraProps: RowExtraProps = useMemo(() => ({
     rankings,
     catId: props.categoryId,
     uTeamId: props.userTeamId,
@@ -273,7 +273,7 @@ export function VirtualizedRankingsList(props: VirtualizedRankingsListProps) {
     pendingSet: props.pendingChallenges,
     isAdmin: props.isAdmin ?? false,
     onAdminRankChanged: props.onAdminRankChanged,
-  };
+  }), [rankings, props.categoryId, props.userTeamId, props.user, props.isTeamFrozen, props.getFrozenUntilDate, props.canChallenge, props.handleChallenge, props.challengingTeamId, props.pendingChallenges, props.isAdmin, props.onAdminRankChanged]);
 
   // For small lists, render without virtualization
   if (rankings.length <= 20) {
@@ -296,7 +296,7 @@ export function VirtualizedRankingsList(props: VirtualizedRankingsListProps) {
 
   return (
     <List
-      rowComponent={RankingRow}
+      rowComponent={RankingRow as any}
       rowCount={rankings.length}
       rowHeight={ROW_HEIGHT}
       rowProps={rowExtraProps as any}
