@@ -16,8 +16,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { isFuture, format } from "date-fns";
 import { JoinLadderDialog } from "@/components/ladder/JoinLadderDialog";
 import { VirtualizedRankingsList } from "@/components/ladder/VirtualizedRankingsList";
-import { CategorySection } from "@/components/ladder/CategorySection";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { LadderRowSkeleton } from "@/components/ui/skeleton-card";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { logger } from "@/lib/logger";
@@ -546,7 +544,7 @@ export default function LadderDetail() {
               </div>
             </div>
 
-          {/* Categories */}
+          {/* Categories Tabs */}
           {categories.length === 0 ? (
             <Card className="text-center py-12">
               <CardContent>
@@ -560,19 +558,61 @@ export default function LadderDetail() {
               </CardContent>
             </Card>
           ) : (
-            <>
-              {/* Mobile: Vertically stacked category sections */}
-              <div className="flex flex-col gap-8 md:hidden">
-                {categories.map((category) => (
-                  <div key={category.id}>
-                    <div className="flex items-center justify-center gap-2 mb-4">
-                      <h2 className="text-lg font-semibold text-foreground">{category.name}</h2>
-                      <Badge variant="secondary" className="text-xs">
-                        {category.rankings.length}
-                      </Badge>
-                    </div>
-                    <CategorySection
-                      category={category}
+            <Tabs value={activeCategory || undefined} onValueChange={setActiveCategory}>
+              <TabsList className="grid w-full max-w-md mx-auto mb-6 overflow-x-auto" style={{ gridTemplateColumns: `repeat(${categories.length}, 1fr)` }}>
+                {categories.map((cat) => (
+                  <TabsTrigger key={cat.id} value={cat.id} className="text-xs sm:text-sm">
+                    {cat.name}
+                    <Badge variant="secondary" className="ml-1 sm:ml-2 text-[10px] sm:text-xs">
+                      {cat.rankings.length}
+                    </Badge>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
+              {categories.map((category) => (
+                <TabsContent key={category.id} value={category.id}>
+                  {category.description && (
+                    <p className="text-center text-muted-foreground mb-6">{category.description}</p>
+                  )}
+
+                  {/* Stats Bar */}
+                  <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-8 max-w-md mx-auto">
+                    <Card className="text-center">
+                      <CardContent className="pt-3 pb-3 sm:pt-4 sm:pb-4">
+                        <div className="text-xl sm:text-2xl font-bold text-foreground">{category.rankings.length}</div>
+                        <div className="text-xs text-muted-foreground">Teams</div>
+                      </CardContent>
+                    </Card>
+                    <Card className="text-center">
+                      <CardContent className="pt-3 pb-3 sm:pt-4 sm:pb-4">
+                        <div className="text-xl sm:text-2xl font-bold text-foreground">
+                          {category.rankings.reduce((sum, r) => sum + r.wins + r.losses, 0)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Matches</div>
+                      </CardContent>
+                    </Card>
+                    <Card className="text-center">
+                      <CardContent className="pt-3 pb-3 sm:pt-4 sm:pb-4">
+                        <div className="text-xl sm:text-2xl font-bold text-foreground">{category.challenge_range}</div>
+                        <div className="text-xs text-muted-foreground">Challenge Range</div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Rankings List */}
+                  {category.rankings.length === 0 ? (
+                    <Card className="text-center py-12">
+                      <CardContent>
+                        <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-semibold text-foreground mb-2">No teams yet</h3>
+                        <p className="text-muted-foreground">Be the first to join this category!</p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <VirtualizedRankingsList
+                      rankings={category.rankings}
+                      categoryId={category.id}
                       userTeamId={userTeamId}
                       user={user}
                       isTeamFrozen={isTeamFrozen}
@@ -584,44 +624,10 @@ export default function LadderDetail() {
                       isAdmin={isAdmin}
                       onAdminRankChanged={fetchLadderData}
                     />
-                  </div>
-                ))}
-              </div>
-
-              {/* Desktop: Tabs */}
-              <div className="hidden md:block">
-                <Tabs value={activeCategory || undefined} onValueChange={setActiveCategory}>
-                  <TabsList className="grid w-full max-w-md mx-auto mb-6" style={{ gridTemplateColumns: `repeat(${categories.length}, 1fr)` }}>
-                    {categories.map((cat) => (
-                      <TabsTrigger key={cat.id} value={cat.id} className="text-sm">
-                        {cat.name}
-                        <Badge variant="secondary" className="ml-2 text-xs">
-                          {cat.rankings.length}
-                        </Badge>
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-
-                  {categories.map((category) => (
-                    <TabsContent key={category.id} value={category.id}>
-                      <CategorySection
-                        category={category}
-                        userTeamId={userTeamId}
-                        user={user}
-                        isTeamFrozen={isTeamFrozen}
-                        getFrozenUntilDate={getFrozenUntilDate}
-                        canChallenge={canChallenge}
-                        handleChallenge={handleChallenge}
-                        challengingTeamId={challengingTeamId}
-                        pendingChallenges={pendingChallenges}
-                        isAdmin={isAdmin}
-                        onAdminRankChanged={fetchLadderData}
-                      />
-                    </TabsContent>
-                  ))}
-                </Tabs>
-              </div>
-            </>
+                  )}
+                </TabsContent>
+              ))}
+            </Tabs>
           )}
         </div>
       </main>
