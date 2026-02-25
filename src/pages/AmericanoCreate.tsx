@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+
 import { ArrowLeft, Plus, Trash2, Shuffle, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermission } from "@/hooks/usePermission";
@@ -279,11 +279,7 @@ export default function AmericanoCreate() {
       </header>
 
       <main className="container py-8 max-w-2xl">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
+        <div className="hero-animate">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center">
               <Shuffle className="w-6 h-6 text-success" />
@@ -532,7 +528,7 @@ export default function AmericanoCreate() {
               Create Session
             </Button>
           </form>
-        </motion.div>
+        </div>
       </main>
     </div>
   );

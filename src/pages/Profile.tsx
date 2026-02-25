@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+
 import { User, Users, Trophy, Loader2, Save, Trash2 } from "lucide-react";
 import { ReportProblemDialog } from "@/components/ReportProblemDialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -378,11 +378,7 @@ export default function ProfilePage() {
       <AppHeader showBack />
 
       <main className="container py-8 max-w-2xl pb-safe-nav sm:pb-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.15 }}
-        >
+        <div className="hero-animate">
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold text-foreground mb-2">Profile</h1>
             <p className="text-muted-foreground">Manage your account settings</p>
@@ -633,7 +629,7 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
           </div>
-        </motion.div>
+        </div>
       </main>
 
       {/* Invite Dialog */}

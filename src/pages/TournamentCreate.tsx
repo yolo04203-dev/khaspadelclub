@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, Navigate } from "react-router-dom";
-import { motion } from "framer-motion";
+
 import { ArrowLeft, Trophy, Banknote, Plus, Trash2, Tag, MapPin, CalendarIcon } from "lucide-react";
 import { format as formatDate } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -187,11 +187,7 @@ export default function TournamentCreate() {
       </header>
 
       <main className="container py-8 max-w-2xl">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
+        <div className="hero-animate">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-12 h-12 rounded-xl bg-warning/10 flex items-center justify-center">
               <Trophy className="w-6 h-6 text-warning" />
@@ -531,7 +527,7 @@ export default function TournamentCreate() {
               Create Tournament
             </Button>
           </form>
-        </motion.div>
+        </div>
       </main>
     </div>
   );

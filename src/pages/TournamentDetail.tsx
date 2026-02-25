@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { Link, useParams } from "react-router-dom";
-import { motion } from "framer-motion";
+
 import { ArrowLeft, Trophy, Users, Play, XCircle, Crown, Settings, Clock, Banknote, Tag, Info, MapPin, Calendar, FileText, ChevronLeft, RotateCcw, Pencil } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -1789,7 +1789,7 @@ export default function TournamentDetail() {
       </header>
 
       <main className="container py-8">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="hero-animate">
           <div className="flex items-start justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-warning/10 flex items-center justify-center">
@@ -1848,7 +1848,7 @@ export default function TournamentDetail() {
           ) : (
             renderFlatLayout()
           )}
-        </motion.div>
+        </div>
       </main>
 
       <BulkRescheduleDialog

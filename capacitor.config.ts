@@ -4,6 +4,7 @@ const config: CapacitorConfig = {
   appId: 'app.lovable.e06ca5ffcee7497891f517099811735c',
   appName: 'Khas Padel Club',
   webDir: 'dist',
+  androidScheme: 'https',
   // DEV ONLY: Uncomment for hot-reload during development
   // server: {
   //   url: 'https://e06ca5ff-cee7-4978-91f5-17099811735c.lovableproject.com?forceHideBadge=true',

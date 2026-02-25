@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
-import { motion } from "framer-motion";
+
 import { ArrowLeft, Play, Trophy, Users, CheckCircle, Shuffle, LayoutList, Clock, Target, Hash, Pencil } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -623,7 +623,7 @@ export default function AmericanoSession() {
       </header>
 
       <main className="container py-6 max-w-3xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+        <div className="hero-animate space-y-6">
           {/* Header */}
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
@@ -1030,7 +1030,7 @@ export default function AmericanoSession() {
               </Card>
             </TabsContent>
           </Tabs>
-        </motion.div>
+        </div>
       </main>
     </div>
   );
