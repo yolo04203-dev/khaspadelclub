@@ -3,6 +3,7 @@ import logoImg from "@/assets/logo.png";
 interface LogoProps {
   size?: "sm" | "md" | "lg";
   showText?: boolean;
+  hideTextOnMobile?: boolean;
   className?: string;
 }
 
@@ -21,6 +22,7 @@ const textSizeClasses = {
 export function Logo({
   size = "md",
   showText = true,
+  hideTextOnMobile = true,
   className = "",
 }: LogoProps) {
   return (
@@ -37,7 +39,7 @@ export function Logo({
 
       {showText && (
         <span
-          className={`font-display font-bold ${textSizeClasses[size]} text-foreground leading-tight whitespace-nowrap`}
+          className={`font-display font-bold ${textSizeClasses[size]} text-foreground leading-tight whitespace-nowrap ${hideTextOnMobile ? "hidden sm:inline" : ""}`}
         >
           Khas Padel Club
         </span>

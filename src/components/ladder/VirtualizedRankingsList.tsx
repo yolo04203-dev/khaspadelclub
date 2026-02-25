@@ -51,10 +51,10 @@ export interface VirtualizedRankingsListProps {
 }
 
 function RankBadge({ rank }: { rank: number }) {
-  const baseClasses = "w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg shrink-0";
-  if (rank === 1) return <div className={cn(baseClasses, "bg-rank-gold/20 text-rank-gold border-2 border-rank-gold/30")}><Trophy className="w-5 h-5" /></div>;
-  if (rank === 2) return <div className={cn(baseClasses, "bg-rank-silver/20 text-rank-silver border-2 border-rank-silver/30")}><Trophy className="w-5 h-5" /></div>;
-  if (rank === 3) return <div className={cn(baseClasses, "bg-rank-bronze/20 text-rank-bronze border-2 border-rank-bronze/30")}><Trophy className="w-5 h-5" /></div>;
+  const baseClasses = "w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-bold text-base sm:text-lg shrink-0";
+  if (rank === 1) return <div className={cn(baseClasses, "bg-rank-gold/20 text-rank-gold border-2 border-rank-gold/30")}><Trophy className="w-4 h-4 sm:w-5 sm:h-5" /></div>;
+  if (rank === 2) return <div className={cn(baseClasses, "bg-rank-silver/20 text-rank-silver border-2 border-rank-silver/30")}><Trophy className="w-4 h-4 sm:w-5 sm:h-5" /></div>;
+  if (rank === 3) return <div className={cn(baseClasses, "bg-rank-bronze/20 text-rank-bronze border-2 border-rank-bronze/30")}><Trophy className="w-4 h-4 sm:w-5 sm:h-5" /></div>;
   return <div className={cn(baseClasses, "bg-muted text-muted-foreground")}>{rank}</div>;
 }
 
@@ -98,15 +98,15 @@ function RankingRow({ index, style, rankings, catId, uTeamId, uObj, frozenCheck,
               {ranking.team && pendingSet.has(ranking.team.id) && (
                 <Badge variant="secondary" className="absolute top-2 right-2 text-xs sm:hidden z-10">Pending</Badge>
               )}
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3 sm:gap-4">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               <RankBadge rank={ranking.rank} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">{ranking.team?.name || "Unknown Team"}</h3>
-                  {isUserTeam && <Badge variant="secondary" className="text-xs">Your Team</Badge>}
+                  <h3 className="font-semibold text-foreground text-xs sm:text-sm truncate">{ranking.team?.name || "Unknown Team"}</h3>
+                  {isUserTeam && <Badge variant="secondary" className="text-[10px] sm:text-xs shrink-0">You</Badge>}
                 </div>
-                <div className="flex items-center gap-3 mt-1">
+                <div className="hidden sm:flex items-center gap-3 mt-1">
                   <div className="flex -space-x-2">
                     {ranking.members.slice(0, 3).map((member) => (
                       <Avatar key={member.user_id} className="w-6 h-6 border-2 border-background">
@@ -172,9 +172,9 @@ function RankingRow({ index, style, rankings, catId, uTeamId, uObj, frozenCheck,
               {ranking.team && pendingSet.has(ranking.team.id) && <Badge variant="secondary" className="hidden sm:flex">Pending</Badge>}
 
               <div className="sm:hidden flex items-center gap-2 shrink-0">
-                <div className="text-right">
-                  <div className="font-semibold text-foreground text-sm">{ranking.points} pts</div>
-                  <div className="text-xs text-muted-foreground">{ranking.wins}W-{ranking.losses}L</div>
+                <div className="text-right shrink-0">
+                  <div className="font-semibold text-foreground text-xs">{ranking.points} pts</div>
+                  <div className="text-[10px] text-muted-foreground">{ranking.wins}W-{ranking.losses}L</div>
                 </div>
                 {uObj && ranking.team && challengeCheck(ranking.rank, ranking.team.id, catId, ranking.team) && (
                   <Button size="sm" variant="outline" className="h-8 px-2" onClick={() => challengeAction(ranking.team!.id, ranking.team!.name)} disabled={challengingId === ranking.team.id}>

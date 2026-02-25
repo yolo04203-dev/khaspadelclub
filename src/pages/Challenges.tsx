@@ -625,7 +625,7 @@ export default function Challenges() {
 
 
       {/* Main Content */}
-      <PullToRefresh onRefresh={handleRefresh} className="min-h-[calc(100vh-4rem)]">
+      <PullToRefresh onRefresh={handleRefresh} className="min-h-[calc(100dvh-4rem)]">
         <main className="container py-4 sm:py-8 max-w-2xl pb-safe-nav sm:pb-8">
           <div className="hero-animate">
             <div className="mb-6 sm:mb-8 text-center">
