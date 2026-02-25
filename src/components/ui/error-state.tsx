@@ -95,7 +95,7 @@ export function OfflineBanner({ isVisible }: { isVisible: boolean }) {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[100] bg-destructive text-destructive-foreground px-4 py-2 text-center text-sm">
+    <div className="fixed top-0 left-0 right-0 z-[100] bg-destructive text-destructive-foreground px-4 py-2 text-center text-sm safe-top">
       <WifiOff className="w-4 h-4 inline-block mr-2" />
       You're offline. Some features may be unavailable.
     </div>
@@ -109,7 +109,7 @@ export function SlowConnectionBanner({ isVisible }: { isVisible: boolean }) {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[100] bg-warning text-warning-foreground px-4 py-2 text-center text-sm">
+    <div className="fixed top-0 left-0 right-0 z-[100] bg-warning text-warning-foreground px-4 py-2 text-center text-sm safe-top">
       <Clock className="w-4 h-4 inline-block mr-2" />
       Slow connection detected. Content may take longer to load.
     </div>
