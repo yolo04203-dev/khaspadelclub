@@ -22,116 +22,155 @@ export default function Privacy() {
 
       {/* Main Content */}
       <main className="container py-12 max-w-3xl">
-        <h1 className="text-3xl font-bold text-foreground mb-8">Privacy Policy</h1>
-        
-        <div className="prose prose-invert max-w-none space-y-6 text-muted-foreground">
+        <h1 className="text-3xl font-bold text-foreground mb-8">Privacy Policy — Khas Padel Club</h1>
+
+        <div className="prose prose-invert max-w-none space-y-8 text-muted-foreground">
+          <p>
+            This Privacy Policy applies to the Khas Padel Club mobile application and website (the "Service"),
+            operated by Khas Padel Club ("we", "us", or "our").
+          </p>
+
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-4">1. Information We Collect</h2>
-            <p>
-              Khas Padel Club collects information you provide directly to us, such as when you create an account, 
-              join a team, or participate in matches. This includes your email address, display name, 
-              profile photo, and game statistics.
+            <p>We collect information you provide directly to us when you:</p>
+            <ul className="list-disc pl-6 mt-2 space-y-1">
+              <li>Create an account</li>
+              <li>Join teams or ladders</li>
+              <li>Participate in matches or challenges</li>
+              <li>Contact support</li>
+            </ul>
+            <p className="mt-3">This may include:</p>
+            <ul className="list-disc pl-6 mt-2 space-y-1">
+              <li>Email address</li>
+              <li>Display name</li>
+              <li>Profile photo (if provided)</li>
+              <li>Match history and game statistics</li>
+              <li>Device and usage information necessary to operate the app</li>
+            </ul>
+            <p className="mt-3">
+              We do not collect sensitive personal data such as financial information, health data, or precise location.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-4">2. How We Use Your Information</h2>
-            <p>
-              We use the information we collect to provide, maintain, and improve our services, 
-              including to track your rankings, display leaderboards, and facilitate challenges 
-              between teams.
-            </p>
+            <p>We use your information solely to:</p>
+            <ul className="list-disc pl-6 mt-2 space-y-1">
+              <li>Provide and maintain the Service</li>
+              <li>Track rankings, results, and leaderboards</li>
+              <li>Enable match scheduling and challenges</li>
+              <li>Improve performance and user experience</li>
+              <li>Respond to support requests</li>
+            </ul>
+            <p className="mt-3">We do not sell, rent, or trade your personal data.</p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-4">3. Third-Party Services &amp; SDKs</h2>
-            <p>
-              Our app uses the following third-party services that may collect data:
-            </p>
-            <ul className="list-disc pl-6 mt-2 space-y-1">
-              <li><strong>Sentry</strong> — crash reporting and error monitoring. Collects device info, OS version, and anonymized error data. Session replays are configured to mask all text and block all media to prevent PII capture.</li>
-              <li><strong>Google Fonts</strong> — font delivery. May collect IP addresses as part of standard web requests.</li>
+            <p>We use trusted third-party services necessary to operate the app:</p>
+            <ul className="list-disc pl-6 mt-2 space-y-2">
+              <li>
+                <strong>Sentry</strong> — crash reporting and diagnostics.
+                Collects device type, OS version, and anonymized error logs.
+                Session replays are configured to mask all text and block all media to prevent capture of personal information.
+              </li>
+              <li>
+                <strong>Google Fonts</strong> — provides typography resources.
+                May collect IP address as part of normal web delivery.
+              </li>
             </ul>
-            <p className="mt-2">
-              We do not sell your personal information to third parties.
+            <p className="mt-3">
+              These providers process data only on our behalf and are bound by privacy obligations.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground mb-4">4. Information Sharing</h2>
-            <p>
-              Your team name, rankings, and match results are publicly visible on the leaderboard. 
-              Your email address and phone number are never publicly displayed.
-            </p>
+            <h2 className="text-xl font-semibold text-foreground mb-4">4. Information Sharing &amp; Public Data</h2>
+            <p>The following information is publicly visible within the app:</p>
+            <ul className="list-disc pl-6 mt-2 space-y-1">
+              <li>Display name</li>
+              <li>Team name</li>
+              <li>Rankings</li>
+              <li>Match results and statistics</li>
+            </ul>
+            <p className="mt-3">Your email address and private account data are never publicly displayed.</p>
+            <p className="mt-2">We do not share personal data with advertisers or data brokers.</p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-4">5. Data Retention</h2>
-            <p>
-              We retain your personal data for as long as your account is active. Match history and 
-              statistics are retained indefinitely to maintain leaderboard integrity. If you delete 
-              your account, your personal information (email, display name, profile photo) will be 
-              permanently removed within 30 days. Anonymized match statistics may be retained.
-            </p>
+            <p>We retain personal data only as long as necessary to provide the Service.</p>
+            <ul className="list-disc pl-6 mt-2 space-y-1">
+              <li>Account data is retained while active</li>
+              <li>If you delete your account, personal information is removed within 30 days</li>
+              <li>Anonymous match statistics may be retained to preserve leaderboard accuracy</li>
+            </ul>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-4">6. Data Security</h2>
-            <p>
-              We implement appropriate security measures to protect your personal information, 
-              including encryption in transit (HTTPS), row-level security on database access, 
-              and secure token-based authentication. However, no method of transmission over 
-              the internet is 100% secure.
+            <p>We implement industry-standard protections including:</p>
+            <ul className="list-disc pl-6 mt-2 space-y-1">
+              <li>HTTPS encryption in transit</li>
+              <li>Secure authentication tokens</li>
+              <li>Controlled database access</li>
+              <li>Role-based security policies</li>
+            </ul>
+            <p className="mt-3">
+              No method of transmission is 100% secure, but we continuously improve safeguards.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground mb-4">7. Your Rights</h2>
-            <p>
-              You have the right to:
-            </p>
+            <h2 className="text-xl font-semibold text-foreground mb-4">7. Your Rights &amp; Choices</h2>
+            <p>You may:</p>
             <ul className="list-disc pl-6 mt-2 space-y-1">
-              <li>Access your personal data through your profile settings</li>
-              <li>Update or correct your information at any time</li>
-              <li>Request a copy of your data (data portability)</li>
-              <li>Delete your account and associated personal data from your profile settings</li>
+              <li>Access and update your information anytime</li>
+              <li>Request a copy of your data</li>
+              <li>Delete your account permanently</li>
+              <li>Contact us to exercise privacy rights</li>
             </ul>
-            <p className="mt-2">
-              Contact us if you need assistance exercising any of these rights.
+            <p className="mt-3">
+              Account deletion removes personal data while preserving anonymized match records.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-4">8. Children's Privacy</h2>
             <p>
-              Khas Padel Club is not intended for children under the age of 13. We do not knowingly 
-              collect personal information from children under 13. If we become aware that we have 
-              collected personal data from a child under 13, we will take steps to delete that 
-              information promptly. If you believe a child under 13 has provided us with personal 
-              information, please contact us.
+              Khas Padel Club is not intended for children under 13.
+              We do not knowingly collect information from children. If discovered, it will be deleted promptly.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground mb-4">9. Changes to This Policy</h2>
+            <h2 className="text-xl font-semibold text-foreground mb-4">9. International Data Processing</h2>
             <p>
-              We may update this Privacy Policy from time to time. We will notify you of any 
-              material changes by posting the new policy on this page and updating the "Last updated" 
-              date below.
+              Your information may be processed on secure servers used to operate the Service.
+              We ensure appropriate safeguards are applied regardless of location.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground mb-4">10. Contact Us</h2>
+            <h2 className="text-xl font-semibold text-foreground mb-4">10. Changes to This Policy</h2>
             <p>
-              If you have any questions about this Privacy Policy, please contact us through 
-              our <Link to="/contact" className="text-accent hover:underline">Contact page</Link>.
+              We may update this Privacy Policy periodically.
+              Changes will be posted here with an updated revision date.
             </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground mb-4">11. Contact Us</h2>
+            <p>If you have questions or privacy requests, contact:</p>
+            <ul className="list-none pl-0 mt-2 space-y-1">
+              <li><strong>Email:</strong> <a href="mailto:support@khaspadelclub.com" className="text-accent hover:underline">support@khaspadelclub.com</a></li>
+              <li><strong>App:</strong> Khas Padel Club</li>
+            </ul>
           </section>
         </div>
 
         <p className="text-sm text-muted-foreground mt-12">
-          Last updated: February 13, 2026
+          Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
       </main>
     </div>
