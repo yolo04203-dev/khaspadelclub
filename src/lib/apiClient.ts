@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { reportApiError } from "@/lib/errorReporting";
-import * as Sentry from "@sentry/react";
+import { getSentry } from "@/lib/sentryLazy";
 
 export type AppErrorCode =
   | "offline"
@@ -96,12 +96,14 @@ async function request<T>(
 
       clearTimeout(timeoutId);
 
-      Sentry.addBreadcrumb({
-        category: "http",
-        message: `${method} ${url}`,
-        level: res.ok ? "info" : "warning",
-        data: { method, url, status_code: res.status, duration_ms: Date.now() - startTime },
-      });
+      getSentry().then(S => {
+        if (S) S.addBreadcrumb({
+          category: "http",
+          message: `${method} ${url}`,
+          level: res.ok ? "info" : "warning",
+          data: { method, url, status_code: res.status, duration_ms: Date.now() - startTime },
+        });
+      }).catch(() => {});
 
       if (!res.ok) {
         const errorBody = await res.json().catch(() => null);

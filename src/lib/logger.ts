@@ -4,7 +4,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import * as Sentry from "@sentry/react";
+import { getSentry } from "@/lib/sentryLazy";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -190,15 +190,10 @@ class Logger {
     }
     this.enqueue(message, undefined, "warn");
 
-    // Wire to Sentry breadcrumbs
-    try {
-      Sentry.addBreadcrumb({
-        category: "logger",
-        message,
-        level: "warning",
-        data: context,
-      });
-    } catch { /* noop */ }
+    // Wire to Sentry breadcrumbs (fire-and-forget)
+    getSentry().then(S => {
+      if (S) S.addBreadcrumb({ category: "logger", message, level: "warning", data: context });
+    }).catch(() => {});
   }
 
   error(message: string, error?: Error | unknown, context?: Record<string, unknown>): void {
@@ -213,15 +208,10 @@ class Logger {
     }
     this.enqueue(message, err, "error");
 
-    // Wire to Sentry breadcrumbs
-    try {
-      Sentry.addBreadcrumb({
-        category: "logger",
-        message,
-        level: "error",
-        data: { ...context, errorMessage: err.message },
-      });
-    } catch { /* noop */ }
+    // Wire to Sentry breadcrumbs (fire-and-forget)
+    getSentry().then(S => {
+      if (S) S.addBreadcrumb({ category: "logger", message, level: "error", data: { ...context, errorMessage: err.message } });
+    }).catch(() => {});
   }
 
   apiError(operation: string, error: unknown, context?: Record<string, unknown>): void {

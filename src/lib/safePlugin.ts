@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/react";
+import { getSentry } from "@/lib/sentryLazy";
 import { logger } from "@/lib/logger";
 
 interface SafePluginSuccess<T> {
@@ -50,15 +50,11 @@ export async function safePluginCall<T>(
     const isUserAction = msg.includes("User cancelled") || msg.includes("User denied");
 
     if (!isUserAction) {
-      Sentry.addBreadcrumb({
-        category: "plugin",
-        message: `${pluginName} failed: ${msg}`,
-        level: "error",
-      });
-      Sentry.captureException(error, {
-        tags: { plugin: pluginName },
-        extra: { pluginName },
-      });
+      getSentry().then(S => {
+        if (!S) return;
+        S.addBreadcrumb({ category: "plugin", message: `${pluginName} failed: ${msg}`, level: "error" });
+        S.captureException(error, { tags: { plugin: pluginName }, extra: { pluginName } });
+      }).catch(() => {});
       logger.error(`Plugin error: ${pluginName}`, error, { pluginName });
     }
 

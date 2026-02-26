@@ -1,5 +1,5 @@
 import { useState } from "react";
-import * as Sentry from "@sentry/react";
+import { getSentry } from "@/lib/sentryLazy";
 import { Capacitor } from "@capacitor/core";
 import { MessageSquare, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,22 +30,19 @@ export function ReportProblemDialog() {
       const appVersion = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "unknown";
       const connection = (navigator as any).connection;
 
-      Sentry.captureFeedback({
-        message: description.trim(),
-      }, {
-        includeReplay: true,
-        attachments: undefined,
-      });
-
-      Sentry.setContext("report_context", {
-        url: window.location.href,
-        app_version: appVersion,
-        platform: Capacitor.getPlatform(),
-        is_native: Capacitor.isNativePlatform(),
-        network_type: connection?.effectiveType ?? "unknown",
-        online: navigator.onLine,
-        timestamp: new Date().toISOString(),
-      });
+      const Sentry = await getSentry();
+      if (Sentry) {
+        Sentry.captureFeedback({ message: description.trim() }, { includeReplay: true, attachments: undefined });
+        Sentry.setContext("report_context", {
+          url: window.location.href,
+          app_version: appVersion,
+          platform: Capacitor.getPlatform(),
+          is_native: Capacitor.isNativePlatform(),
+          network_type: connection?.effectiveType ?? "unknown",
+          online: navigator.onLine,
+          timestamp: new Date().toISOString(),
+        });
+      }
 
       toast({ title: "Report sent", description: "Thank you for your feedback!" });
       setDescription("");
