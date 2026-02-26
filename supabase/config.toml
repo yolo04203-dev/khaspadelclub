@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.send-contact-message]
 verify_jwt = false
+
+[functions.seed-review-account]
+verify_jwt = false
