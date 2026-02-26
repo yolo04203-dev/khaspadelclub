@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.khaspadel.app',
-  appName: 'Khas Padel',
+  appName: 'Khas Padel Club',
   webDir: 'dist',
   server: {
     androidScheme: 'https'
