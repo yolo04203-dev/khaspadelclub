@@ -15,10 +15,10 @@ import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { useCapacitorAnalytics } from "@/hooks/useCapacitorAnalytics";
 import { AuthProvider } from "@/contexts/AuthContext";
 
-// Dev-only: lazy-loaded so it's fully tree-shaken in production
+// Dev-only perf overlay — fully excluded from production via dead-code elimination
 const PerfOverlay = import.meta.env.DEV
   ? lazyWithRetry(() => import("@/components/dev/PerfOverlay").then(m => ({ default: m.PerfOverlay })))
-  : () => null;
+  : null;
 
 // Eager load only the landing page — everything else is lazy
 import Index from "./pages/Index";
@@ -190,7 +190,7 @@ const App = () => {
           </BrowserRouter>
         </TooltipProvider>
       </QueryClientProvider>
-      {import.meta.env.DEV && <Suspense fallback={null}><PerfOverlay /></Suspense>}
+      {import.meta.env.DEV && PerfOverlay && <Suspense fallback={null}><PerfOverlay /></Suspense>}
     </ErrorBoundary>
   );
 };

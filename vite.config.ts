@@ -52,17 +52,42 @@ export default defineConfig(({ mode }) => ({
     dedupe: ["react", "react-dom", "react/jsx-runtime"],
   },
   build: {
-    sourcemap: !!process.env.SENTRY_AUTH_TOKEN,
+    sourcemap: false,
     target: 'es2019',
-    minify: 'esbuild',
+    minify: mode === 'production' ? 'terser' : 'esbuild',
+    terserOptions: {
+      compress: {
+        passes: 3,
+        pure_getters: true,
+        unsafe_comps: true,
+        drop_console: true,
+        drop_debugger: true,
+      },
+      mangle: true,
+    },
     cssMinify: true,
     cssCodeSplit: true,
-    chunkSizeWarningLimit: 600,
+    modulePreload: { polyfill: false },
+    chunkSizeWarningLimit: 400,
     rollupOptions: {
       output: {
         manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-tabs', '@radix-ui/react-select', '@radix-ui/react-popover'],
+          'react-core': ['react', 'react-dom'],
+          'router': ['react-router-dom'],
+          'ui-vendor': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-select',
+            '@radix-ui/react-popover',
+            '@radix-ui/react-tooltip',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-accordion',
+            '@radix-ui/react-avatar',
+            '@radix-ui/react-checkbox',
+            '@radix-ui/react-switch',
+            '@radix-ui/react-toast',
+            '@radix-ui/react-scroll-area',
+          ],
           'animation': ['framer-motion'],
           'charts': ['recharts'],
           'supabase': ['@supabase/supabase-js'],
@@ -72,9 +97,5 @@ export default defineConfig(({ mode }) => ({
         },
       },
     },
-  },
-  esbuild: {
-    // Strip console.log and console.debug in production builds
-    drop: mode === 'production' ? ['console', 'debugger'] : [],
   },
 }));
