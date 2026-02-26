@@ -11,6 +11,7 @@ interface AppHeaderProps {
   showBack?: boolean;
   backTo?: string;
   actions?: React.ReactNode;
+  showUserActions?: boolean;
 }
 
 // Map nav routes to their lazy import keys for prefetching
@@ -29,7 +30,7 @@ const navLinks = [
   { to: "/stats", label: "Stats", icon: BarChart3 },
 ];
 
-export const AppHeader = React.memo(function AppHeader({ showBack = false, backTo = "/dashboard", actions }: AppHeaderProps) {
+export const AppHeader = React.memo(function AppHeader({ showBack = false, backTo = "/dashboard", actions, showUserActions = false }: AppHeaderProps) {
   const { user, role, signOut } = useAuth();
   const location = useLocation();
 
@@ -90,18 +91,22 @@ export const AppHeader = React.memo(function AppHeader({ showBack = false, backT
           <div className="flex items-center gap-2">
             {actions}
             
-            {user && <NotificationBell />}
+            {showUserActions && user && <NotificationBell />}
 
-            <div className="text-right hidden sm:block ml-2">
-              <p className="text-sm font-medium text-foreground">
-                {user?.user_metadata?.display_name || user?.email?.split("@")[0]}
-              </p>
-              <p className="text-xs text-muted-foreground capitalize">{role || "Player"}</p>
-            </div>
+            {showUserActions && (
+              <div className="text-right hidden sm:block ml-2">
+                <p className="text-sm font-medium text-foreground">
+                  {user?.user_metadata?.display_name || user?.email?.split("@")[0]}
+                </p>
+                <p className="text-xs text-muted-foreground capitalize">{role || "Player"}</p>
+              </div>
+            )}
 
-            <Button variant="ghost" size="icon" onClick={signOut}>
-              <LogOut className="w-4 h-4" />
-            </Button>
+            {showUserActions && (
+              <Button variant="ghost" size="icon" onClick={signOut}>
+                <LogOut className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </div>
       </header>
