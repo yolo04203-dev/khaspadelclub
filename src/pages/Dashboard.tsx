@@ -211,7 +211,7 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <AppHeader />
+        <AppHeader showUserActions />
         <main className="container py-4 sm:py-8">
           <div className="mb-5 sm:mb-8">
             <div className="h-8 w-64 bg-muted rounded animate-pulse mb-2" />
@@ -242,7 +242,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader />
+      <AppHeader showUserActions />
 
       {/* Mobile FAB for quick challenge */}
       <FABContainer show={!!userTeam}>
