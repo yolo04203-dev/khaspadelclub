@@ -20,7 +20,7 @@ export function useStatusBar() {
         await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
 
         if (Capacitor.getPlatform() === "android") {
-          await StatusBar.setOverlaysWebView({ overlay: true });
+          await StatusBar.setOverlaysWebView({ overlay: false });
           await StatusBar.setBackgroundColor({
             color: isDark ? "#0d1a2d" : "#ffffff",
           });
