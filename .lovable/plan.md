@@ -1,32 +1,28 @@
 
 
-## Plan: Replace App Icon and Splash Screen
+## Plan: Page-Specific Header Icons
 
-The uploaded image (`user-uploads://splash_icon._png.png`) — the metallic "K" with "PADEL CLUB" text — will replace all icon and logo assets across the project.
+### Change Summary
+Show the notification bell and logout button **only on the Home/Dashboard page**. All other pages get a cleaner header with just the logo, nav, and any page-specific actions (like "Create Ladder" for admins).
 
-### Files to update
+### Implementation
 
-**1. Copy uploaded image to all asset locations (5 copies):**
-- `user-uploads://splash_icon._png.png` → `src/assets/logo.png` (Logo component)
-- `user-uploads://splash_icon._png.png` → `public/favicon.png` (favicon)
-- `user-uploads://splash_icon._png.png` → `public/icon-192.png` (PWA 192px icon)
-- `user-uploads://splash_icon._png.png` → `public/icon-512.png` (PWA 512px icon, also used for OG/Twitter meta)
+**1. Update `AppHeader` component** (`src/components/AppHeader.tsx`)
+- Add a new prop `showUserActions?: boolean` (defaults to `false`)
+- Wrap the `<NotificationBell />`, user info display, and `<LogOut>` button in a conditional that only renders when `showUserActions` is `true`
+- The `actions` slot remains always visible, so admin buttons like "Create Ladder" will naturally fill the right side when user actions are hidden
 
-**2. Delete unused SVG icons:**
-- `public/favicon.svg` — remove (PNG favicon is sufficient)
-- `public/icon-192.svg` — remove (old hand-drawn SVG, not referenced)
-- `public/icon-512.svg` — remove (old hand-drawn SVG, not referenced)
+**2. Update Dashboard** (`src/pages/Dashboard.tsx`)
+- Pass `showUserActions` to both `<AppHeader />` calls (loading state and main render):
+  ```tsx
+  <AppHeader showUserActions />
+  ```
 
-**3. Update `index.html`:**
-- Remove the `favicon.svg` link (line 5) since the file is being deleted
-- Keep the PNG favicon references (lines 6-8)
+**3. No changes needed on other pages**
+- Ladders, Challenges, Tournaments, Stats, and inner pages already don't pass `showUserActions`, so they'll get the clean header by default
+- The Ladders page already passes the "Create Ladder" button via `actions`, which will align to the far right automatically since bell/logout won't be present
 
-### What stays the same
-- `src/components/Logo.tsx` — already imports from `@/assets/logo.png`, no change needed
-- `public/manifest.json` — already references `/icon-192.png` and `/icon-512.png`
-- `capacitor.config.ts` — splash screen background stays `#0d1a2d` (dark navy); the native splash screen displays this color while the app loads
-- OG/Twitter meta tags already reference `/icon-512.png`
-
-### Note on Android splash screen
-The Capacitor splash screen on Android shows a solid `#0d1a2d` background. To display this logo image as the actual splash graphic, you would need to place a properly sized PNG in the Android native resource folders (`android/app/src/main/res/drawable*/`). This requires running `npx cap sync android` after the icon update, then manually placing the splash drawable in Android Studio, or using a tool like `@capacitor/assets` to generate all native sizes. After this change, I can guide you through that step.
+### Affected Files
+- `src/components/AppHeader.tsx` — add `showUserActions` prop, conditionally render bell + logout + user info
+- `src/pages/Dashboard.tsx` — pass `showUserActions` on both AppHeader usages
 
