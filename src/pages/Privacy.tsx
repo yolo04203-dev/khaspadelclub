@@ -22,9 +22,10 @@ export default function Privacy() {
 
       {/* Main Content */}
       <main className="container py-12 max-w-3xl">
-        <h1 className="text-3xl font-bold text-foreground mb-8">Privacy Policy — Khas Padel Club</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Privacy Policy — Khas Padel Club</h1>
+        <p className="text-sm text-muted-foreground mb-10">Last Updated: February 26, 2026</p>
 
-        <div className="prose prose-invert max-w-none space-y-8 text-muted-foreground">
+        <div className="prose prose-invert max-w-none space-y-10 text-muted-foreground">
           <p>
             This Privacy Policy applies to the Khas Padel Club mobile application and website (the "Service"),
             operated by Khas Padel Club ("we", "us", or "our").
@@ -63,6 +64,7 @@ export default function Privacy() {
               <li>Respond to support requests</li>
             </ul>
             <p className="mt-3">We do not sell, rent, or trade your personal data.</p>
+            <p className="mt-3">We process your information based on your consent when you create an account and use the Service.</p>
           </section>
 
           <section>
@@ -169,9 +171,6 @@ export default function Privacy() {
           </section>
         </div>
 
-        <p className="text-sm text-muted-foreground mt-12">
-          Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
       </main>
     </div>
   );
