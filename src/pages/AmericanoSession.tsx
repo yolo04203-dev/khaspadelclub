@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { ArrowLeft, Play, Trophy, Users, CheckCircle, Shuffle, LayoutList, Clock, Target, Hash, Pencil } from "lucide-react";
+import { ArrowLeft, Play, Trophy, Users, CheckCircle, Shuffle, LayoutList, Clock, Target, Hash, Pencil, FileText } from "lucide-react";
+import { exportAmericanoTeamMatchesCSV, exportAmericanoRoundsCSV } from "@/lib/exportMatches";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
@@ -654,6 +655,22 @@ export default function AmericanoSession() {
               }}>
                 <CheckCircle className="w-4 h-4 mr-2" />
                 Complete
+              </Button>
+            )}
+            {isOwner && session.status !== "draft" && totalMatches > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (isTeamMode) {
+                    exportAmericanoTeamMatchesCSV(teamMatches, teams, session);
+                  } else {
+                    exportAmericanoRoundsCSV(rounds, players, session);
+                  }
+                }}
+              >
+                <FileText className="w-4 h-4 mr-1" />
+                Export CSV
               </Button>
             )}
           </div>
