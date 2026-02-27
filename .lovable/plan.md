@@ -1,31 +1,54 @@
 
 
-## Plan: Production Build Optimization for Mobile WebView
+## Plan: Admin Match Export + Auth Persistence Verification
 
-### Current State
-- **vite.config.ts** already has manual chunks, `es2019` target, esbuild minify, CSS code splitting, and console stripping
-- Source maps are conditionally enabled (only when `SENTRY_AUTH_TOKEN` exists)
-- Dev-only `PerfOverlay` is conditionally imported but still referenced in `App.tsx`
-- `perfBudget.ts` is a constants-only file (harmless, tree-shaken if unused)
-- Chunk splitting groups several Radix packages together but misses opportunities for finer granularity
+### Auth Persistence — Already Fully Implemented ✓
 
-### Changes
+Your `AuthContext.tsx` already has all the requested features:
+- `persistSession: true` and `autoRefreshToken: true` on the Supabase client
+- Silent session refresh every 55 minutes via `refreshSession()`
+- Session restored on app launch via `getSession()` before showing UI
+- Splash screen shown during auth initialization, dismissed after
+- Users stay logged in until manual `signOut()`
+- Retry logic for transient session restore failures
 
-#### 1. `vite.config.ts` — Aggressive production build config
-- **Disable source maps entirely** (`sourcemap: false`)
-- **Switch from esbuild to terser** for minification with aggressive compression (`passes: 3`, `pure_getters: true`, `unsafe_comps: true`, drop `console`/`debugger`)
-- **Refine manual chunks**: split `react` core from `react-router-dom`; isolate `@tanstack/react-query` and `@supabase/supabase-js` into their own chunks; group all Radix UI into one `ui-vendor` chunk; keep `framer-motion`, `recharts`, `sentry`, `posthog` separate
-- **Lower chunk size warning limit** to 400KB
-- **Add `modulePreload.polyfill: false`** (WebView supports native module preload)
+**No changes needed for authentication.**
 
-#### 2. `src/App.tsx` — Remove dev PerfOverlay from production bundle
-- Remove the `PerfOverlay` import and its `Suspense` wrapper entirely. It is already tree-shaken via `import.meta.env.DEV` but the conditional dynamic import still produces a chunk. Replace with a cleaner guard that eliminates any production trace.
+---
 
-#### 3. Install `terser` as a dev dependency
-- Required for Vite's terser minification mode (not bundled with Vite by default).
+### Match Export — New Feature
 
-### No changes needed
-- `index.html` viewport-fit=cover is already set
-- `lazyWithRetry` and route-level splitting are already optimal
-- `perfBudget.ts` and `webVitals.ts` are deferred and tree-shakeable — no action needed
+#### 1. Create `src/lib/exportMatches.ts` — CSV generation utility
+
+A single utility file with two export functions:
+
+- **`exportTournamentMatchesCSV(matches, participants, groups, tournament, categoryName)`**
+  - Columns: Stage, Round, Team 1, Team 1 Players, Team 2, Team 2 Players, Score, Winner, Category, Venue, Court, Date, Time
+  - Maps `team1_id`/`team2_id` to team names using participants data
+  - Maps `group_id` to group name, derives stage from `match.stage` field
+  - Filename: `khas-padel-{tournamentName}-matches.csv`
+
+- **`exportAmericanoMatchesCSV(matches, teams/players, session)`**
+  - For team mode: Round, Court, Team 1, Team 2, Team 1 Score, Team 2 Score, Status
+  - For individual mode: Round, Court, Team 1 (Player1 & Player2), Team 2 (Player1 & Player2), Scores, Status
+  - Filename: `khas-padel-{sessionName}-matches.csv`
+
+- Both use `Blob` + `URL.createObjectURL` + anchor click for download (works on web, Android WebView, iOS Safari)
+
+#### 2. Update `src/pages/TournamentDetail.tsx` — Add Export button
+
+- Import `exportTournamentMatchesCSV`
+- Add "Export Matches" button in the category detail header area, visible only when `isAdmin` is true and matches exist for the selected category
+- Button triggers CSV generation using already-loaded `matches`, `participants`, `groups`, and `tournament` state
+- Filter matches to the selected category before export
+
+#### 3. Update `src/pages/AmericanoSession.tsx` — Add Export button
+
+- Import `exportAmericanoMatchesCSV`
+- Add "Export Matches" button near the top of the session page, visible only when `isOwner` (session creator) or admin, and session is in progress or completed
+- Uses already-loaded `teamMatches`/`rounds`, `teams`/`players`, and `session` state
+
+#### No image export
+
+Image export via `html-to-image` adds a heavy dependency and is unreliable across mobile WebViews. CSV covers the primary use case. Can be added later if needed.
 
