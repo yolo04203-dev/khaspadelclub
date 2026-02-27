@@ -25,6 +25,7 @@ import type { SchedulingConfig } from "@/components/tournament/GenerateMatchesDi
 import { formatMatchDateTime } from "@/components/tournament/matchDateFormat";
 import { BulkRescheduleDialog } from "@/components/tournament/BulkRescheduleDialog";
 import { RescheduleMatchDialog } from "@/components/tournament/RescheduleMatchDialog";
+import { exportTournamentMatchesCSV } from "@/lib/exportMatches";
 
 // Lazy-load admin-only components
 const AdminGroupManagement = lazy(() => import("@/components/tournament/AdminGroupManagement").then(m => ({ default: m.AdminGroupManagement })));
@@ -1007,7 +1008,25 @@ export default function TournamentDetail() {
           Back to Categories
         </Button>
 
-        <h2 className="text-xl font-bold mb-4">{selectedCategory.name}</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">{selectedCategory.name}</h2>
+          {isAdmin && filteredMatches.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportTournamentMatchesCSV(
+                filteredMatches,
+                filteredParticipants,
+                filteredGroups,
+                tournament!,
+                selectedCategory.name,
+              )}
+            >
+              <FileText className="w-4 h-4 mr-1" />
+              Export CSV
+            </Button>
+          )}
+        </div>
 
         <Tabs defaultValue="standings" className="w-full">
           <TabsList className="mb-4">
