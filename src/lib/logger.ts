@@ -3,7 +3,7 @@
  * All errors are visible in console and can be extended to external services
  */
 
-import { supabase } from "@/integrations/supabase/client";
+// Supabase client is loaded lazily to keep it off the critical path
 import { getSentry } from "@/lib/sentryLazy";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -134,6 +134,9 @@ class Logger {
       this.dedupMap.clear();
 
       if (collapsed.length === 0) return;
+
+      // Lazy-load Supabase client to keep it off the critical path
+      const { supabase } = await import("@/integrations/supabase/client");
 
       let userId: string | null = null;
       try {

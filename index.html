@@ -29,6 +29,9 @@
     <link rel="preload" as="font" type="font/woff2" href="/fonts/Inter-Latin.woff2" crossorigin />
     <link rel="preload" as="font" type="font/woff2" href="/fonts/SpaceGrotesk-Latin.woff2" crossorigin />
 
+    <!-- Modulepreload critical entry point -->
+    <link rel="modulepreload" href="/src/main.tsx" />
+
     <meta property="og:title" content="Khas Padel Club" />
     <meta property="og:description" content="Padel ladder, tournaments & americano sessions" />
     <meta property="og:type" content="website" />
@@ -39,7 +42,14 @@
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Instant loading shell — replaced by React on mount -->
+      <div id="loading-shell" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh;background:#0f1a2d;gap:16px;">
+        <div style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.15);border-top-color:#6366f1;border-radius:50%;animation:sp .7s linear infinite;"></div>
+        <p style="font-family:Inter,system-ui,sans-serif;font-size:14px;color:rgba(255,255,255,0.5);margin:0;">Loading...</p>
+      </div>
+      <style>@keyframes sp{to{transform:rotate(360deg)}}</style>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
