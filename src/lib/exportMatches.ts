@@ -79,7 +79,17 @@ export function exportTournamentMatchesCSV(
   groups: GroupExport[],
   tournament: TournamentExport,
   categoryName?: string,
+  onWarning?: (msg: string) => void,
 ) {
+  // Warn about missing scheduling data
+  const missingCourt = matches.filter(m => m.court_number == null).length;
+  const missingTime = matches.filter(m => !m.scheduled_at).length;
+  if ((missingCourt > 0 || missingTime > 0) && onWarning) {
+    const parts: string[] = [];
+    if (missingCourt > 0) parts.push(`${missingCourt} missing court`);
+    if (missingTime > 0) parts.push(`${missingTime} missing time`);
+    onWarning(`${parts.join(", ")} out of ${matches.length} matches.`);
+  }
   const teamMap = new Map<string, ParticipantExport>();
   for (const p of participants) {
     teamMap.set(p.team_id, p);
@@ -182,7 +192,12 @@ export function exportAmericanoTeamMatchesCSV(
   matches: AmericanoTeamMatchExport[],
   teams: AmericanoTeamExport[],
   session: AmericanoSessionExport,
+  onWarning?: (msg: string) => void,
 ) {
+  const missingCourt = matches.filter(m => !m.court_number).length;
+  if (missingCourt > 0 && onWarning) {
+    onWarning(`${missingCourt} of ${matches.length} matches are missing court assignments.`);
+  }
   const teamMap = new Map<string, AmericanoTeamExport>();
   for (const t of teams) teamMap.set(t.id, t);
 
@@ -213,7 +228,12 @@ export function exportAmericanoRoundsCSV(
   rounds: AmericanoRoundExport[],
   players: AmericanoPlayerExport[],
   session: AmericanoSessionExport,
+  onWarning?: (msg: string) => void,
 ) {
+  const missingCourt = rounds.filter(r => !r.court_number).length;
+  if (missingCourt > 0 && onWarning) {
+    onWarning(`${missingCourt} of ${rounds.length} rounds are missing court assignments.`);
+  }
   const playerMap = new Map<string, string>();
   for (const p of players) playerMap.set(p.id, p.player_name);
 

@@ -662,10 +662,11 @@ export default function AmericanoSession() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
+                  const warn = (msg: string) => toast({ title: "Warning", description: msg, variant: "destructive" });
                   if (isTeamMode) {
-                    exportAmericanoTeamMatchesCSV(teamMatches, teams, session);
+                    exportAmericanoTeamMatchesCSV(teamMatches, teams, session, warn);
                   } else {
-                    exportAmericanoRoundsCSV(rounds, players, session);
+                    exportAmericanoRoundsCSV(rounds, players, session, warn);
                   }
                 }}
               >
