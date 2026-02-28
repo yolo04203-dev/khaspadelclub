@@ -63,7 +63,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       ] = await Promise.all([
         supabase
           .from("challenges")
-          .select("*", { count: "exact", head: true })
+          .select("id", { count: "exact", head: true })
           .eq("challenged_team_id", teamId)
           .eq("status", "pending"),
         supabase
@@ -73,7 +73,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           .eq("status", "accepted"),
         supabase
           .from("ladder_join_requests")
-          .select("*", { count: "exact", head: true })
+          .select("id", { count: "exact", head: true })
           .eq("team_id", teamId)
           .eq("status", "approved"),
       ]);
