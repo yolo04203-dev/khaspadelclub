@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { getSentry } from "@/lib/sentryLazy";
-import { Capacitor } from "@capacitor/core";
+import { isNative, getPlatform } from "@/lib/capacitor";
 import { MessageSquare, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,8 +36,8 @@ export function ReportProblemDialog() {
         Sentry.setContext("report_context", {
           url: window.location.href,
           app_version: appVersion,
-          platform: Capacitor.getPlatform(),
-          is_native: Capacitor.isNativePlatform(),
+          platform: getPlatform(),
+          is_native: isNative(),
           network_type: connection?.effectiveType ?? "unknown",
           online: navigator.onLine,
           timestamp: new Date().toISOString(),

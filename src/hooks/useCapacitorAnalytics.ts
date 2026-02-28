@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Capacitor } from "@capacitor/core";
+import { isNative, getPlatform } from "@/lib/capacitor";
 import { analytics } from "@/lib/analytics/posthog";
 
 /**
@@ -9,7 +9,7 @@ import { analytics } from "@/lib/analytics/posthog";
  */
 export function useCapacitorAnalytics() {
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
+    if (!isNative()) return;
 
     let listener: { remove: () => void } | undefined;
 
@@ -19,12 +19,12 @@ export function useCapacitorAnalytics() {
         listener = await CapApp.addListener("appStateChange", (state) => {
           if (state.isActive) {
             analytics.track("App Resumed", {
-              platform: Capacitor.getPlatform(),
+              platform: getPlatform(),
               is_online: navigator.onLine,
             });
           } else {
             analytics.track("App Backgrounded", {
-              platform: Capacitor.getPlatform(),
+              platform: getPlatform(),
             });
           }
         });

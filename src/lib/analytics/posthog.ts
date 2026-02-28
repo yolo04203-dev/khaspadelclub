@@ -1,4 +1,4 @@
-import { Capacitor } from "@capacitor/core";
+import { isNative, getPlatform } from "@/lib/capacitor";
 import { logger } from "@/lib/logger";
 
 // Sensitive property patterns to strip before sending
@@ -13,10 +13,6 @@ function getEnvironment(): string {
   return "production";
 }
 
-function getPlatform(): string {
-  if (Capacitor.isNativePlatform()) return Capacitor.getPlatform(); // "ios" | "android"
-  return "web";
-}
 
 function sanitizeProperties(properties: Record<string, any>): Record<string, any> {
   const cleaned: Record<string, any> = {};
@@ -33,6 +29,9 @@ function sanitizeProperties(properties: Record<string, any>): Record<string, any
 }
 
 function isEnabled(): boolean {
+  // Skip PostHog on native Capacitor to reduce JS execution and network overhead
+  if (isNative()) return false;
+
   const key = import.meta.env.VITE_POSTHOG_KEY;
   if (!key) return false;
 

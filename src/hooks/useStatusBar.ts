@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Capacitor } from "@capacitor/core";
+import { isNative, getPlatform } from "@/lib/capacitor";
 import { logger } from "@/lib/logger";
 
 /**
@@ -8,7 +8,7 @@ import { logger } from "@/lib/logger";
  */
 export function useStatusBar() {
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
+    if (!isNative()) return;
 
     const updateStatusBar = async () => {
       try {
@@ -19,7 +19,7 @@ export function useStatusBar() {
 
         await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
 
-        if (Capacitor.getPlatform() === "android") {
+        if (getPlatform() === "android") {
           await StatusBar.setOverlaysWebView({ overlay: false });
           await StatusBar.setBackgroundColor({
             color: isDark ? "#0d1a2d" : "#ffffff",
