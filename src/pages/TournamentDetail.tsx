@@ -1020,6 +1020,7 @@ export default function TournamentDetail() {
                 filteredGroups,
                 tournament!,
                 selectedCategory.name,
+                (msg) => sonnerToast.warning(msg),
               )}
             >
               <FileText className="w-4 h-4 mr-1" />
