@@ -18,6 +18,8 @@ import {
   Search
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchTeamNamesByIds } from "@/services/teams";
+import { fetchMatchesByIds } from "@/services/matches";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
@@ -203,24 +205,19 @@ export default function Challenges() {
     ];
 
     // Fetch teams, ranks, and matches all in parallel
-    const [{ data: teams }, { data: ranks }, { data: matches }] = await Promise.all([
-      supabase.from("teams").select("id, name").in("id", uniqueTeamIds),
+    const [teamNameMap, { data: ranks }, matchMap] = await Promise.all([
+      fetchTeamNamesByIds(uniqueTeamIds),
       supabase.from("ladder_rankings").select("team_id, rank").in("team_id", uniqueTeamIds),
-      allMatchIds.length > 0
-        ? supabase.from("matches")
-            .select("id, status, scheduled_at, venue, winner_team_id, challenger_score, challenged_score, challenger_sets, challenged_sets, score_submitted_by, score_confirmed_by, score_disputed, dispute_reason")
-            .in("id", allMatchIds)
-        : Promise.resolve({ data: [] as any[] }),
+      fetchMatchesByIds(allMatchIds),
     ]);
 
-    const teamsMap = new Map(teams?.map(t => [t.id, t]) || []);
-    const ranksMap = new Map(ranks?.map(r => [r.team_id, r.rank]) || []);
-    const matchMap = new Map<string, any>(
-      (matches || []).map((m: any) => [m.id, m])
+    const teamsMap = new Map(
+      uniqueTeamIds.map(id => [id, { id, name: teamNameMap.get(id) || "Unknown" }])
     );
+    const ranksMap = new Map(ranks?.map(r => [r.team_id, r.rank]) || []);
 
     const mapChallenge = (c: any): Challenge => {
-      const matchInfo = c.match_id ? matchMap.get(c.match_id) : null;
+      const matchInfo = c.match_id ? matchMap.get(c.match_id) as any : null;
       const ladderCategory = c.ladder_categories;
       return {
         id: c.id,

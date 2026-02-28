@@ -26,6 +26,8 @@ import { formatMatchDateTime } from "@/components/tournament/matchDateFormat";
 import { BulkRescheduleDialog } from "@/components/tournament/BulkRescheduleDialog";
 import { RescheduleMatchDialog } from "@/components/tournament/RescheduleMatchDialog";
 import { exportTournamentMatchesCSV } from "@/lib/exportMatches";
+import { fetchTournamentDetail } from "@/services/tournaments";
+import { fetchTeamNamesByIds, fetchTeamMemberProfiles, fetchUserCaptainTeam } from "@/services/teams";
 
 // Lazy-load admin-only components
 const AdminGroupManagement = lazy(() => import("@/components/tournament/AdminGroupManagement").then(m => ({ default: m.AdminGroupManagement })));
@@ -139,70 +141,31 @@ export default function TournamentDetail() {
   const fetchData = useCallback(async () => {
     if (!id) return;
     try {
-      const [tournamentRes, groupsRes, participantsRes, matchesRes, categoriesRes, paymentRes] = await Promise.all([
-        supabase.from("tournaments").select("id, name, description, format, status, max_teams, created_by, winner_team_id, number_of_groups, sets_per_match, entry_fee, entry_fee_currency, payment_instructions, venue, registration_deadline, start_date, end_date, created_at").eq("id", id).single(),
-        supabase.from("tournament_groups").select("id, name, display_order, category_id").eq("tournament_id", id).order("display_order"),
-        supabase.from("tournament_participants_public").select("id, tournament_id, team_id, seed, is_eliminated, eliminated_at, final_placement, registered_at, group_id, category_id, group_wins, group_losses, group_points_for, group_points_against, waitlist_position, payment_status, custom_team_name, player1_name, player2_name").eq("tournament_id", id),
-        supabase.from("tournament_matches").select("id, round_number, match_number, team1_id, team2_id, team1_score, team2_score, winner_team_id, is_losers_bracket, group_id, category_id, stage, scheduled_at, court_number, duration_minutes, sets_per_match").eq("tournament_id", id).order("round_number").order("match_number"),
-        supabase.from("tournament_categories").select("id, tournament_id, name, description, max_teams, display_order, entry_fee").eq("tournament_id", id).order("display_order"),
-        supabase.from("tournament_participants").select("id, team_id, registered_at, payment_status, payment_notes, custom_team_name, waitlist_position").eq("tournament_id", id),
-      ]);
-
-      if (tournamentRes.error) throw tournamentRes.error;
-      setTournament(tournamentRes.data);
-      setGroups(groupsRes.data || []);
-      setMatches(matchesRes.data || []);
+      const detail = await fetchTournamentDetail(id);
+      
+      setTournament(detail.tournament);
+      setGroups(detail.groups);
+      setMatches(detail.matches);
       
       // Process categories with participant counts
-      const cats = (categoriesRes.data || []).map(cat => ({
+      const cats = detail.categories.map(cat => ({
         ...cat,
         entry_fee: (cat as any).entry_fee ?? 0,
-        participantCount: (participantsRes.data || []).filter(p => p.category_id === cat.id && p.waitlist_position === null).length,
+        participantCount: detail.participants.filter(p => p.category_id === cat.id && p.waitlist_position === null).length,
       }));
       setCategories(cats);
 
       // Fetch team names and member profiles for participants
-      const participantTeamIds = [...new Set((participantsRes.data || []).map(p => p.team_id).filter(Boolean) as string[])];
+      const participantTeamIds = [...new Set(detail.participants.map(p => p.team_id).filter(Boolean) as string[])];
       
-      const [teamsResult, membersResult] = await Promise.all([
-        participantTeamIds.length > 0 
-          ? supabase.from("teams").select("id, name").in("id", participantTeamIds)
-          : Promise.resolve({ data: [] }),
-        participantTeamIds.length > 0
-          ? supabase.from("team_members").select("team_id, user_id").in("team_id", participantTeamIds).order("joined_at")
-          : Promise.resolve({ data: [] }),
+      const [teamNameMap, membersMap] = await Promise.all([
+        fetchTeamNamesByIds(participantTeamIds),
+        fetchTeamMemberProfiles(participantTeamIds),
       ]);
 
-      const teamNameMap = new Map((teamsResult.data || []).map(t => [t.id, t.name]));
-      
-      const allUserIds = [...new Set((membersResult.data || []).map(m => m.user_id))];
-      let profileMap = new Map<string, string>();
-      if (allUserIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from("public_profiles")
-          .select("user_id, display_name")
-          .in("user_id", allUserIds);
-        profileMap = new Map((profiles || []).map(p => [p.user_id!, p.display_name || "Player"]));
-      }
-
-      const membersMap = new Map<string, { player1: string; player2: string }>();
-      for (const teamId of participantTeamIds) {
-        const members = (membersResult.data || []).filter(m => m.team_id === teamId);
-        if (members.length >= 2) {
-          membersMap.set(teamId, {
-            player1: profileMap.get(members[0].user_id) || "Player",
-            player2: profileMap.get(members[1].user_id) || "Player",
-          });
-        } else if (members.length === 1) {
-          membersMap.set(teamId, {
-            player1: profileMap.get(members[0].user_id) || "Player",
-            player2: "",
-          });
-        }
-      }
       setTeamMembersMap(membersMap);
 
-      const participantsWithNames = (participantsRes.data || []).map((p) => {
+      const participantsWithNames = detail.participants.map((p) => {
         const teamName = teamNameMap.get(p.team_id!) || "Unknown";
         let p1 = (p as any).player1_name || null;
         let p2 = (p as any).player2_name || null;
@@ -228,7 +191,7 @@ export default function TournamentDetail() {
       setParticipants(participantsWithNames);
 
       // Build payment participants from the same data (no extra query)
-      const paymentData = (paymentRes.data || []).map((p) => ({
+      const paymentData = detail.paymentParticipants.map((p) => ({
         ...p,
         team_name: teamNameMap.get(p.team_id) || "Unknown",
         payment_status: p.payment_status || "pending",
@@ -243,21 +206,11 @@ export default function TournamentDetail() {
 
   const fetchUserTeam = useCallback(async () => {
     if (!user) return;
-    const { data: member } = await supabase
-      .from("team_members")
-      .select("team_id")
-      .eq("user_id", user.id)
-      .eq("is_captain", true)
-      .maybeSingle();
-
-    if (member) {
-      const [teamResult, countResult] = await Promise.all([
-        supabase.from("teams").select("id, name").eq("id", member.team_id).single(),
-        supabase.from("team_members").select("id", { count: "exact", head: true }).eq("team_id", member.team_id),
-      ]);
-      if (teamResult.data) setUserTeam(teamResult.data);
-      const memberCount = countResult.count || 0;
-      if (memberCount < 2 && teamResult.data?.name?.includes(" & ")) {
+    const result = await fetchUserCaptainTeam(user.id);
+    if (result?.team) {
+      setUserTeam(result.team);
+      const memberCount = result.memberCount;
+      if (memberCount < 2 && result.team.name?.includes(" & ")) {
         setUserTeamMemberCount(2);
       } else {
         setUserTeamMemberCount(memberCount);

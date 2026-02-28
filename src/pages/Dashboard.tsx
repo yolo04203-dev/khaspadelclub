@@ -7,6 +7,7 @@ import { AddPartnerDialog } from "@/components/team/AddPartnerDialog";
 import { RemovePartnerDialog } from "@/components/team/RemovePartnerDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchPendingChallengeCounts } from "@/services/matches";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -149,17 +150,12 @@ export default function Dashboard() {
         // Use requestIdleCallback (or setTimeout fallback) so team card renders first
         const loadStats = async () => {
           try {
-            const [pendingResult, incomingResult, unifiedResult] = await Promise.all([
-              supabase.from("challenges").select("id", { count: "exact", head: true })
-                .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
-                .eq("status", "pending"),
-              supabase.from("challenges").select("id", { count: "exact", head: true })
-                .eq("challenged_team_id", teamId)
-                .eq("status", "pending"),
+            const [challengeCounts, unifiedResult] = await Promise.all([
+              fetchPendingChallengeCounts(teamId),
               supabase.rpc("get_player_unified_stats", { p_user_id: user.id, p_days: 0 }),
             ]);
 
-            setIncomingChallenges(safeCount(incomingResult.count));
+            setIncomingChallenges(challengeCounts.incoming);
 
             const unified = unifiedResult.data as any;
             if (unified?.by_mode) setModeBreakdown(unified.by_mode);
@@ -171,7 +167,7 @@ export default function Dashboard() {
               matchesPlayed: totalWins + totalLosses,
               wins: totalWins,
               losses: totalLosses,
-              pendingChallenges: safeCount(pendingResult.count),
+              pendingChallenges: challengeCounts.total,
             });
           } catch (err) {
             logger.warn("Dashboard: stats section failed, using defaults", err);
