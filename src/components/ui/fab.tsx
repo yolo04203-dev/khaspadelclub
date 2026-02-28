@@ -2,7 +2,6 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Button, ButtonProps } from "@/components/ui/button";
 import { Slot } from "@radix-ui/react-slot";
-import { motion, AnimatePresence } from "framer-motion";
 
 interface FABProps extends Omit<ButtonProps, 'asChild'> {
   icon: React.ReactNode;
@@ -38,14 +37,11 @@ const FAB = React.forwardRef<HTMLButtonElement, FABProps>(
       </>
     );
 
+    // Use CSS animations instead of framer-motion to avoid pulling the animation chunk
     return (
-      <motion.div
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0, opacity: 0 }}
-        transition={{ type: "spring", stiffness: 260, damping: 20 }}
+      <div
         className={cn(
-          "fixed z-50",
+          "fixed z-50 animate-scale-in",
           "bottom-[calc(7rem+env(safe-area-inset-bottom))] sm:bottom-6",
           positionClasses[position]
         )}
@@ -70,7 +66,7 @@ const FAB = React.forwardRef<HTMLButtonElement, FABProps>(
             {content}
           </Button>
         )}
-      </motion.div>
+      </div>
     );
   }
 );
@@ -82,11 +78,8 @@ interface FABContainerProps {
 }
 
 function FABContainer({ children, show = true }: FABContainerProps) {
-  return (
-    <AnimatePresence>
-      {show && children}
-    </AnimatePresence>
-  );
+  if (!show) return null;
+  return <>{children}</>;
 }
 
 export { FAB, FABContainer };
