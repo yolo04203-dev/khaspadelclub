@@ -1,31 +1,34 @@
 
 
-## Analysis: No Deduplication Exists
+## Current State
 
-The CSV export code (`src/lib/exportMatches.ts`) has **zero deduplication logic**. Every row maps directly from its match record:
+1. **Routes are already lazy-loaded** via `lazyWithRetry` in `AuthenticatedRoutes.tsx` and `App.tsx` — Stats, Tournaments, Americano, Challenges, Admin are all code-split. ✓
+2. **Vite `manualChunks` already splits** react-core, router, ui-vendor, animation, charts, supabase, sentry, analytics, query. ✓
+3. **Supabase client is already a singleton** in `src/integrations/supabase/client.ts`. No page creates its own instance. ✓
+4. **NotificationContext already defers** its initial fetch by 3 seconds. ✓
+5. **Dashboard already defers stats** via `requestIdleCallback`. ✓
 
-- `tournament.venue || ""` — venue from the tournament object (same for all rows, by design)
-- `m.court_number ? String(m.court_number) : ""` — per-match court
-- `formatDate(m.scheduled_at)` — per-match date
-- `formatTime(m.scheduled_at)` — per-match time
+### Actual problems found
 
-There are no `previousCourt`, `previousTime`, or "skip if same" comparisons anywhere.
+- **Charts leak into main bundle**: `src/components/ui/chart.tsx` imports `recharts` at top level. Even though it's unused by any component, Vite may still include it if tree-shaking fails (barrel re-exports). The *real* chart usage is `WinRateChart.tsx` which is imported statically by `Stats.tsx` — but Stats is already lazy-loaded, so recharts only loads with the Stats route. The `chart.tsx` file is dead code and should be removed.
+- **`PendingInvitations` fires its own DB queries on Dashboard mount** (team_invitations + teams + profiles = 3 queries). This runs in parallel with Dashboard's own team_members query, causing a duplicate `team_members` fetch from NotificationContext (deferred 3s) + PendingInvitations (immediate). 
+- **Dashboard `select("*")` in NotificationContext**: Lines 66 and 76 use `select("*", { count: "exact", head: true })` — the `head: true` means no rows are returned so `*` is harmless, but it's inconsistent with the explicit-columns pattern established elsewhere.
+- **`framer-motion` is in manualChunks** but imported by `PageTransition.tsx` — need to verify it's not eagerly loaded.
 
-**Root cause of blank values**: The `court_number` and `scheduled_at` columns in the `tournament_matches` table are nullable. When matches haven't been assigned a court or scheduled time, they export as empty strings — not because of deduplication, but because the data is `NULL` in the database.
+### Changes (backend/loading only, no UI changes)
 
-### Changes needed
+#### 1. Delete dead `chart.tsx`
+Remove `src/components/ui/chart.tsx` — it's unused and pulls recharts into the dependency graph unnecessarily.
 
-#### 1. `src/lib/exportMatches.ts` — Add missing-data warning callback
+#### 2. Lazy-load `PendingInvitations` in Dashboard
+Convert the `PendingInvitations` import in `Dashboard.tsx` to a dynamic import using `lazyWithRetry`. This defers 3 DB queries until the component mounts asynchronously, letting the team card render first.
 
-Add an `onWarning` callback to `exportTournamentMatchesCSV` and both Americano export functions. Before generating CSV, count matches with null `court_number` or `scheduled_at`. If any are missing, call the warning with a descriptive message. Still proceed with export.
+#### 3. Lazy-load dialog components in Dashboard
+`RenameTeamDialog`, `AddPartnerDialog`, `RemovePartnerDialog` are imported statically but only rendered conditionally. Convert to `lazyWithRetry` so their code (and sub-dependencies) loads only when the dialog opens.
 
-#### 2. `src/pages/TournamentDetail.tsx` — Show toast warning on export
+#### 4. Clean up NotificationContext selects
+Replace `select("*", { count: "exact", head: true })` with `select("id", { count: "exact", head: true })` on lines 66 and 76 for consistency and to ensure no unnecessary column parsing.
 
-Pass `toast.warning(msg)` as the `onWarning` callback so admins see: "X of Y matches are missing court or time assignments."
-
-#### 3. `src/pages/AmericanoSession.tsx` — Same warning pattern
-
-Pass `toast.warning(msg)` for Americano exports, warning about missing `court_number` values.
-
-No deduplication removal needed — none exists. This is purely a data-completeness visibility fix.
+#### 5. Verify framer-motion isolation
+Check if `PageTransition.tsx` or any eagerly-loaded component imports framer-motion. If so, make it lazy or conditional.
 
