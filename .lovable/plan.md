@@ -1,34 +1,37 @@
 
 
-## Current State
+## Analysis: Everything Requested Is Already Implemented
 
-1. **Routes are already lazy-loaded** via `lazyWithRetry` in `AuthenticatedRoutes.tsx` and `App.tsx` — Stats, Tournaments, Americano, Challenges, Admin are all code-split. ✓
-2. **Vite `manualChunks` already splits** react-core, router, ui-vendor, animation, charts, supabase, sentry, analytics, query. ✓
-3. **Supabase client is already a singleton** in `src/integrations/supabase/client.ts`. No page creates its own instance. ✓
-4. **NotificationContext already defers** its initial fetch by 3 seconds. ✓
-5. **Dashboard already defers stats** via `requestIdleCallback`. ✓
+All five optimization categories in this request are already in place:
 
-### Actual problems found
+### 1. Route-level code splitting — DONE
+Every major route (Tournaments, Americano, Challenges, Stats, Admin, Dashboard, Players, Profile, Ladders) uses `lazyWithRetry` in `AuthenticatedRoutes.tsx`. Public pages (Auth, Privacy, Terms, Contact, DeleteAccount) are lazy in `App.tsx`. The `AuthenticatedRoutes` shell itself is lazy-loaded, so none of those pages exist in the initial bundle.
 
-- **Charts leak into main bundle**: `src/components/ui/chart.tsx` imports `recharts` at top level. Even though it's unused by any component, Vite may still include it if tree-shaking fails (barrel re-exports). The *real* chart usage is `WinRateChart.tsx` which is imported statically by `Stats.tsx` — but Stats is already lazy-loaded, so recharts only loads with the Stats route. The `chart.tsx` file is dead code and should be removed.
-- **`PendingInvitations` fires its own DB queries on Dashboard mount** (team_invitations + teams + profiles = 3 queries). This runs in parallel with Dashboard's own team_members query, causing a duplicate `team_members` fetch from NotificationContext (deferred 3s) + PendingInvitations (immediate). 
-- **Dashboard `select("*")` in NotificationContext**: Lines 66 and 76 use `select("*", { count: "exact", head: true })` — the `head: true` means no rows are returned so `*` is harmless, but it's inconsistent with the explicit-columns pattern established elsewhere.
-- **`framer-motion` is in manualChunks** but imported by `PageTransition.tsx` — need to verify it's not eagerly loaded.
+### 2. Dialog components lazy-loaded — DONE
+Dashboard lazy-loads `PendingInvitations`, `RenameTeamDialog`, `AddPartnerDialog`, `RemovePartnerDialog` via `lazyWithRetry` (implemented in the previous message).
 
-### Changes (backend/loading only, no UI changes)
+### 3. Charts isolated to Stats page — DONE
+`recharts` is imported only in `src/components/stats/WinRateChart.tsx`, which is statically imported by `Stats.tsx` — but Stats itself is lazy-loaded. The dead `chart.tsx` barrel was already deleted. Charts never enter the initial or Dashboard bundle.
 
-#### 1. Delete dead `chart.tsx`
-Remove `src/components/ui/chart.tsx` — it's unused and pulls recharts into the dependency graph unnecessarily.
+### 4. Vite manualChunks — DONE
+`vite.config.ts` already splits: `react-core`, `router`, `ui-vendor` (12 Radix packages), `animation` (framer-motion), `charts` (recharts), `supabase`, `sentry`, `analytics` (posthog), `query` (tanstack).
 
-#### 2. Lazy-load `PendingInvitations` in Dashboard
-Convert the `PendingInvitations` import in `Dashboard.tsx` to a dynamic import using `lazyWithRetry`. This defers 3 DB queries until the component mounts asynchronously, letting the team card render first.
+### 5. Dashboard minimal dependencies — DONE
+Dashboard imports no page-level modules. Its dialogs and PendingInvitations are lazy. The landing page (`Index.tsx`) is eagerly loaded but minimal (Header + Hero above fold; Features, SportsModes, Footer are lazy).
 
-#### 3. Lazy-load dialog components in Dashboard
-`RenameTeamDialog`, `AddPartnerDialog`, `RemovePartnerDialog` are imported statically but only rendered conditionally. Convert to `lazyWithRetry` so their code (and sub-dependencies) loads only when the dialog opens.
+### One Remaining Opportunity: framer-motion leaks into Dashboard chunk
 
-#### 4. Clean up NotificationContext selects
-Replace `select("*", { count: "exact", head: true })` with `select("id", { count: "exact", head: true })` on lines 66 and 76 for consistency and to ensure no unnecessary column parsing.
+`PullToRefresh` and `FAB` both `import { motion } from "framer-motion"` at top level. Dashboard imports both, so framer-motion loads with the Dashboard chunk despite being in a separate manualChunk. This doesn't affect initial page load (Dashboard is lazy), but it does inflate the Dashboard chunk.
 
-#### 5. Verify framer-motion isolation
-Check if `PageTransition.tsx` or any eagerly-loaded component imports framer-motion. If so, make it lazy or conditional.
+**Proposed fix**: Convert `PullToRefresh` and `FAB` to use dynamic `import("framer-motion")` internally, so the animation chunk only loads when those components actually render — not when Dashboard's JS is parsed.
+
+### Implementation steps
+
+1. **Refactor `src/components/ui/pull-to-refresh.tsx`** — Replace static `import { motion, ... } from "framer-motion"` with a lazy-loaded motion component pattern using `React.lazy` or a local `useMotion` hook that dynamically imports framer-motion.
+
+2. **Refactor `src/components/ui/fab.tsx`** — Same treatment: remove static framer-motion import, use dynamic import so the animation chunk is deferred until FAB actually animates.
+
+3. **No changes to `ChallengeHistoryTab.tsx`** — It's inside the lazy-loaded Challenges page, so framer-motion there is already isolated.
+
+These are the only changes needed. Everything else requested is already implemented.
 
