@@ -13,7 +13,7 @@ export function AdminHeader() {
               <ArrowLeft className="w-4 h-4" />
             </Link>
           </Button>
-          <Logo size="sm" />
+          <Logo size="sm" showImage={false} />
         </div>
       </div>
     </header>

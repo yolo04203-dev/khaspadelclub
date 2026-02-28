@@ -3,6 +3,7 @@ import logoImg from "@/assets/logo.png";
 interface LogoProps {
   size?: "sm" | "md" | "lg";
   showText?: boolean;
+  showImage?: boolean;
   hideTextOnMobile?: boolean;
   className?: string;
 }
@@ -22,20 +23,23 @@ const textSizeClasses = {
 export function Logo({
   size = "md",
   showText = true,
+  showImage = true,
   hideTextOnMobile = true,
   className = "",
 }: LogoProps) {
   return (
     <div className={`flex items-center gap-3 ${className}`}>
-      <img
-        src={logoImg}
-        alt="Khas Padel Club"
-        decoding="async"
-        fetchPriority="high"
-        width={size === "lg" ? 72 : size === "md" ? 52 : 40}
-        height={size === "lg" ? 72 : size === "md" ? 52 : 40}
-        className={`${sizeClasses[size]} object-contain transition-transform duration-150 hover:scale-105 active:scale-95`}
-      />
+      {showImage && (
+        <img
+          src={logoImg}
+          alt="Khas Padel Club"
+          decoding="async"
+          fetchPriority="high"
+          width={size === "lg" ? 72 : size === "md" ? 52 : 40}
+          height={size === "lg" ? 72 : size === "md" ? 52 : 40}
+          className={`${sizeClasses[size]} object-contain transition-transform duration-150 hover:scale-105 active:scale-95`}
+        />
+      )}
 
       {showText && (
         <span

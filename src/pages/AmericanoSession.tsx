@@ -619,7 +619,7 @@ export default function AmericanoSession() {
               <ArrowLeft className="w-4 h-4" />
             </Link>
           </Button>
-          <Logo size="sm" className="ml-4" />
+          <Logo size="sm" showImage={false} className="ml-4" />
         </div>
       </header>
 
