@@ -2,9 +2,6 @@ import { useEffect, useState, useCallback } from "react";
 import { Navigate, Link, useNavigate } from "react-router-dom";
 
 import { User, Trophy, Swords, Settings, Users, Plus, Shuffle, Layers, Pencil, AlertTriangle, UserPlus, UserMinus, RefreshCw } from "lucide-react";
-import { RenameTeamDialog } from "@/components/team/RenameTeamDialog";
-import { AddPartnerDialog } from "@/components/team/AddPartnerDialog";
-import { RemovePartnerDialog } from "@/components/team/RemovePartnerDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchPendingChallengeCounts } from "@/services/matches";
@@ -17,7 +14,13 @@ import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { FAB, FABContainer } from "@/components/ui/fab";
 import { logger } from "@/lib/logger";
 import { safeCount, safeString } from "@/lib/safeData";
-import { PendingInvitations } from "@/components/team/PendingInvitations";
+import { Suspense } from "react";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
+
+const PendingInvitations = lazyWithRetry(() => import("@/components/team/PendingInvitations").then(m => ({ default: m.PendingInvitations })));
+const RenameTeamDialog = lazyWithRetry(() => import("@/components/team/RenameTeamDialog").then(m => ({ default: m.RenameTeamDialog })));
+const AddPartnerDialog = lazyWithRetry(() => import("@/components/team/AddPartnerDialog").then(m => ({ default: m.AddPartnerDialog })));
+const RemovePartnerDialog = lazyWithRetry(() => import("@/components/team/RemovePartnerDialog").then(m => ({ default: m.RemovePartnerDialog })));
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 interface LadderRank {
   rank: number;
@@ -370,7 +373,9 @@ export default function Dashboard() {
 
           {/* Pending Team Invitations */}
           <div className="mb-5 sm:mb-8">
-            <PendingInvitations onAccepted={fetchDashboardData} />
+            <Suspense fallback={null}>
+              <PendingInvitations onAccepted={fetchDashboardData} />
+            </Suspense>
           </div>
 
           {/* Quick Stats */}
@@ -613,7 +618,7 @@ export default function Dashboard() {
      </PullToRefresh>
 
       {userTeam && isCaptain && (
-        <>
+        <Suspense fallback={null}>
           <RenameTeamDialog
             open={showRenameDialog}
             onOpenChange={setShowRenameDialog}
@@ -637,7 +642,7 @@ export default function Dashboard() {
             captainName={userTeam.memberNames[0] || "Captain"}
             onRemoved={fetchDashboardData}
           />
-        </>
+        </Suspense>
       )}
     </div>
   );
