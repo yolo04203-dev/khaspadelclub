@@ -3,12 +3,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { LoadingScreen } from "@/components/ui/loading-screen";
+import { RouteLoadingFallback } from "@/components/ui/loading-screen";
 import { OfflineBanner, SlowConnectionBanner } from "@/components/ui/error-state";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useStatusBar } from "@/hooks/useStatusBar";
 import { logger } from "@/lib/logger";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
+import { isNative } from "@/lib/capacitor";
 import { useCapacitorAnalytics } from "@/hooks/useCapacitorAnalytics";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -141,14 +142,15 @@ function NativeLifecycleManager() {
   return null;
 }
 
-// Configure QueryClient with production-ready settings
+// Native Capacitor gets longer cache times to reduce costly network round-trips
+const native = isNative();
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 3,
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      staleTime: 2 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
+      staleTime: native ? 5 * 60 * 1000 : 2 * 60 * 1000,
+      gcTime: native ? 30 * 60 * 1000 : 10 * 60 * 1000,
       refetchOnWindowFocus: false,
     },
     mutations: {
@@ -181,7 +183,7 @@ const App = () => {
           <BrowserRouter>
             <NativeLifecycleManager />
             <DeferredNetworkBanners />
-            <Suspense fallback={<LoadingScreen message="Loading..." />}>
+            <Suspense fallback={<RouteLoadingFallback />}>
               <Routes>
                 {/* Public routes — no AuthProvider, no NotificationProvider */}
                 <Route path="/" element={<Index />} />

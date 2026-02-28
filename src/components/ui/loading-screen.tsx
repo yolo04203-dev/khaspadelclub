@@ -33,6 +33,21 @@ export function LoadingScreen({
 }
 
 /**
+ * Pure CSS spinner for route-level Suspense fallbacks.
+ * Zero JS dependencies — renders instantly without importing lucide-react.
+ */
+export function RouteLoadingFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh] bg-background">
+      <div
+        className="w-8 h-8 rounded-full border-2 border-muted border-t-primary"
+        style={{ animation: "spin .7s linear infinite" }}
+      />
+    </div>
+  );
+}
+
+/**
  * Inline loading spinner for smaller contexts
  */
 export function LoadingSpinner({ className }: { className?: string }) {

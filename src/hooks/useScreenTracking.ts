@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
-import { Capacitor } from "@capacitor/core";
+import { isNative, getPlatform } from "@/lib/capacitor";
 import { analytics } from "@/lib/analytics/posthog";
 
 /** Route path → human-readable name */
@@ -28,7 +28,7 @@ export function useScreenTracking() {
 
     analytics.screen(routeName(path), {
       path,
-      platform: Capacitor.isNativePlatform() ? Capacitor.getPlatform() : "web",
+      platform: isNative() ? getPlatform() : "web",
     });
   }, [location.pathname]);
 }

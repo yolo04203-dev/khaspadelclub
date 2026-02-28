@@ -1,5 +1,6 @@
 import { getSentry } from "@/lib/sentryLazy";
 import { analytics } from "@/lib/analytics/posthog";
+import { isNative } from "@/lib/capacitor";
 
 declare const __APP_VERSION__: string;
 declare const __GIT_COMMIT_SHA__: string;
@@ -46,6 +47,9 @@ const REPLAYS_SESSION_RATE = 0; // PostHog owns UX session replay
 const REPLAYS_ERROR_RATE = IS_DEV ? 1.0 : 0.5; // Moderate crash-only sampling
 
 export async function initErrorReporting() {
+  // Skip Sentry on native Capacitor — reduces JS execution and network cost
+  if (isNative()) return;
+
   if (!SENTRY_DSN) {
     if (import.meta.env.DEV) console.warn("[ErrorReporting] No VITE_SENTRY_DSN configured, skipping Sentry init");
     return;
