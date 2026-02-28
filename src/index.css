@@ -290,7 +290,7 @@ button, a, [role="button"], nav {
 
 /* Safe area utility classes */
 .safe-top {
-  padding-top: max(16px, env(safe-area-inset-top));
+  padding-top: max(28px, env(safe-area-inset-top));
 }
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
