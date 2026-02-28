@@ -1,29 +1,20 @@
 
 
-## Plan: Remove K logo from in-app pages
+## Fix: Remove K logo from all remaining in-app pages
 
-The K monogram image currently appears in the AppHeader (all authenticated pages), AdminHeader, TournamentCreate, AmericanoCreate, AmericanoSession, and other in-app pages. It should only appear on the landing page, auth page, and public pages (Contact, Terms, Privacy, DeleteAccount, Footer).
+The previous change missed pages that render their own headers instead of using `AppHeader`. These pages still show the K monogram and need `showImage={false}`:
 
-### Changes
+### Pages to update
 
-**1. Add `showImage` prop to `src/components/Logo.tsx`**
-- New optional boolean prop `showImage`, default `true`
-- When `false`, skip rendering the `<img>` tag, show only the text
+1. **`src/pages/LadderDetail.tsx`** — 3 Logo instances (lines 451, 481, 507)
+2. **`src/pages/LadderCreate.tsx`** — 2 Logo instances (lines 157, 182)
+3. **`src/pages/LadderManage.tsx`** — 2 Logo instances (lines 293, 326)
+4. **`src/pages/TournamentDetail.tsx`** — Logo instances in custom header
+5. **`src/pages/CreateTeam.tsx`** — Logo instance in custom header
 
-**2. Update `src/components/AppHeader.tsx`**
-- Set `showImage={false}` on the Logo — shows "Khas Padel Club" text only, no K image
+### No changes to (public pages — keep K logo)
+- Auth, Contact, Terms, Privacy, DeleteAccount, Landing Header, Footer
 
-**3. Update `src/components/admin/AdminHeader.tsx`**
-- Set `showImage={false}` on the Logo
-
-**4. Update `src/pages/TournamentCreate.tsx`**
-- Set `showImage={false}` on both Logo instances
-
-**5. Update `src/pages/AmericanoCreate.tsx`**
-- Set `showImage={false}` on both Logo instances
-
-**6. Update `src/pages/AmericanoSession.tsx`**
-- Set `showImage={false}` on the Logo
-
-**No changes to**: Landing Header, Footer, Auth page, Contact, Terms, Privacy, DeleteAccount — these keep the K logo.
+### Implementation
+Add `showImage={false}` to every `<Logo>` call in the five pages listed above. Same pattern as the previous fix.
 
