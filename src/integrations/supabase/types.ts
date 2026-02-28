@@ -1508,6 +1508,11 @@ export type Database = {
         Args: { _avatar_url?: string; _name: string }
         Returns: string
       }
+      delete_team_cascade: { Args: { _team_id: string }; Returns: undefined }
+      delete_tournament_cascade: {
+        Args: { _tournament_id: string }
+        Returns: undefined
+      }
       get_player_unified_stats: {
         Args: { p_days?: number; p_user_id: string }
         Returns: Json
