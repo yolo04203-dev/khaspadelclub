@@ -1,54 +1,31 @@
 
 
-## Plan: Admin Match Export + Auth Persistence Verification
+## Analysis: No Deduplication Exists
 
-### Auth Persistence — Already Fully Implemented ✓
+The CSV export code (`src/lib/exportMatches.ts`) has **zero deduplication logic**. Every row maps directly from its match record:
 
-Your `AuthContext.tsx` already has all the requested features:
-- `persistSession: true` and `autoRefreshToken: true` on the Supabase client
-- Silent session refresh every 55 minutes via `refreshSession()`
-- Session restored on app launch via `getSession()` before showing UI
-- Splash screen shown during auth initialization, dismissed after
-- Users stay logged in until manual `signOut()`
-- Retry logic for transient session restore failures
+- `tournament.venue || ""` — venue from the tournament object (same for all rows, by design)
+- `m.court_number ? String(m.court_number) : ""` — per-match court
+- `formatDate(m.scheduled_at)` — per-match date
+- `formatTime(m.scheduled_at)` — per-match time
 
-**No changes needed for authentication.**
+There are no `previousCourt`, `previousTime`, or "skip if same" comparisons anywhere.
 
----
+**Root cause of blank values**: The `court_number` and `scheduled_at` columns in the `tournament_matches` table are nullable. When matches haven't been assigned a court or scheduled time, they export as empty strings — not because of deduplication, but because the data is `NULL` in the database.
 
-### Match Export — New Feature
+### Changes needed
 
-#### 1. Create `src/lib/exportMatches.ts` — CSV generation utility
+#### 1. `src/lib/exportMatches.ts` — Add missing-data warning callback
 
-A single utility file with two export functions:
+Add an `onWarning` callback to `exportTournamentMatchesCSV` and both Americano export functions. Before generating CSV, count matches with null `court_number` or `scheduled_at`. If any are missing, call the warning with a descriptive message. Still proceed with export.
 
-- **`exportTournamentMatchesCSV(matches, participants, groups, tournament, categoryName)`**
-  - Columns: Stage, Round, Team 1, Team 1 Players, Team 2, Team 2 Players, Score, Winner, Category, Venue, Court, Date, Time
-  - Maps `team1_id`/`team2_id` to team names using participants data
-  - Maps `group_id` to group name, derives stage from `match.stage` field
-  - Filename: `khas-padel-{tournamentName}-matches.csv`
+#### 2. `src/pages/TournamentDetail.tsx` — Show toast warning on export
 
-- **`exportAmericanoMatchesCSV(matches, teams/players, session)`**
-  - For team mode: Round, Court, Team 1, Team 2, Team 1 Score, Team 2 Score, Status
-  - For individual mode: Round, Court, Team 1 (Player1 & Player2), Team 2 (Player1 & Player2), Scores, Status
-  - Filename: `khas-padel-{sessionName}-matches.csv`
+Pass `toast.warning(msg)` as the `onWarning` callback so admins see: "X of Y matches are missing court or time assignments."
 
-- Both use `Blob` + `URL.createObjectURL` + anchor click for download (works on web, Android WebView, iOS Safari)
+#### 3. `src/pages/AmericanoSession.tsx` — Same warning pattern
 
-#### 2. Update `src/pages/TournamentDetail.tsx` — Add Export button
+Pass `toast.warning(msg)` for Americano exports, warning about missing `court_number` values.
 
-- Import `exportTournamentMatchesCSV`
-- Add "Export Matches" button in the category detail header area, visible only when `isAdmin` is true and matches exist for the selected category
-- Button triggers CSV generation using already-loaded `matches`, `participants`, `groups`, and `tournament` state
-- Filter matches to the selected category before export
-
-#### 3. Update `src/pages/AmericanoSession.tsx` — Add Export button
-
-- Import `exportAmericanoMatchesCSV`
-- Add "Export Matches" button near the top of the session page, visible only when `isOwner` (session creator) or admin, and session is in progress or completed
-- Uses already-loaded `teamMatches`/`rounds`, `teams`/`players`, and `session` state
-
-#### No image export
-
-Image export via `html-to-image` adds a heavy dependency and is unreliable across mobile WebViews. CSV covers the primary use case. Can be added later if needed.
+No deduplication removal needed — none exists. This is purely a data-completeness visibility fix.
 
