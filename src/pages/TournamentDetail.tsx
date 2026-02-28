@@ -136,30 +136,16 @@ export default function TournamentDetail() {
     waitlist_position: number | null;
   }>>([]);
 
-  const fetchPaymentData = useCallback(async () => {
-    if (!id) return;
-    const { data } = await supabase
-      .from("tournament_participants")
-      .select("id, team_id, registered_at, payment_status, payment_notes, custom_team_name, waitlist_position")
-      .eq("tournament_id", id);
-    if (data) {
-      const withNames = await Promise.all(data.map(async (p) => {
-        const { data: team } = await supabase.from("teams").select("name").eq("id", p.team_id).single();
-        return { ...p, team_name: team?.name || "Unknown", payment_status: p.payment_status || "pending" };
-      }));
-      setPaymentParticipants(withNames);
-    }
-  }, [id]);
-
   const fetchData = useCallback(async () => {
     if (!id) return;
     try {
-      const [tournamentRes, groupsRes, participantsRes, matchesRes, categoriesRes] = await Promise.all([
-        supabase.from("tournaments").select("*").eq("id", id).single(),
-        supabase.from("tournament_groups").select("*").eq("tournament_id", id).order("display_order"),
-        supabase.from("tournament_participants_public").select("*").eq("tournament_id", id),
-        supabase.from("tournament_matches").select("*").eq("tournament_id", id).order("round_number").order("match_number"),
-        supabase.from("tournament_categories").select("*").eq("tournament_id", id).order("display_order"),
+      const [tournamentRes, groupsRes, participantsRes, matchesRes, categoriesRes, paymentRes] = await Promise.all([
+        supabase.from("tournaments").select("id, name, description, format, status, max_teams, created_by, winner_team_id, number_of_groups, sets_per_match, entry_fee, entry_fee_currency, payment_instructions, venue, registration_deadline, start_date, end_date, created_at").eq("id", id).single(),
+        supabase.from("tournament_groups").select("id, name, display_order, category_id").eq("tournament_id", id).order("display_order"),
+        supabase.from("tournament_participants_public").select("id, tournament_id, team_id, seed, is_eliminated, eliminated_at, final_placement, registered_at, group_id, category_id, group_wins, group_losses, group_points_for, group_points_against, waitlist_position, payment_status, custom_team_name, player1_name, player2_name").eq("tournament_id", id),
+        supabase.from("tournament_matches").select("id, round_number, match_number, team1_id, team2_id, team1_score, team2_score, winner_team_id, is_losers_bracket, group_id, category_id, stage, scheduled_at, court_number, duration_minutes, sets_per_match").eq("tournament_id", id).order("round_number").order("match_number"),
+        supabase.from("tournament_categories").select("id, tournament_id, name, description, max_teams, display_order, entry_fee").eq("tournament_id", id).order("display_order"),
+        supabase.from("tournament_participants").select("id, team_id, registered_at, payment_status, payment_notes, custom_team_name, waitlist_position").eq("tournament_id", id),
       ]);
 
       if (tournamentRes.error) throw tournamentRes.error;
@@ -240,6 +226,14 @@ export default function TournamentDetail() {
         };
       });
       setParticipants(participantsWithNames);
+
+      // Build payment participants from the same data (no extra query)
+      const paymentData = (paymentRes.data || []).map((p) => ({
+        ...p,
+        team_name: teamNameMap.get(p.team_id) || "Unknown",
+        payment_status: p.payment_status || "pending",
+      }));
+      setPaymentParticipants(paymentData);
     } catch (error) {
       logger.apiError("fetchTournament", error);
     } finally {
@@ -259,7 +253,7 @@ export default function TournamentDetail() {
     if (member) {
       const [teamResult, countResult] = await Promise.all([
         supabase.from("teams").select("id, name").eq("id", member.team_id).single(),
-        supabase.from("team_members").select("*", { count: "exact", head: true }).eq("team_id", member.team_id),
+        supabase.from("team_members").select("id", { count: "exact", head: true }).eq("team_id", member.team_id),
       ]);
       if (teamResult.data) setUserTeam(teamResult.data);
       const memberCount = countResult.count || 0;
@@ -276,7 +270,6 @@ export default function TournamentDetail() {
       fetchData();
       if (user) {
         fetchUserTeam();
-        fetchPaymentData();
       }
     }
 
@@ -308,7 +301,7 @@ export default function TournamentDetail() {
       supabase.removeChannel(groupsChannel);
       supabase.removeChannel(tournamentChannel);
     };
-  }, [id, user, fetchData, fetchUserTeam, fetchPaymentData]);
+  }, [id, user, fetchData, fetchUserTeam]);
 
   const registerTeam = async (teamId: string | null, customTeamName: string | null, player1Name?: string, player2Name?: string, categoryId?: string) => {
     if (!tournament) return;
@@ -1543,7 +1536,7 @@ export default function TournamentDetail() {
             entryFee={tournament.entry_fee || 0}
             entryFeeCurrency={tournament.entry_fee_currency || "PKR"}
             participants={paymentParticipants}
-            onRefresh={fetchPaymentData}
+            onRefresh={fetchData}
           />
           </Suspense>
         </TabsContent>
@@ -1667,7 +1660,7 @@ export default function TournamentDetail() {
           <TabsContent value="payments">
             <Suspense fallback={<Skeleton className="h-48 w-full" />}>
             <PaymentManagement tournamentId={tournament.id} entryFee={tournament.entry_fee || 0} entryFeeCurrency={tournament.entry_fee_currency || "PKR"}
-              participants={paymentParticipants} onRefresh={fetchPaymentData} />
+              participants={paymentParticipants} onRefresh={fetchData} />
             </Suspense>
           </TabsContent>
         )}

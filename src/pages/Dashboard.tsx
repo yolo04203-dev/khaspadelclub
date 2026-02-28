@@ -150,10 +150,10 @@ export default function Dashboard() {
         const loadStats = async () => {
           try {
             const [pendingResult, incomingResult, unifiedResult] = await Promise.all([
-              supabase.from("challenges").select("*", { count: "exact", head: true })
+              supabase.from("challenges").select("id", { count: "exact", head: true })
                 .or(`challenger_team_id.eq.${teamId},challenged_team_id.eq.${teamId}`)
                 .eq("status", "pending"),
-              supabase.from("challenges").select("*", { count: "exact", head: true })
+              supabase.from("challenges").select("id", { count: "exact", head: true })
                 .eq("challenged_team_id", teamId)
                 .eq("status", "pending"),
               supabase.rpc("get_player_unified_stats", { p_user_id: user.id, p_days: 0 }),
