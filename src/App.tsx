@@ -1,10 +1,7 @@
-import { useEffect, Suspense } from "react";
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
+import { useEffect, useState, Suspense, lazy } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
-import { Capacitor } from "@capacitor/core";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { OfflineBanner, SlowConnectionBanner } from "@/components/ui/error-state";
@@ -14,6 +11,10 @@ import { logger } from "@/lib/logger";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { useCapacitorAnalytics } from "@/hooks/useCapacitorAnalytics";
 import { AuthProvider } from "@/contexts/AuthContext";
+
+// Lazy-load toast providers — never needed during initial render
+const LazyToaster = lazy(() => import("@/components/ui/toaster").then(m => ({ default: m.Toaster })));
+const LazySonner = lazy(() => import("@/components/ui/sonner").then(m => ({ default: m.Toaster })));
 
 // Dev-only perf overlay — fully excluded from production via dead-code elimination
 const PerfOverlay = import.meta.env.DEV
@@ -59,17 +60,20 @@ export const lazyImports = {
   Contact: () => import("./pages/Contact"),
 };
 
-// Network status wrapper component
-function NetworkStatusProvider({ children }: { children: React.ReactNode }) {
-  const { isOnline, isSlowConnection } = useNetworkStatus();
+// Deferred network status — doesn't block initial paint
+function DeferredNetworkBanners() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return null;
+  return <NetworkBanners />;
+}
 
+function NetworkBanners() {
+  const { isOnline, isSlowConnection } = useNetworkStatus();
   return (
     <>
       <OfflineBanner isVisible={!isOnline} />
       <SlowConnectionBanner isVisible={isOnline && isSlowConnection} />
-      <div className={!isOnline ? "pt-8" : isSlowConnection ? "pt-8" : ""}>
-        {children}
-      </div>
     </>
   );
 }
@@ -81,7 +85,9 @@ function NativeLifecycleManager() {
   useCapacitorAnalytics();
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
+    // Use window.Capacitor instead of importing @capacitor/core
+    const cap = (window as any).Capacitor;
+    if (!cap?.isNativePlatform?.()) return;
 
     let appListener: { remove: () => void } | undefined;
     let resumeListener: { remove: () => void } | undefined;
@@ -168,25 +174,26 @@ const App = () => {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <Toaster />
-          <Sonner />
+          <Suspense fallback={null}>
+            <LazyToaster />
+            <LazySonner />
+          </Suspense>
           <BrowserRouter>
             <NativeLifecycleManager />
-            <NetworkStatusProvider>
-              <Suspense fallback={<LoadingScreen message="Loading..." />}>
-                <Routes>
-                  {/* Public routes — no AuthProvider, no NotificationProvider */}
-                  <Route path="/" element={<Index />} />
-                  <Route path="/auth" element={<AuthProvider><Auth /></AuthProvider>} />
-                  <Route path="/privacy" element={<Privacy />} />
-                  <Route path="/terms" element={<Terms />} />
-                  <Route path="/contact" element={<Contact />} />
-                  <Route path="/delete-account" element={<DeleteAccount />} />
-                  {/* All other routes go through AuthProvider + NotificationProvider */}
-                  <Route path="/*" element={<AuthenticatedRoutes />} />
-                </Routes>
-              </Suspense>
-            </NetworkStatusProvider>
+            <DeferredNetworkBanners />
+            <Suspense fallback={<LoadingScreen message="Loading..." />}>
+              <Routes>
+                {/* Public routes — no AuthProvider, no NotificationProvider */}
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<AuthProvider><Auth /></AuthProvider>} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/delete-account" element={<DeleteAccount />} />
+                {/* All other routes go through AuthProvider + NotificationProvider */}
+                <Route path="/*" element={<AuthenticatedRoutes />} />
+              </Routes>
+            </Suspense>
           </BrowserRouter>
         </TooltipProvider>
       </QueryClientProvider>
