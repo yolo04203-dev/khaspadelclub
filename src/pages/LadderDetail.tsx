@@ -448,7 +448,7 @@ export default function LadderDetail() {
                 <ArrowLeft className="w-4 h-4" />
               </Link>
             </Button>
-            <Logo size="sm" className="ml-4" />
+            <Logo size="sm" showImage={false} className="ml-4" />
           </div>
         </header>
         <main className="container py-6 sm:py-8">
@@ -478,7 +478,7 @@ export default function LadderDetail() {
                 <ArrowLeft className="w-4 h-4" />
               </Link>
             </Button>
-            <Logo size="sm" className="ml-4" />
+            <Logo size="sm" showImage={false} className="ml-4" />
           </div>
         </header>
         <main className="container py-8">
@@ -504,7 +504,7 @@ export default function LadderDetail() {
                 <ArrowLeft className="w-4 h-4" />
               </Link>
             </Button>
-            <Logo size="sm" />
+            <Logo size="sm" showImage={false} />
           </div>
 
           <div className="flex items-center gap-2">
