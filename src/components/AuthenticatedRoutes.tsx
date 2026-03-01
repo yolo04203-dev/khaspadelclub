@@ -12,6 +12,7 @@ const NotFound = lazyWithRetry(() => import("@/pages/NotFound"));
 const Dashboard = lazyWithRetry(() => import("@/pages/Dashboard"));
 const Ladders = lazyWithRetry(() => import("@/pages/Ladders"));
 const LadderDetail = lazyWithRetry(() => import("@/pages/LadderDetail"));
+const LadderCategoryDetail = lazyWithRetry(() => import("@/pages/LadderCategoryDetail"));
 const LadderCreate = lazyWithRetry(() => import("@/pages/LadderCreate"));
 const LadderManage = lazyWithRetry(() => import("@/pages/LadderManage"));
 const CreateTeam = lazyWithRetry(() => import("@/pages/CreateTeam"));
@@ -38,6 +39,7 @@ function AuthenticatedAnimatedRoutes() {
         <Route path="/ladders" element={<Ladders />} />
         <Route path="/ladders/create" element={<LadderCreate />} />
         <Route path="/ladders/:id" element={<LadderDetail />} />
+        <Route path="/ladders/:id/category/:categoryId" element={<LadderCategoryDetail />} />
         <Route path="/ladders/:id/manage" element={<LadderManage />} />
         <Route path="/teams/create" element={<CreateTeam />} />
         <Route path="/challenges" element={<Challenges />} />
