@@ -20,11 +20,11 @@ const FAB = React.forwardRef<HTMLButtonElement, FABProps>(
     };
 
     const buttonClasses = cn(
-      "h-14 shadow-lg hover:shadow-xl transition-shadow",
+      "min-h-[56px] h-auto shadow-lg hover:shadow-xl transition-shadow",
       "bg-accent text-accent-foreground hover:bg-accent/90",
       "active:scale-95 transition-transform",
       "inline-flex items-center justify-center",
-      showLabel ? "px-6 rounded-full gap-2" : "w-14 rounded-full",
+      showLabel ? "px-6 rounded-full gap-2" : "min-w-[56px] rounded-full",
       className
     );
 

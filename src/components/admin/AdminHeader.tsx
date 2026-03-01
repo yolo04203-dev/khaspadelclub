@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 export function AdminHeader() {
   return (
     <header className="border-b border-border bg-card sticky top-0 z-40 safe-top">
-      <div className="container flex items-center h-16">
+      <div className="container flex items-center min-h-[64px] h-auto py-2">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
             <Link to="/dashboard">
