@@ -1,46 +1,22 @@
 
 
-## Split Challenges into Tab-Based Lazy Loading
+## Fix: Tournament Detail back arrow overlapping notification bar
 
-### Problem
-The current `Challenges.tsx` (1016 lines) fetches **all 4 categories** (incoming, outgoing, active, history) in parallel on mount — even though only one tab is visible. This blocks the first paint with unnecessary queries.
+The tournament detail page header (line 1746 in `TournamentDetail.tsx`) is missing the `safe-top` class that other pages use to clear the system notification bar on Android devices.
 
-### Approach
-Rather than separate routes (which would lose the tab navigation UX), **lazy-fetch per tab** — only load data when a tab is activated. Extract each tab's content and logic into its own component file, and fetch data on-demand.
+**Current** (line 1746):
+```html
+<header className="border-b border-border bg-card">
+```
 
-### Changes
+**Fixed**:
+```html
+<header className="border-b border-border bg-card sticky top-0 z-40 safe-top">
+```
 
-**1. Create `src/components/challenges/IncomingTab.tsx`**
-- Receives `userTeamId`, fetches only incoming pending challenges on mount
-- Contains accept/decline handlers and the decline reason dialog
-- Skeleton loader while fetching
+This single-line change adds:
+- `safe-top` — applies minimum 28px top padding to clear the Samsung S21 FE notification bar
+- `sticky top-0 z-40` — matches the header pattern used on Admin, DeleteAccount, and other pages
 
-**2. Create `src/components/challenges/OutgoingTab.tsx`**
-- Receives `userTeamId`, fetches only outgoing challenges (pending + declined)
-- Contains cancel handler
-- Skeleton loader while fetching
-
-**3. Create `src/components/challenges/ActiveTab.tsx`**
-- Receives `userTeamId` and `userTeam` (for score submission context), fetches only accepted challenges
-- Contains score submission, scheduling, score confirmation logic
-- Skeleton loader while fetching
-
-**4. Refactor existing `src/components/challenges/ChallengeHistoryTab.tsx`**
-- Make it self-fetching: receives `userTeamId`, fetches history challenges internally
-- Currently it receives pre-fetched data as props — change to fetch on mount
-
-**5. Slim down `src/pages/Challenges.tsx`**
-- Remove the monolithic `fetchChallenges()` that queries all 4 categories
-- Keep only: `fetchUserTeam()`, frozen team banner, tab shell
-- Each `TabsContent` renders the corresponding lazy-fetched tab component
-- Pass a shared `refreshKey` counter that tabs can listen to for cross-tab refreshes (e.g. after accepting an incoming challenge, bump the key so Active tab refetches when opened)
-
-**6. Extract shared utilities to `src/components/challenges/challengeUtils.ts`**
-- `formatTimeAgo()`, `formatExpiresIn()`, `getOpponentName()`, `mapChallenge()` — used across multiple tabs
-- `Challenge` and `UserTeam` interfaces
-
-### Result
-- Opening Challenges page: 1 query (fetch user team) instead of 5
-- Switching to a tab: 1-2 targeted queries for that tab only
-- Each tab ~100-200 lines instead of one 1016-line file
+This is the same pattern already used in `AdminHeader.tsx` (line 5) and `DeleteAccount.tsx` (line 10).
 
