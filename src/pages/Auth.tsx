@@ -130,7 +130,7 @@ export default function Auth() {
     setIsSubmitting(true);
     try {
       await supabase.auth.resetPasswordForEmail(data.email, {
-        redirectTo: `${window.location.origin}/auth?reset=true`,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
 
       // Always show success message to prevent email enumeration
