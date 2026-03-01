@@ -1,59 +1,46 @@
 
 
-## Mobile-First Capacitor Performance Optimization
+## Analysis: Would a two-level ladder flow improve loading speed?
 
-After thorough analysis, **most of the 10 requested optimizations are already implemented**. Here is what exists and what remains:
+**Yes, significantly.** The current `LadderDetail.tsx` fetches rankings, team members, and profiles for **every category at once** (lines 170-222). If a ladder has 3 categories with 50 teams each, that's 150 rankings + 300 member lookups + 300 profile lookups on initial load — all blocking the first paint.
 
-### Already Done (no changes needed)
-- **1. Route-based code splitting** — All routes use `lazyWithRetry` with `Suspense`
-- **3. Vite build config** — Sourcemaps disabled, Terser enabled, `manualChunks` configured for all major vendors
-- **4. Non-blocking data fetching** — Dashboard uses skeleton loaders and defers stats via `requestIdleCallback`
-- **5. In-memory caching** — React Query configured with `staleTime: 2min`, `gcTime: 10min`, `refetchOnWindowFocus: false`
-- **7. Capacitor optimization** — SplashScreen hides only after auth resolves; SPA navigation; production build used
-- **8. Tree-shaking** — Terser with `drop_console`, `drop_debugger`, 3 passes; toast/sentry/analytics all lazy-loaded
-- **9. Shared layout** — `AppHeader` stays mounted; only route content swaps via `<Routes>`
+A tournament-style two-level flow would mean:
+- **Level 1** (Ladder page): Load only category metadata (name, description, team count) — a single lightweight query
+- **Level 2** (Category page): Load rankings + members + profiles for **one category only** — 3x less data
 
-### Remaining Gaps to Fix
+### Estimated impact
+- Current: ~4-6 queries fetching all categories' rankings → 1-3s load
+- Proposed: 1 query for category list (~50ms), then 3-4 queries for one category (~300ms)
 
-**1. Remove `@capacitor/core` from critical bundle (6 files)**
-Six files eagerly import `Capacitor` from `@capacitor/core`, pulling ~15KB into every chunk that uses it. Replace with `window.Capacitor` runtime checks:
-- `src/contexts/AuthContext.tsx`
-- `src/hooks/useCapacitorAnalytics.ts`
-- `src/hooks/useScreenTracking.ts`
-- `src/hooks/useStatusBar.ts`
-- `src/components/ReportProblemDialog.tsx`
-- `src/lib/analytics/posthog.ts`
+### Changes
 
-Pattern: Replace `import { Capacitor } from "@capacitor/core"` with a helper, and use `(window as any).Capacitor?.isNativePlatform?.()` / `(window as any).Capacitor?.getPlatform?.()`.
+**1. Create `src/pages/LadderCategories.tsx`** (new — Level 1)
+- Fetch ladder info + category list with team counts (single query with aggregate)
+- Display category cards similar to `TournamentCategoryCard`
+- Show category name, description, team count, challenge range, entry fee
+- Each card links to `/ladders/:id/category/:categoryId`
+- Include Join Ladder button and admin manage link
 
-**2. Create a shared Capacitor utility (`src/lib/capacitor.ts`)**
-A tiny helper that wraps `window.Capacitor` access to avoid repeating `(window as any)` casts in every file:
-```typescript
-export const isNative = () => !!(window as any).Capacitor?.isNativePlatform?.();
-export const getPlatform = () => (window as any).Capacitor?.getPlatform?.() ?? "web";
-```
+**2. Create `src/pages/LadderCategoryDetail.tsx`** (new — Level 2)
+- Move the current rankings list, challenge logic, and frozen team display here
+- Fetch rankings only for the selected `categoryId`
+- Back button returns to the ladder categories page
+- Contains all existing functionality: challenge buttons, admin controls, realtime subscription, pull-to-refresh
 
-**3. Disable Sentry + PostHog inside Capacitor runtime**
-- In `src/lib/errorReporting.ts`: Skip `Sentry.init()` when running on native Capacitor (reduces JS execution cost and removes network overhead on mobile)
-- In `src/lib/analytics/posthog.ts`: Already has `isEnabled()` check — add native platform skip
+**3. Update `src/pages/LadderDetail.tsx`**
+- Replace with the Level 1 component (or redirect to `LadderCategories`)
+- Remove all-categories ranking fetch logic
 
-**4. Replace `LoadingScreen` Suspense fallback with a lighter component**
-The current `LoadingScreen` imports `lucide-react` (Loader2 icon). For route-level Suspense fallbacks, use a pure CSS spinner matching the HTML loading shell — zero JS dependencies, instant render.
+**4. Update `src/components/AuthenticatedRoutes.tsx`**
+- Add route: `/ladders/:id/category/:categoryId` → `LadderCategoryDetail`
+- Keep `/ladders/:id` → `LadderCategories` (the new Level 1)
 
-**5. Increase React Query `staleTime` for Capacitor**
-On native, network round-trips are costlier. Bump `staleTime` to 5 minutes and `gcTime` to 30 minutes when running inside Capacitor to avoid redundant refetches during navigation.
+**5. Update navigation references**
+- Dashboard rank badges that link to specific categories should now link to `/ladders/:id/category/:categoryId`
+- Search for all `navigate` and `Link` references to `/ladders/:id` that include category context
 
-### Files to create
-- `src/lib/capacitor.ts` — shared utility (3 lines)
-
-### Files to modify
-- `src/contexts/AuthContext.tsx` — replace Capacitor import
-- `src/hooks/useCapacitorAnalytics.ts` — replace Capacitor import
-- `src/hooks/useScreenTracking.ts` — replace Capacitor import
-- `src/hooks/useStatusBar.ts` — replace Capacitor import
-- `src/components/ReportProblemDialog.tsx` — replace Capacitor import
-- `src/lib/analytics/posthog.ts` — replace Capacitor import + skip on native
-- `src/lib/errorReporting.ts` — skip Sentry init on native
-- `src/App.tsx` — use native-aware QueryClient settings + lighter Suspense fallback
-- `src/components/ui/loading-screen.tsx` — add CSS-only variant for route transitions
+### What stays the same
+- All challenge logic, frozen team handling, admin controls, realtime subscriptions
+- Visual design of ranking cards (VirtualizedRankingsList)
+- Join ladder dialog and pending request logic
 
