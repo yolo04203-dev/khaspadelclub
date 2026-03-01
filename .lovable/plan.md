@@ -1,46 +1,46 @@
 
 
-## Analysis: Would a two-level ladder flow improve loading speed?
+## Split Challenges into Tab-Based Lazy Loading
 
-**Yes, significantly.** The current `LadderDetail.tsx` fetches rankings, team members, and profiles for **every category at once** (lines 170-222). If a ladder has 3 categories with 50 teams each, that's 150 rankings + 300 member lookups + 300 profile lookups on initial load — all blocking the first paint.
+### Problem
+The current `Challenges.tsx` (1016 lines) fetches **all 4 categories** (incoming, outgoing, active, history) in parallel on mount — even though only one tab is visible. This blocks the first paint with unnecessary queries.
 
-A tournament-style two-level flow would mean:
-- **Level 1** (Ladder page): Load only category metadata (name, description, team count) — a single lightweight query
-- **Level 2** (Category page): Load rankings + members + profiles for **one category only** — 3x less data
-
-### Estimated impact
-- Current: ~4-6 queries fetching all categories' rankings → 1-3s load
-- Proposed: 1 query for category list (~50ms), then 3-4 queries for one category (~300ms)
+### Approach
+Rather than separate routes (which would lose the tab navigation UX), **lazy-fetch per tab** — only load data when a tab is activated. Extract each tab's content and logic into its own component file, and fetch data on-demand.
 
 ### Changes
 
-**1. Create `src/pages/LadderCategories.tsx`** (new — Level 1)
-- Fetch ladder info + category list with team counts (single query with aggregate)
-- Display category cards similar to `TournamentCategoryCard`
-- Show category name, description, team count, challenge range, entry fee
-- Each card links to `/ladders/:id/category/:categoryId`
-- Include Join Ladder button and admin manage link
+**1. Create `src/components/challenges/IncomingTab.tsx`**
+- Receives `userTeamId`, fetches only incoming pending challenges on mount
+- Contains accept/decline handlers and the decline reason dialog
+- Skeleton loader while fetching
 
-**2. Create `src/pages/LadderCategoryDetail.tsx`** (new — Level 2)
-- Move the current rankings list, challenge logic, and frozen team display here
-- Fetch rankings only for the selected `categoryId`
-- Back button returns to the ladder categories page
-- Contains all existing functionality: challenge buttons, admin controls, realtime subscription, pull-to-refresh
+**2. Create `src/components/challenges/OutgoingTab.tsx`**
+- Receives `userTeamId`, fetches only outgoing challenges (pending + declined)
+- Contains cancel handler
+- Skeleton loader while fetching
 
-**3. Update `src/pages/LadderDetail.tsx`**
-- Replace with the Level 1 component (or redirect to `LadderCategories`)
-- Remove all-categories ranking fetch logic
+**3. Create `src/components/challenges/ActiveTab.tsx`**
+- Receives `userTeamId` and `userTeam` (for score submission context), fetches only accepted challenges
+- Contains score submission, scheduling, score confirmation logic
+- Skeleton loader while fetching
 
-**4. Update `src/components/AuthenticatedRoutes.tsx`**
-- Add route: `/ladders/:id/category/:categoryId` → `LadderCategoryDetail`
-- Keep `/ladders/:id` → `LadderCategories` (the new Level 1)
+**4. Refactor existing `src/components/challenges/ChallengeHistoryTab.tsx`**
+- Make it self-fetching: receives `userTeamId`, fetches history challenges internally
+- Currently it receives pre-fetched data as props — change to fetch on mount
 
-**5. Update navigation references**
-- Dashboard rank badges that link to specific categories should now link to `/ladders/:id/category/:categoryId`
-- Search for all `navigate` and `Link` references to `/ladders/:id` that include category context
+**5. Slim down `src/pages/Challenges.tsx`**
+- Remove the monolithic `fetchChallenges()` that queries all 4 categories
+- Keep only: `fetchUserTeam()`, frozen team banner, tab shell
+- Each `TabsContent` renders the corresponding lazy-fetched tab component
+- Pass a shared `refreshKey` counter that tabs can listen to for cross-tab refreshes (e.g. after accepting an incoming challenge, bump the key so Active tab refetches when opened)
 
-### What stays the same
-- All challenge logic, frozen team handling, admin controls, realtime subscriptions
-- Visual design of ranking cards (VirtualizedRankingsList)
-- Join ladder dialog and pending request logic
+**6. Extract shared utilities to `src/components/challenges/challengeUtils.ts`**
+- `formatTimeAgo()`, `formatExpiresIn()`, `getOpponentName()`, `mapChallenge()` — used across multiple tabs
+- `Challenge` and `UserTeam` interfaces
+
+### Result
+- Opening Challenges page: 1 query (fetch user team) instead of 5
+- Switching to a tab: 1-2 targeted queries for that tab only
+- Each tab ~100-200 lines instead of one 1016-line file
 
