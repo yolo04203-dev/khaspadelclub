@@ -25,6 +25,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 interface LadderRank {
   rank: number;
   categoryName: string;
+  categoryId: string;
   ladderName: string;
   ladderId: string;
   points: number;
@@ -135,6 +136,7 @@ export default function Dashboard() {
               rank: r.rank,
               points: r.points,
               categoryName: r.ladder_categories?.name || "Unknown",
+              categoryId: r.ladder_category_id || "",
               ladderName: r.ladder_categories?.ladders?.name || "Unknown",
               ladderId: r.ladder_categories?.ladder_id || "",
             }));
@@ -419,7 +421,7 @@ export default function Dashboard() {
                           <button
                             key={i}
                             className="w-full flex items-center justify-between p-2 rounded-md hover:bg-accent/10 transition-colors text-left"
-                            onClick={() => navigate(`/ladders/${r.ladderId}`)}
+                            onClick={() => navigate(`/ladders/${r.ladderId}/category/${r.categoryId}`)}
                           >
                             <div className="min-w-0">
                               <p className="text-sm font-medium truncate">{r.categoryName}</p>
@@ -434,7 +436,7 @@ export default function Dashboard() {
                 );
               } else if (rankings.length === 1) {
                 return (
-                  <Link to={`/ladders/${rankings[0].ladderId}`}>
+                  <Link to={`/ladders/${rankings[0].ladderId}/category/${rankings[0].categoryId}`}>
                     <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
                       {rankCardContent}
                     </Card>
