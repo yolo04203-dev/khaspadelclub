@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Send, Trophy, Clock, Loader2, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +8,10 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { logger } from "@/lib/logger";
 import { ChallengeCardSkeleton } from "@/components/ui/skeleton-card";
-import { Challenge, formatTimeAgo, enrichChallenges, mapChallenge } from "./challengeUtils";
+import {
+  Challenge, formatTimeAgo,
+  CHALLENGE_SELECT_WITH_TEAMS, mapChallengeWithJoins, fetchRanksMap,
+} from "./challengeUtils";
 
 interface OutgoingTabProps {
   userTeamId: string;
@@ -17,26 +20,35 @@ interface OutgoingTabProps {
 }
 
 export function OutgoingTab({ userTeamId, refreshKey, onAction }: OutgoingTabProps) {
-  const [challenges, setChallenges] = useState<Challenge[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [challenges, setChallenges] = useState<Challenge[] | null>(null);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
+  const lastKeyRef = useRef(-1);
 
   const fetchData = useCallback(async () => {
+    // Single query with FK joins for team names
     const { data, error } = await supabase
       .from("challenges")
-      .select("id, status, message, decline_reason, expires_at, created_at, match_id, challenger_team_id, challenged_team_id")
+      .select(CHALLENGE_SELECT_WITH_TEAMS)
       .eq("challenger_team_id", userTeamId)
       .in("status", ["pending", "declined"])
       .order("created_at", { ascending: false });
 
     if (error) { logger.apiError("fetchOutgoingChallenges", error); return; }
 
-    const { teamsMap, ranksMap, matchMap } = await enrichChallenges(data || []);
-    setChallenges((data || []).map(c => mapChallenge(c, teamsMap, ranksMap, matchMap)));
-    setIsLoading(false);
+    if (!data || data.length === 0) { setChallenges([]); return; }
+
+    // Fetch ranks in parallel (non-blocking for render)
+    const teamIds = [...new Set(data.flatMap(c => [c.challenger_team_id, c.challenged_team_id]).filter(Boolean))];
+    const ranksMap = await fetchRanksMap(teamIds);
+    setChallenges(data.map(c => mapChallengeWithJoins(c, ranksMap)));
   }, [userTeamId]);
 
-  useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
+  useEffect(() => {
+    if (lastKeyRef.current !== refreshKey) {
+      lastKeyRef.current = refreshKey;
+      fetchData();
+    }
+  }, [fetchData, refreshKey]);
 
   const handleCancel = async (challengeId: string) => {
     setRespondingTo(challengeId);
@@ -53,7 +65,7 @@ export function OutgoingTab({ userTeamId, refreshKey, onAction }: OutgoingTabPro
     }
   };
 
-  if (isLoading) return <div className="space-y-3"><ChallengeCardSkeleton /><ChallengeCardSkeleton /></div>;
+  if (challenges === null) return <div className="space-y-3"><ChallengeCardSkeleton /><ChallengeCardSkeleton /></div>;
 
   if (challenges.length === 0) {
     return (

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { History, Trophy, Clock, X, Check, AlertCircle, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +12,10 @@ import { cn } from "@/lib/utils";
 import { format, subDays, isAfter } from "date-fns";
 import { logger } from "@/lib/logger";
 import { ChallengeCardSkeleton } from "@/components/ui/skeleton-card";
-import { Challenge, formatTimeAgo, enrichChallenges, mapChallenge } from "./challengeUtils";
+import {
+  Challenge, formatTimeAgo,
+  CHALLENGE_SELECT_WITH_TEAMS, mapChallengeWithJoins, enrichWithRanksAndMatches,
+} from "./challengeUtils";
 
 interface ChallengeHistoryTabProps {
   userTeamId: string;
@@ -20,15 +23,15 @@ interface ChallengeHistoryTabProps {
 }
 
 export function ChallengeHistoryTab({ userTeamId, refreshKey }: ChallengeHistoryTabProps) {
-  const [challenges, setChallenges] = useState<Challenge[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [challenges, setChallenges] = useState<Challenge[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
+  const lastKeyRef = useRef(-1);
 
   const fetchData = useCallback(async () => {
     const { data, error } = await supabase
       .from("challenges")
-      .select("id, status, message, decline_reason, expires_at, created_at, match_id, challenger_team_id, challenged_team_id")
+      .select(CHALLENGE_SELECT_WITH_TEAMS)
       .or(`challenger_team_id.eq.${userTeamId},challenged_team_id.eq.${userTeamId}`)
       .in("status", ["declined", "cancelled", "expired"])
       .order("created_at", { ascending: false })
@@ -36,12 +39,19 @@ export function ChallengeHistoryTab({ userTeamId, refreshKey }: ChallengeHistory
 
     if (error) { logger.apiError("fetchHistoryChallenges", error); return; }
 
-    const { teamsMap, ranksMap, matchMap } = await enrichChallenges(data || [], true);
-    setChallenges((data || []).map(c => mapChallenge(c, teamsMap, ranksMap, matchMap)));
-    setIsLoading(false);
+    if (!data || data.length === 0) { setChallenges([]); return; }
+
+    // Fetch ranks + matches in parallel (team names already joined)
+    const { ranksMap, matchMap } = await enrichWithRanksAndMatches(data, true);
+    setChallenges(data.map(c => mapChallengeWithJoins(c, ranksMap, matchMap)));
   }, [userTeamId]);
 
-  useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
+  useEffect(() => {
+    if (lastKeyRef.current !== refreshKey) {
+      lastKeyRef.current = refreshKey;
+      fetchData();
+    }
+  }, [fetchData, refreshKey]);
 
   const getOpponentName = (challenge: Challenge) => {
     return challenge.challenger_team?.id === userTeamId
@@ -69,7 +79,7 @@ export function ChallengeHistoryTab({ userTeamId, refreshKey }: ChallengeHistory
     return null;
   };
 
-  const filteredChallenges = challenges.filter(challenge => {
+  const filteredChallenges = (challenges || []).filter(challenge => {
     if (statusFilter !== "all" && challenge.status !== statusFilter) return false;
     if (dateFilter !== "all") {
       const challengeDate = new Date(challenge.created_at);
@@ -83,7 +93,7 @@ export function ChallengeHistoryTab({ userTeamId, refreshKey }: ChallengeHistory
     return true;
   });
 
-  if (isLoading) return <div className="space-y-3"><ChallengeCardSkeleton /><ChallengeCardSkeleton /></div>;
+  if (challenges === null) return <div className="space-y-3"><ChallengeCardSkeleton /><ChallengeCardSkeleton /></div>;
 
   return (
     <div className="space-y-4">
@@ -121,7 +131,7 @@ export function ChallengeHistoryTab({ userTeamId, refreshKey }: ChallengeHistory
             <CardContent>
               <History className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
               <p className="text-muted-foreground">
-                {challenges.length === 0 ? "No challenge history yet" : "No challenges match your filters"}
+                {(challenges || []).length === 0 ? "No challenge history yet" : "No challenges match your filters"}
               </p>
             </CardContent>
           </Card>

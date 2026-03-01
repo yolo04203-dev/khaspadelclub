@@ -1,16 +1,18 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Inbox, Trophy, Clock, Check, X, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 import { ChallengeCardSkeleton } from "@/components/ui/skeleton-card";
 import { DeclineReasonDialog } from "./DeclineReasonDialog";
-import { Challenge, UserTeam, formatTimeAgo, formatExpiresIn, enrichChallenges, mapChallenge } from "./challengeUtils";
+import {
+  Challenge, UserTeam, formatTimeAgo, formatExpiresIn,
+  CHALLENGE_SELECT_WITH_TEAMS, mapChallengeWithJoins, enrichWithRanksAndMatches,
+} from "./challengeUtils";
 
 interface IncomingTabProps {
   userTeamId: string;
@@ -21,54 +23,68 @@ interface IncomingTabProps {
 
 export function IncomingTab({ userTeamId, userTeam, refreshKey, onAction }: IncomingTabProps) {
   const { user } = useAuth();
-  const [challenges, setChallenges] = useState<Challenge[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [challenges, setChallenges] = useState<Challenge[] | null>(null);
   const [respondingTo, setRespondingTo] = useState<string | null>(null);
   const [declineDialogOpen, setDeclineDialogOpen] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [isDeclining, setIsDeclining] = useState(false);
+  const lastKeyRef = useRef(-1);
 
   const fetchData = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("challenges")
-      .select("id, status, message, decline_reason, expires_at, created_at, match_id, challenger_team_id, challenged_team_id")
-      .eq("challenged_team_id", userTeamId)
-      .eq("status", "pending")
-      .order("created_at", { ascending: false });
+    // Single query with FK joins — no waterfall
+    const [challengeResult, ranksResult] = await Promise.all([
+      supabase.from("challenges")
+        .select(CHALLENGE_SELECT_WITH_TEAMS)
+        .eq("challenged_team_id", userTeamId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false }),
+      // Ranks fetched in parallel with challenges
+      supabase.from("ladder_rankings")
+        .select("team_id, rank")
+        .or(`team_id.eq.${userTeamId}`)
+    ]);
 
-    if (error) { logger.apiError("fetchIncomingChallenges", error); return; }
+    if (challengeResult.error) { logger.apiError("fetchIncomingChallenges", challengeResult.error); return; }
 
-    const { teamsMap, ranksMap, matchMap } = await enrichChallenges(data || []);
-    setChallenges((data || []).map(c => mapChallenge(c, teamsMap, ranksMap, matchMap)));
-    setIsLoading(false);
+    const data = challengeResult.data || [];
+    // Build ranks map from parallel query + any additional team IDs
+    const allTeamIds = [...new Set(data.flatMap(c => [c.challenger_team_id, c.challenged_team_id]).filter(Boolean))];
+    let ranksMap = new Map((ranksResult.data || []).map((r: any) => [r.team_id, r.rank]));
+
+    // If we have team IDs not in the initial rank query, fetch them
+    const missingIds = allTeamIds.filter(id => !ranksMap.has(id));
+    if (missingIds.length > 0) {
+      const { data: extraRanks } = await supabase.from("ladder_rankings").select("team_id, rank").in("team_id", missingIds);
+      (extraRanks || []).forEach((r: any) => ranksMap.set(r.team_id, r.rank));
+    }
+
+    setChallenges(data.map(c => mapChallengeWithJoins(c, ranksMap)));
   }, [userTeamId]);
 
-  useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
+  useEffect(() => {
+    if (lastKeyRef.current !== refreshKey) {
+      lastKeyRef.current = refreshKey;
+      fetchData();
+    }
+  }, [fetchData, refreshKey]);
 
   const handleAccept = async (challengeId: string) => {
     setRespondingTo(challengeId);
     try {
       const { data: challenge } = await supabase
-        .from("challenges")
-        .select("challenger_team_id, challenged_team_id")
-        .eq("id", challengeId)
-        .single();
+        .from("challenges").select("challenger_team_id, challenged_team_id").eq("id", challengeId).single();
       if (!challenge) throw new Error("Challenge not found");
 
       const { data: match, error: matchError } = await supabase
-        .from("matches")
-        .insert({ challenger_team_id: challenge.challenger_team_id, challenged_team_id: challenge.challenged_team_id, status: "pending" })
-        .select().single();
+        .from("matches").insert({ challenger_team_id: challenge.challenger_team_id, challenged_team_id: challenge.challenged_team_id, status: "pending" }).select().single();
       if (matchError) throw matchError;
 
       const { error: updateError } = await supabase
-        .from("challenges")
-        .update({ status: "accepted", responded_at: new Date().toISOString(), match_id: match.id })
-        .eq("id", challengeId);
+        .from("challenges").update({ status: "accepted", responded_at: new Date().toISOString(), match_id: match.id }).eq("id", challengeId);
       if (updateError) throw updateError;
 
       try {
-        const ch = challenges.find(c => c.id === challengeId);
+        const ch = challenges?.find(c => c.id === challengeId);
         if (ch) {
           await supabase.functions.invoke("send-challenge-notification", {
             body: { type: "challenge_accepted", challengerTeamId: ch.challenger_team?.id, challengerTeamName: ch.challenger_team?.name, challengedTeamId: userTeam.id, challengedTeamName: userTeam.name },
@@ -91,9 +107,7 @@ export function IncomingTab({ userTeamId, userTeam, refreshKey, onAction }: Inco
     setIsDeclining(true);
     try {
       const { error } = await supabase
-        .from("challenges")
-        .update({ status: "declined", responded_at: new Date().toISOString(), decline_reason: reason })
-        .eq("id", selectedChallenge.id);
+        .from("challenges").update({ status: "declined", responded_at: new Date().toISOString(), decline_reason: reason }).eq("id", selectedChallenge.id);
       if (error) throw error;
 
       try {
@@ -114,7 +128,7 @@ export function IncomingTab({ userTeamId, userTeam, refreshKey, onAction }: Inco
     }
   };
 
-  if (isLoading) return <div className="space-y-3"><ChallengeCardSkeleton /><ChallengeCardSkeleton /></div>;
+  if (challenges === null) return <div className="space-y-3"><ChallengeCardSkeleton /><ChallengeCardSkeleton /></div>;
 
   return (
     <>

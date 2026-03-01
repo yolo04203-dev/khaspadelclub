@@ -58,14 +58,19 @@ export default function LadderCategoryDetail() {
     if (!id || !categoryId) return;
 
     try {
-      // Fetch ladder name, category info, and rankings in parallel
-      const [ladderResult, categoryResult, rankingsResult] = await Promise.all([
+      // Fetch everything in a single parallel batch — no waterfall
+      const userMembershipPromise = user
+        ? supabase.from("team_members").select("team_id, team:teams(id, name)").eq("user_id", user.id).maybeSingle()
+        : Promise.resolve({ data: null });
+
+      const [ladderResult, categoryResult, rankingsResult, userMembershipResult] = await Promise.all([
         supabase.from("ladders").select("name").eq("id", id).single(),
         supabase.from("ladder_categories").select("name, description, challenge_range").eq("id", categoryId).single(),
         supabase.from("ladder_rankings").select(`
           id, rank, points, wins, losses, streak,
           team:teams(id, name, avatar_url, is_frozen, frozen_until, frozen_reason)
         `).eq("ladder_category_id", categoryId).order("rank", { ascending: true }),
+        userMembershipPromise,
       ]);
 
       if (ladderResult.error) throw ladderResult.error;
@@ -80,34 +85,46 @@ export default function LadderCategoryDetail() {
       const rankingsData = rankingsResult.data || [];
       const teamIds = rankingsData.map((r: any) => r.team?.id).filter(Boolean);
 
-      // Fetch members + profiles for this category only
-      let membersData: { team_id: string; user_id: string }[] = [];
-      if (teamIds.length > 0) {
-        const { data } = await supabase.from("team_members").select("team_id, user_id").in("team_id", teamIds);
-        membersData = data || [];
-      }
+      // User team info (from parallel query above)
+      const teamId = (userMembershipResult.data as any)?.team_id || null;
+      setUserTeamId(teamId);
+      setUserTeamName(((userMembershipResult.data as any)?.team as any)?.name || null);
 
-      const userIds = [...new Set(membersData.map(m => m.user_id))];
+      // Fetch members, profiles, and user-specific data ALL in parallel
+      const [membersResult, memberCountResult, challengesResult] = await Promise.all([
+        teamIds.length > 0
+          ? supabase.from("team_members").select("team_id, user_id").in("team_id", teamIds)
+          : Promise.resolve({ data: [] as { team_id: string; user_id: string }[] }),
+        teamId
+          ? supabase.from("team_members").select("*", { count: "exact", head: true }).eq("team_id", teamId)
+          : Promise.resolve({ count: 0 }),
+        teamId
+          ? supabase.from("challenges").select("challenged_team_id").eq("challenger_team_id", teamId).eq("status", "pending")
+          : Promise.resolve({ data: [] as { challenged_team_id: string }[] }),
+      ]);
+
+      const membersData = (membersResult as any).data || [];
+      const userIds = [...new Set(membersData.map((m: any) => m.user_id))] as string[];
+
       let profilesMap = new Map<string, { display_name: string | null; avatar_url: string | null }>();
       if (userIds.length > 0) {
         const { data } = await supabase.from("public_profiles").select("user_id, display_name, avatar_url").in("user_id", userIds);
-        (data || []).forEach(p => profilesMap.set(p.user_id, p));
+        (data || []).forEach(p => profilesMap.set(p.user_id!, p));
       }
 
       const builtRankings: TeamRanking[] = rankingsData.map((ranking: any) => {
         const team = ranking.team as TeamRanking["team"];
         let members = (membersData || [])
-          .filter(m => m.team_id === team?.id)
-          .map(m => {
+          .filter((m: any) => m.team_id === team?.id)
+          .map((m: any) => {
             const profile = profilesMap.get(m.user_id);
             return { user_id: m.user_id, display_name: profile?.display_name || null, avatar_url: profile?.avatar_url || null };
           });
 
-        // Synthetic partner for manual teams
         if (team?.name?.includes(" & ") && members.length === 1) {
           const parts = team.name.split(" & ");
           const existingName = members[0]?.display_name?.toLowerCase();
-          const partnerName = parts.find(p => p.toLowerCase() !== existingName) || parts[1];
+          const partnerName = parts.find((p: string) => p.toLowerCase() !== existingName) || parts[1];
           if (partnerName) {
             members = [...members, { user_id: `manual-${team.id}`, display_name: partnerName.trim(), avatar_url: null }];
           }
@@ -118,24 +135,11 @@ export default function LadderCategoryDetail() {
 
       setRankings(builtRankings);
 
-      // User team info
-      if (user) {
-        const { data: membership } = await supabase.from("team_members").select("team_id, team:teams(id, name)").eq("user_id", user.id).maybeSingle();
-        const teamId = (membership as any)?.team_id || null;
-        setUserTeamId(teamId);
-        setUserTeamName(((membership as any)?.team as any)?.name || null);
-
-        if (teamId) {
-          const [memberCountResult, challengesResult] = await Promise.all([
-            supabase.from("team_members").select("*", { count: "exact", head: true }).eq("team_id", teamId),
-            supabase.from("challenges").select("challenged_team_id").eq("challenger_team_id", teamId).eq("status", "pending"),
-          ]);
-          setUserTeamMemberCount(memberCountResult.count || 0);
-          setPendingChallenges(new Set(challengesResult.data?.map(c => c.challenged_team_id) || []));
-
-          const userRanking = builtRankings.find(r => r.team?.id === teamId);
-          setUserRank(userRanking?.rank ?? null);
-        }
+      if (teamId) {
+        setUserTeamMemberCount((memberCountResult as any).count || 0);
+        setPendingChallenges(new Set(((challengesResult as any).data || []).map((c: any) => c.challenged_team_id)));
+        const userRanking = builtRankings.find(r => r.team?.id === teamId);
+        setUserRank(userRanking?.rank ?? null);
       }
     } catch (error) {
       logger.apiError("fetchLadderCategoryDetail", error);
