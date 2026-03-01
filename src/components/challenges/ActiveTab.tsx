@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Swords, Clock, Check, Trophy, Target, Calendar, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,7 +13,10 @@ import { ChallengeCardSkeleton } from "@/components/ui/skeleton-card";
 import { SetScoreDialog } from "./SetScoreDialog";
 import { ScheduleMatchDialog } from "./ScheduleMatchDialog";
 import { ScoreConfirmationCard } from "./ScoreConfirmationCard";
-import { Challenge, UserTeam, formatTimeAgo, getOpponentName, enrichChallenges, mapChallenge } from "./challengeUtils";
+import {
+  Challenge, UserTeam, formatTimeAgo, getOpponentName,
+  CHALLENGE_SELECT_WITH_TEAMS_AND_CATEGORY, mapChallengeWithJoins, enrichWithRanksAndMatches,
+} from "./challengeUtils";
 
 interface ActiveTabProps {
   userTeamId: string;
@@ -24,30 +27,37 @@ interface ActiveTabProps {
 
 export function ActiveTab({ userTeamId, userTeam, refreshKey, onAction }: ActiveTabProps) {
   const { user } = useAuth();
-  const [challenges, setChallenges] = useState<Challenge[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [challenges, setChallenges] = useState<Challenge[] | null>(null);
   const [scoreDialogOpen, setScoreDialogOpen] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<Challenge | null>(null);
   const [isSubmittingScore, setIsSubmittingScore] = useState(false);
+  const lastKeyRef = useRef(-1);
 
   const fetchData = useCallback(async () => {
+    // Single query with FK joins for team names + ladder category
     const { data, error } = await supabase
       .from("challenges")
-      .select(`id, status, message, decline_reason, expires_at, created_at, match_id, challenger_team_id, challenged_team_id, ladder_category_id,
-        ladder_categories!ladder_category_id ( id, name, ladders!ladder_id ( id, name ) )`)
+      .select(CHALLENGE_SELECT_WITH_TEAMS_AND_CATEGORY)
       .or(`challenger_team_id.eq.${userTeamId},challenged_team_id.eq.${userTeamId}`)
       .eq("status", "accepted")
       .order("created_at", { ascending: false });
 
     if (error) { logger.apiError("fetchAcceptedChallenges", error); return; }
 
-    const { teamsMap, ranksMap, matchMap } = await enrichChallenges(data || [], true);
-    setChallenges((data || []).map(c => mapChallenge(c, teamsMap, ranksMap, matchMap)));
-    setIsLoading(false);
+    if (!data || data.length === 0) { setChallenges([]); return; }
+
+    // Fetch ranks + match data in parallel (team names already joined)
+    const { ranksMap, matchMap } = await enrichWithRanksAndMatches(data, true);
+    setChallenges(data.map(c => mapChallengeWithJoins(c, ranksMap, matchMap)));
   }, [userTeamId]);
 
-  useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
+  useEffect(() => {
+    if (lastKeyRef.current !== refreshKey) {
+      lastKeyRef.current = refreshKey;
+      fetchData();
+    }
+  }, [fetchData, refreshKey]);
 
   const handleSubmitScore = async (mySets: number[], opponentSets: number[], setsWonByMe: number, setsWonByOpponent: number) => {
     if (!selectedChallenge) return;
@@ -95,7 +105,7 @@ export function ActiveTab({ userTeamId, userTeam, refreshKey, onAction }: Active
     }
   };
 
-  if (isLoading) return <div className="space-y-3"><ChallengeCardSkeleton /><ChallengeCardSkeleton /></div>;
+  if (challenges === null) return <div className="space-y-3"><ChallengeCardSkeleton /><ChallengeCardSkeleton /></div>;
 
   return (
     <>

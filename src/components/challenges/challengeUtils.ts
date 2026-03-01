@@ -1,7 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { fetchTeamNamesByIds } from "@/services/teams";
 import { fetchMatchesByIds } from "@/services/matches";
-import { logger } from "@/lib/logger";
 
 export interface Challenge {
   id: string;
@@ -73,8 +71,34 @@ export function getOpponentName(challenge: Challenge, userTeamId: string) {
     : challenge.challenger_team?.name || "Unknown";
 }
 
-export function mapChallenge(c: any, teamsMap: Map<string, { id: string; name: string }>, ranksMap: Map<string, number>, matchMap: Map<string, Record<string, unknown>>): Challenge {
-  const matchInfo = c.match_id ? matchMap.get(c.match_id) as any : null;
+/** Base select with FK joins for team names — single query, no waterfall */
+const CHALLENGE_SELECT_WITH_TEAMS = `
+  id, status, message, decline_reason, expires_at, created_at, match_id,
+  challenger_team_id, challenged_team_id,
+  challenger_team:teams!challenger_team_id(id, name),
+  challenged_team:teams!challenged_team_id(id, name)
+`;
+
+const CHALLENGE_SELECT_WITH_TEAMS_AND_CATEGORY = `
+  id, status, message, decline_reason, expires_at, created_at, match_id,
+  challenger_team_id, challenged_team_id, ladder_category_id,
+  challenger_team:teams!challenger_team_id(id, name),
+  challenged_team:teams!challenged_team_id(id, name),
+  ladder_categories!ladder_category_id(id, name, ladders!ladder_id(id, name))
+`;
+
+export { CHALLENGE_SELECT_WITH_TEAMS, CHALLENGE_SELECT_WITH_TEAMS_AND_CATEGORY };
+
+/**
+ * Map a raw challenge row (with FK-joined teams) to a Challenge object.
+ * Ranks and match data are optional maps applied on top.
+ */
+export function mapChallengeWithJoins(
+  c: any,
+  ranksMap?: Map<string, number>,
+  matchMap?: Map<string, Record<string, unknown>>
+): Challenge {
+  const matchInfo = c.match_id && matchMap ? matchMap.get(c.match_id) as any : null;
   const ladderCategory = c.ladder_categories;
   return {
     id: c.id,
@@ -87,10 +111,10 @@ export function mapChallenge(c: any, teamsMap: Map<string, { id: string; name: s
     match_status: matchInfo?.status ?? null,
     match_scheduled_at: matchInfo?.scheduled_at ?? null,
     match_venue: matchInfo?.venue ?? null,
-    challenger_team: teamsMap.get(c.challenger_team_id) || null,
-    challenged_team: teamsMap.get(c.challenged_team_id) || null,
-    challenger_rank: ranksMap.get(c.challenger_team_id) || null,
-    challenged_rank: ranksMap.get(c.challenged_team_id) || null,
+    challenger_team: c.challenger_team || null,
+    challenged_team: c.challenged_team || null,
+    challenger_rank: ranksMap?.get(c.challenger_team_id) ?? null,
+    challenged_rank: ranksMap?.get(c.challenged_team_id) ?? null,
     winner_team_id: matchInfo?.winner_team_id ?? null,
     challenger_score: matchInfo?.challenger_score ?? null,
     challenged_score: matchInfo?.challenged_score ?? null,
@@ -108,19 +132,32 @@ export function mapChallenge(c: any, teamsMap: Map<string, { id: string; name: s
   };
 }
 
-export async function enrichChallenges(rawChallenges: any[], includeMatches = false): Promise<{ teamsMap: Map<string, { id: string; name: string }>; ranksMap: Map<string, number>; matchMap: Map<string, Record<string, unknown>> }> {
-  const allTeamIds = rawChallenges.flatMap(c => [c.challenger_team_id, c.challenged_team_id]).filter(Boolean);
-  const uniqueTeamIds = [...new Set(allTeamIds)];
+/** Fetch ranks for a set of team IDs. Returns Map<teamId, rank>. */
+export async function fetchRanksMap(teamIds: string[]): Promise<Map<string, number>> {
+  if (teamIds.length === 0) return new Map();
+  const { data } = await supabase
+    .from("ladder_rankings")
+    .select("team_id, rank")
+    .in("team_id", teamIds);
+  return new Map((data || []).map(r => [r.team_id, r.rank]));
+}
+
+/** Fetch match data and ranks in parallel for a set of challenges. */
+export async function enrichWithRanksAndMatches(
+  rawChallenges: any[],
+  includeMatches: boolean
+): Promise<{ ranksMap: Map<string, number>; matchMap: Map<string, Record<string, unknown>> }> {
+  if (rawChallenges.length === 0) return { ranksMap: new Map(), matchMap: new Map() };
+
+  const uniqueTeamIds = [...new Set(
+    rawChallenges.flatMap(c => [c.challenger_team_id, c.challenged_team_id]).filter(Boolean)
+  )];
   const matchIds = includeMatches ? rawChallenges.map(c => c.match_id).filter(Boolean) : [];
 
-  const [teamNameMap, { data: ranks }, matchMap] = await Promise.all([
-    fetchTeamNamesByIds(uniqueTeamIds),
-    supabase.from("ladder_rankings").select("team_id, rank").in("team_id", uniqueTeamIds.length > 0 ? uniqueTeamIds : ["__none__"]),
+  const [ranksMap, matchMap] = await Promise.all([
+    fetchRanksMap(uniqueTeamIds),
     fetchMatchesByIds(matchIds),
   ]);
 
-  const teamsMap = new Map(uniqueTeamIds.map(id => [id, { id, name: teamNameMap.get(id) || "Unknown" }]));
-  const ranksMap = new Map(ranks?.map(r => [r.team_id, r.rank]) || []);
-
-  return { teamsMap, ranksMap, matchMap };
+  return { ranksMap, matchMap };
 }
