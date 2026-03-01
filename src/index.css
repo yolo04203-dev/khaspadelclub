@@ -162,6 +162,8 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    word-break: break-word;
+    overflow-wrap: anywhere;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -263,9 +265,9 @@ a, button, input, select, textarea, [role="button"], [tabindex] {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Prevent iOS auto-zoom on input focus (must be >= 16px) */
+/* Prevent iOS auto-zoom on input focus while respecting system font scaling */
 input, textarea, select {
-  font-size: 16px !important;
+  font-size: max(16px, 1rem) !important;
 }
 
 /* Smooth scrolling for older WebKit */

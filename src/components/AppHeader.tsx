@@ -47,7 +47,7 @@ export const AppHeader = React.memo(function AppHeader({ showBack = false, backT
   return (
     <>
       <header className="border-b border-border bg-card sticky top-0 z-40 safe-top">
-        <div className="container flex items-center justify-between h-16">
+        <div className="container flex items-center justify-between min-h-[64px] h-auto py-2">
           <div className="flex items-center gap-4">
             {showBack && (
               <Button variant="ghost" size="icon" asChild>
@@ -113,7 +113,7 @@ export const AppHeader = React.memo(function AppHeader({ showBack = false, backT
 
       {/* Mobile Navigation - Fixed bottom bar */}
       {user && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border bg-card py-1.5 px-1 safe-bottom">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border bg-card min-h-[56px] h-auto py-1.5 px-1 safe-bottom">
           {navLinks.map(({ to, label, icon: Icon }) => {
             const isActive = location.pathname === to || 
               (to !== "/dashboard" && location.pathname.startsWith(to));
