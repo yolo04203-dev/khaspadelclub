@@ -31,6 +31,7 @@ const Privacy = lazyWithRetry(() => import("./pages/Privacy"));
 const Terms = lazyWithRetry(() => import("./pages/Terms"));
 const Contact = lazyWithRetry(() => import("./pages/Contact"));
 const DeleteAccount = lazyWithRetry(() => import("./pages/DeleteAccount"));
+const ResetPassword = lazyWithRetry(() => import("./pages/ResetPassword"));
 
 // Authenticated shell (AuthProvider + NotificationProvider + all protected routes)
 const AuthenticatedRoutes = lazyWithRetry(() => import("./components/AuthenticatedRoutes"));
@@ -192,6 +193,7 @@ const App = () => {
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/delete-account" element={<DeleteAccount />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 {/* All other routes go through AuthProvider + NotificationProvider */}
                 <Route path="/*" element={<AuthenticatedRoutes />} />
               </Routes>
